@@ -140,9 +140,8 @@ export class DangerousBotServer {
         (chunk) => {
           if (chunk.type === 'text' && chunk.text) {
             this.wsManager.sendStreamChunk(chunk.text);
-          } else if (chunk.type === 'tool_use') {
-            this.wsManager.sendToolUse(chunk.name!, chunk.input);
           }
+          // Note: tool_use is handled in the loop below with proper executionId
         }
       );
 
@@ -240,10 +239,8 @@ export class DangerousBotServer {
           (chunk) => {
             if (chunk.type === 'text' && chunk.text) {
               this.wsManager.sendStreamChunk(chunk.text);
-            } else if (chunk.type === 'tool_use') {
-              const executionId = `exec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-              this.wsManager.sendToolUse(chunk.name!, chunk.input, executionId);
             }
+            // Note: tool_use is handled in the loop above with proper executionId
           }
         );
       }
