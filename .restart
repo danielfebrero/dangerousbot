@@ -1,1 +1,1 @@
-{"reason":"Fix emoji encoding with Unicode escape sequences","timestamp":"2026-01-30T15:08:23.366Z"}
+{"reason":"Activation des fixes emojis avec String.fromCodePoint et correction de l'affichage des tool_calls","timestamp":"2026-01-30T15:10:46.754Z"}

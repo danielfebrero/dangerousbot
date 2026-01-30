@@ -1,5 +1,14 @@
 [
   {
+    "id": "backup_1769786115715",
+    "timestamp": "2026-01-30T15:15:15.755Z",
+    "description": "Fix emoji encoding for Firefox - use direct UTF-8 strings instead of String.fromCodePoint()",
+    "commitHash": "62aacee",
+    "files": [
+      "src/web/components/ToolBadge.tsx"
+    ]
+  },
+  {
     "id": "backup_1769785842921",
     "timestamp": "2026-01-30T15:10:42.945Z",
     "description": "Ne pas afficher le content si vide et qu'il y a des tool_calls",
@@ -76,15 +85,6 @@
     "timestamp": "2026-01-30T12:35:36.229Z",
     "description": "TEST ROLLBACK v2 - Erreur TypeScript volontaire",
     "commitHash": "2f98ca5",
-    "files": [
-      "src/config.ts"
-    ]
-  },
-  {
-    "id": "backup_1769776498885",
-    "timestamp": "2026-01-30T12:34:58.950Z",
-    "description": "TEST ROLLBACK - Modification volontairement cassée pour tester le système de rollback",
-    "commitHash": "ced307a",
     "files": [
       "src/config.ts"
     ]
