@@ -1,5 +1,14 @@
 [
   {
+    "id": "backup_1769785842921",
+    "timestamp": "2026-01-30T15:10:42.945Z",
+    "description": "Ne pas afficher le content si vide et qu'il y a des tool_calls",
+    "commitHash": "d594df4",
+    "files": [
+      "src/web/components/MessageItem.tsx"
+    ]
+  },
+  {
     "id": "backup_1769785831612",
     "timestamp": "2026-01-30T15:10:31.635Z",
     "description": "Supprimer le cas 'tool' obsolète - les tool_calls s'affichent via renderToolCalls",
@@ -74,15 +83,6 @@
   {
     "id": "backup_1769776498885",
     "timestamp": "2026-01-30T12:34:58.950Z",
-    "description": "TEST ROLLBACK - Modification volontairement cassée pour tester le système de rollback",
-    "commitHash": "ced307a",
-    "files": [
-      "src/config.ts"
-    ]
-  },
-  {
-    "id": "backup_1769776490229",
-    "timestamp": "2026-01-30T12:34:50.267Z",
     "description": "TEST ROLLBACK - Modification volontairement cassée pour tester le système de rollback",
     "commitHash": "ced307a",
     "files": [

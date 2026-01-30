@@ -9,11 +9,6 @@ interface MessageItemProps {
 
 export function MessageItem({ message }: MessageItemProps) {
   const renderContent = () => {
-    // Si le contenu est vide (message avec seulement tool_calls), ne rien afficher
-    if (!message.content && message.toolCalls && message.toolCalls.length > 0) {
-      return null;
-    }
-    
     switch (message.type) {
       case 'bot':
         return <Markdown content={message.content} />;
