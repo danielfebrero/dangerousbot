@@ -1,5 +1,14 @@
 [
   {
+    "id": "backup_1769787075946",
+    "timestamp": "2026-01-30T15:31:15.986Z",
+    "description": "Rebuild with multimodal support for Kimi - images can be sent from UI and read from files",
+    "commitHash": "158bfbf",
+    "files": [
+      "src/server/index.ts"
+    ]
+  },
+  {
     "id": "backup_1769786852686",
     "timestamp": "2026-01-30T15:27:32.729Z",
     "description": "Rebuild with simplified self_update tool (no file params, just build/restart)",
@@ -78,15 +87,6 @@
     "commitHash": "adc1c50",
     "files": [
       "src/web/components/MessageItem.tsx"
-    ]
-  },
-  {
-    "id": "backup_1769786564760",
-    "timestamp": "2026-01-30T15:22:44.786Z",
-    "description": "Modifier handleSend pour supporter les images",
-    "commitHash": "e8c72db",
-    "files": [
-      "src/web/App.tsx"
     ]
   }
 ]

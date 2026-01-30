@@ -183,6 +183,51 @@ export class Executor {
     }
   }
 
+  // Lecture d'image en base64 pour les modèles multimodaux
+  readImage(filePath: string): { success: boolean; data?: string; media_type?: string; error?: string } {
+    const resolved = this.resolvePath(filePath);
+    try {
+      if (!fs.existsSync(resolved)) {
+        return { success: false, error: 'Fichier non trouvé' };
+      }
+      const stats = fs.statSync(resolved);
+      if (stats.isDirectory()) {
+        return { success: false, error: 'Le chemin pointe vers un répertoire' };
+      }
+
+      // Lire le fichier en buffer
+      const buffer = fs.readFileSync(resolved);
+      
+      // Détecter le type MIME
+      const ext = path.extname(resolved).toLowerCase();
+      const mimeTypes: Record<string, string> = {
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.bmp': 'image/bmp',
+        '.svg': 'image/svg+xml'
+      };
+      
+      const mediaType = mimeTypes[ext];
+      if (!mediaType) {
+        return { success: false, error: `Format d'image non supporté: ${ext}. Formats supportés: png, jpg, jpeg, gif, webp, bmp, svg` };
+      }
+
+      // Convertir en base64
+      const base64Data = buffer.toString('base64');
+      
+      return { 
+        success: true, 
+        data: base64Data,
+        media_type: mediaType
+      };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  }
+
   // Écriture de fichier
   writeFile(filePath: string, content: string): { success: boolean; path?: string; error?: string } {
     const resolved = this.resolvePath(filePath);

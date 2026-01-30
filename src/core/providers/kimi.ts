@@ -7,7 +7,7 @@ import { AIProvider, AIMessage, AIResponse, AIToolDefinition, AIContentBlock, AI
 
 interface KimiChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string | null;
+  content: string | Array<{type: 'text'; text: string} | {type: 'image_url'; image_url: {url: string}}> | null;
   reasoning_content?: string | null;  // Required when tool_calls are present and thinking is enabled
   tool_calls?: Array<{
     id: string;
@@ -131,12 +131,12 @@ export class KimiProvider implements AIProvider {
       // Format OpenAI/Kimi: 
       // - Un message assistant peut avoir du texte ET des tool_calls
       // - Les tool_results sont des messages séparés de role 'tool'
+      // - Les images sont supportées dans les messages user
       
       // Collecter le texte et les tool_calls pour les messages assistant
       if (msg.role === 'assistant') {
         let textContent = '';
         const toolCalls: Array<{id: string; type: 'function'; function: {name: string; arguments: string}}> = [];
-        let reasoningContent = '';
         
         for (const block of msg.content) {
           if (block.type === 'text' && block.text) {
@@ -170,13 +170,20 @@ export class KimiProvider implements AIProvider {
         result.push(assistantMsg);
         
       } else if (msg.role === 'user') {
-        // Pour les messages user, extraire les tool_results et le texte
+        // Pour les messages user, extraire les tool_results, le texte et les images
         const toolResults: KimiChatMessage[] = [];
-        let textContent = '';
+        const contentParts: Array<{type: 'text'; text: string} | {type: 'image_url'; image_url: {url: string}}> = [];
         
         for (const block of msg.content) {
           if (block.type === 'text' && block.text) {
-            textContent += block.text;
+            contentParts.push({ type: 'text', text: block.text });
+          } else if (block.type === 'image' && block.source) {
+            // Format OpenAI pour les images: image_url avec data URL
+            const dataUrl = `data:${block.source.media_type};base64,${block.source.data}`;
+            contentParts.push({ 
+              type: 'image_url', 
+              image_url: { url: dataUrl }
+            });
           } else if (block.type === 'tool_result') {
             // Tool result devient un message 'tool' séparé
             let resultContent = '';
@@ -200,9 +207,18 @@ export class KimiProvider implements AIProvider {
         // D'abord les tool results (ils répondent au message assistant précédent)
         result.push(...toolResults);
         
-        // Puis le texte user s'il y en a
-        if (textContent) {
-          result.push({ role: 'user', content: textContent });
+        // Puis le message user avec contenu (texte + images)
+        if (contentParts.length > 0) {
+          if (contentParts.length === 1 && contentParts[0].type === 'text') {
+            // Message texte simple
+            result.push({ role: 'user', content: contentParts[0].text });
+          } else {
+            // Message avec images - utiliser le format array de contenu OpenAI
+            result.push({ 
+              role: 'user', 
+              content: contentParts 
+            });
+          }
         }
       }
     }

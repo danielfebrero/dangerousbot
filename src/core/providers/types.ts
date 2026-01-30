@@ -7,15 +7,34 @@ export interface AIMessage {
   content: string | AIContentBlock[];
 }
 
-export interface AIContentBlock {
-  type: 'text' | 'tool_use' | 'tool_result';
-  text?: string;
-  id?: string;
-  name?: string;
-  input?: unknown;
-  tool_use_id?: string;
-  content?: string;
+export interface AIImageContent {
+  type: 'image';
+  source: {
+    type: 'base64';
+    media_type: string;
+    data: string;
+  };
 }
+
+export interface AITextContent {
+  type: 'text';
+  text: string;
+}
+
+export interface AIToolUseContent {
+  type: 'tool_use';
+  id: string;
+  name: string;
+  input: unknown;
+}
+
+export interface AIToolResultContent {
+  type: 'tool_result';
+  tool_use_id: string;
+  content: string;
+}
+
+export type AIContentBlock = AITextContent | AIToolUseContent | AIToolResultContent | AIImageContent;
 
 export interface AIToolDefinition {
   name: string;
