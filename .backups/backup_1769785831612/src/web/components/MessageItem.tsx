@@ -10,6 +10,8 @@ interface MessageItemProps {
 export function MessageItem({ message }: MessageItemProps) {
   const renderContent = () => {
     switch (message.type) {
+      case 'tool':
+        return <span className="tool-name">🔧 {message.toolName}</span>;
       case 'bot':
         return <Markdown content={message.content} />;
       case 'provider_switch':
