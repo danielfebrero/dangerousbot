@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ToolCall } from '../types';
 
 interface ToolBadgeProps {
@@ -28,6 +28,7 @@ function getToolIcon(toolName: string): string {
 
 export function ToolBadge({ toolCall }: ToolBadgeProps) {
   const [showTooltip, setShowTooltip] = useState(false);
+  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const formatInput = (input: unknown): string => {
     try {
@@ -37,15 +38,34 @@ export function ToolBadge({ toolCall }: ToolBadgeProps) {
     }
   };
 
+  const handleMouseEnter = () => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+    setShowTooltip(true);
+  };
+
+  const handleMouseLeave = () => {
+    hideTimeoutRef.current = setTimeout(() => {
+      setShowTooltip(false);
+    }, 200);
+  };
+
   return (
     <span 
       className="tool-badge"
-      onMouseEnter={() => setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      style={{ position: 'relative' }}
     >
       {getToolIcon(toolCall.name)} {toolCall.name}
       {showTooltip && (
-        <div className="tool-tooltip">
+        <div 
+          className="tool-tooltip"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
           <div className="tool-tooltip-header">{toolCall.name}</div>
           <pre className="tool-tooltip-content">{formatInput(toolCall.input)}</pre>
         </div>
