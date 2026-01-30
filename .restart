@@ -1,1 +1,1 @@
-{"reason":"Apply emoji encoding fix for Firefox","timestamp":"2026-01-30T15:16:07.858Z"}
+{"reason":"Correction transmission images WebSocket - server/index.ts doit transmettre les images au MessageHandler","timestamp":"2026-01-30T16:02:30.155Z"}

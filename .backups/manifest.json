@@ -1,5 +1,52 @@
 [
   {
+    "id": "backup_1769791159330",
+    "timestamp": "2026-01-30T16:39:19.389Z",
+    "description": "Correction du nom du tool web_search dans l'execute (était $web_search, maintenant web_search)",
+    "commitHash": "d9d9a86",
+    "files": [
+      "src/cli/setup.ts",
+      "src/config.ts",
+      "src/core/brain.ts",
+      "src/core/compressor.ts",
+      "src/core/context-injector.ts",
+      "src/core/contextCleaner.ts",
+      "src/core/embedding.ts",
+      "src/core/executor.ts",
+      "src/core/lifecycle.ts",
+      "src/core/logger.ts",
+      "src/core/memory.ts",
+      "src/core/mistral.ts",
+      "src/core/providers/claude.ts",
+      "src/core/providers/index.ts",
+      "src/core/providers/kimi.ts",
+      "src/core/providers/types.ts",
+      "src/core/rollback.ts",
+      "src/core/tools.ts",
+      "src/core/types.ts",
+      "src/core/versioning.ts",
+      "src/main.ts",
+      "src/server/index.ts",
+      "src/server/routes.ts",
+      "src/server/websocket.ts",
+      "src/web/App.tsx",
+      "src/web/components/Header.tsx",
+      "src/web/components/Markdown.tsx",
+      "src/web/components/MessageInput.tsx",
+      "src/web/components/MessageItem.tsx",
+      "src/web/components/MessageList.tsx",
+      "src/web/components/TokenCounter.tsx",
+      "src/web/components/ToolBadge.tsx",
+      "src/web/components/TypingIndicator.tsx",
+      "src/web/components/index.ts",
+      "src/web/hooks/useWebSocket.ts",
+      "src/web/index.tsx",
+      "src/web/public/components/TokenCounter.tsx",
+      "src/web/styles/global.css",
+      "src/web/types.ts"
+    ]
+  },
+  {
     "id": "backup_1769788948653",
     "timestamp": "2026-01-30T16:02:28.738Z",
     "description": "Correction transmission images WebSocket - server/index.ts doit transmettre les images au MessageHandler",
@@ -116,15 +163,6 @@
     "commitHash": "e462c14",
     "files": [
       "src/server/index.ts"
-    ]
-  },
-  {
-    "id": "backup_1769786649039",
-    "timestamp": "2026-01-30T15:24:09.069Z",
-    "description": "Modifier types pour supporter les images",
-    "commitHash": "564ceea",
-    "files": [
-      "src/server/websocket.ts"
     ]
   }
 ]
