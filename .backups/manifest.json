@@ -1,5 +1,14 @@
 [
   {
+    "id": "backup_1769786852686",
+    "timestamp": "2026-01-30T15:27:32.729Z",
+    "description": "Rebuild with simplified self_update tool (no file params, just build/restart)",
+    "commitHash": "5431eaf",
+    "files": [
+      "src/core/tools.ts"
+    ]
+  },
+  {
     "id": "backup_1769786801203",
     "timestamp": "2026-01-30T15:26:41.249Z",
     "description": "Simplify self_update tool to only build/restart without file modification parameters",
@@ -78,15 +87,6 @@
     "commitHash": "e8c72db",
     "files": [
       "src/web/App.tsx"
-    ]
-  },
-  {
-    "id": "backup_1769786555438",
-    "timestamp": "2026-01-30T15:22:35.469Z",
-    "description": "Modifier useWebSocket pour supporter l'envoi d'images",
-    "commitHash": "a3e53a5",
-    "files": [
-      "src/web/hooks/useWebSocket.ts"
     ]
   }
 ]
