@@ -6,7 +6,7 @@ import { MessageList } from './components/MessageList';
 import { MessageInput } from './components/MessageInput';
 import { ToolPanel } from './components/ToolPanel';
 import { ToolPanelToggle } from './components/ToolPanelToggle';
-import { Message, WSMessage, TokenUsage, ContentPart } from './types';
+import { Message, WSMessage, TokenUsage, ContentPart, ToolCallExecution } from './types';
 import './styles/global.css';
 
 function App() {
@@ -30,6 +30,10 @@ function App() {
 
   // Track tool execution IDs for matching results
   const toolExecutionMapRef = useRef<Record<string, string>>({});
+  
+  // Track active tool executions for chat display
+  const [activeToolExecutions, setActiveToolExecutions] = useState<ToolCallExecution[]>([]);
+  const activeToolExecutionsRef = useRef<ToolCallExecution[]>([]);
 
   // Header auto-hide on scroll
   useEffect(() => {
@@ -113,12 +117,39 @@ function App() {
         break;
 
       case 'bot_message':
-        setMessages(prev => [...prev, {
-          id: crypto.randomUUID(),
-          type: 'bot',
-          content: wsMessage.payload.text,
-          timestamp: new Date()
-        }]);
+        // Don't create a new message if we already have a streaming message
+        if (streamingMessageIdRef.current) {
+          const streamId = streamingMessageIdRef.current;
+          setMessages(prev => {
+            const messageIndex = prev.findIndex(m => m.id === streamId);
+            if (messageIndex >= 0) {
+              // Streaming message exists, update it with final content if different
+              if (prev[messageIndex].content !== wsMessage.payload.text) {
+                const updatedMessages = [...prev];
+                updatedMessages[messageIndex] = {
+                  ...updatedMessages[messageIndex],
+                  content: wsMessage.payload.text
+                };
+                return updatedMessages;
+              }
+              return prev;
+            }
+            // No streaming message found, create new one
+            return [...prev, {
+              id: crypto.randomUUID(),
+              type: 'bot',
+              content: wsMessage.payload.text,
+              timestamp: new Date()
+            }];
+          });
+        } else {
+          setMessages(prev => [...prev, {
+            id: crypto.randomUUID(),
+            type: 'bot',
+            content: wsMessage.payload.text,
+            timestamp: new Date()
+          }]);
+        }
         streamingMessageIdRef.current = null;
         break;
 
@@ -133,28 +164,27 @@ function App() {
         const execId = addExecution(toolName, toolInput);
         toolExecutionMapRef.current[toolName] = execId;
 
-        // Add to messages
-        setMessages(prev => {
-          const lastMessage = prev[prev.length - 1];
-
-          if (lastMessage && lastMessage.type === 'bot' && lastMessage.id === streamingMessageIdRef.current) {
-            const updatedMessages = [...prev];
-            const existingToolCalls = lastMessage.toolCalls || [];
-            updatedMessages[updatedMessages.length - 1] = {
-              ...lastMessage,
-              toolCalls: [...existingToolCalls, { name: toolName, input: toolInput }]
-            };
-            return updatedMessages;
-          }
-
-          return [...prev, {
-            id: crypto.randomUUID(),
-            type: 'bot',
-            content: '',
-            toolCalls: [{ name: toolName, input: toolInput }],
-            timestamp: new Date()
-          }];
-        });
+        // Create a new tool execution message in the chat
+        const newExecution: ToolCallExecution = {
+          id: execId,
+          toolName: toolName,
+          input: toolInput,
+          status: 'running',
+          startTime: new Date()
+        };
+        
+        // Add to active executions
+        activeToolExecutionsRef.current = [...activeToolExecutionsRef.current, newExecution];
+        setActiveToolExecutions(activeToolExecutionsRef.current);
+        
+        // Add as a separate message in the chat
+        setMessages(prev => [...prev, {
+          id: execId,
+          type: 'tool_execution',
+          content: '',
+          toolExecution: newExecution,
+          timestamp: new Date()
+        }]);
         break;
 
       case 'tool_result':
@@ -163,11 +193,48 @@ function App() {
         const resultExecId = toolExecutionMapRef.current[resultToolName];
         if (resultExecId) {
           const result = wsMessage.payload.result;
-          if (result?.success === false || result?.error) {
+          const isError = result?.success === false || result?.error;
+          
+          if (isError) {
             failExecution(resultExecId, result.error || 'Unknown error');
           } else {
             completeExecution(resultExecId, result);
           }
+          
+          // Update the tool execution message in chat
+          setMessages(prev => {
+            return prev.map(msg => {
+              if (msg.type === 'tool_execution' && msg.toolExecution?.id === resultExecId) {
+                return {
+                  ...msg,
+                  toolExecution: {
+                    ...msg.toolExecution,
+                    status: isError ? 'error' : 'completed',
+                    output: isError ? undefined : result,
+                    error: isError ? (result.error || 'Unknown error') : undefined,
+                    endTime: new Date()
+                  }
+                };
+              }
+              return msg;
+            });
+          });
+          
+          // Update active executions ref
+          activeToolExecutionsRef.current = activeToolExecutionsRef.current.map(exec => {
+            if (exec.id === resultExecId) {
+              return {
+                ...exec,
+                status: isError ? 'error' : 'completed',
+                output: isError ? undefined : result,
+                error: isError ? (result.error || 'Unknown error') : undefined,
+                endTime: new Date()
+              };
+            }
+            return exec;
+          });
+          setActiveToolExecutions(activeToolExecutionsRef.current);
+          
           delete toolExecutionMapRef.current[resultToolName];
         }
         break;
@@ -218,6 +285,9 @@ function App() {
   const { status, sendMessage, sendStop } = useWebSocket({ onMessage: handleMessage });
 
   const handleSend = useCallback((text: string, images?: ContentPart[]) => {
+    // Reset streaming message ID when user sends a new message
+    streamingMessageIdRef.current = null;
+
     if (sendMessage(text, images)) {
       let content = text;
       let contentParts: ContentPart[] | undefined;

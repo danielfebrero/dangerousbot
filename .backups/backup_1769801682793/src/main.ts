@@ -192,6 +192,32 @@ async function main(): Promise<void> {
   const backups = rollbackManager.listBackups();
   print(`✓ Système de rollback initialisé (${backups.length} backups disponibles)`, 'green');
 
+  // Initialiser l'indexation du code si Mistral est configuré
+  if (APIS.MISTRAL_API_KEY) {
+    try {
+      const { initCodeIndexer, getCodeIndexer } = await import('./core/code-indexer.js');
+      const { initCodeEmbeddingService } = await import('./core/code-embedding.js');
+      
+      const embeddingService = initCodeEmbeddingService(APIS.MISTRAL_API_KEY);
+      const indexer = initCodeIndexer(PROJECT_ROOT, memory, embeddingService);
+      
+      // Vérifier si une indexation est nécessaire
+      if (indexer.needsIndexing()) {
+        print('📚 Indexation de la codebase en arrière-plan...', 'cyan');
+        // Lancer l'indexation en arrière-plan (ne pas bloquer le démarrage)
+        indexer.indexAll().then(result => {
+          print(`✓ Indexation terminée: ${result.indexed} nouveaux, ${result.updated} mis à jour`, 'green');
+        }).catch(err => {
+          print(`⚠ Erreur d'indexation: ${err.message}`, 'yellow');
+        });
+      } else {
+        print('✓ Codebase déjà indexée', 'green');
+      }
+    } catch (err) {
+      print(`⚠ Impossible d'initialiser l'indexation: ${(err as Error).message}`, 'yellow');
+    }
+  }
+
   // Créer et démarrer le serveur
   const server = new DangerousBotServer({ port: PORT, host: HOST }, PROJECT_ROOT);
   server.initBrain(apiKey, openRouterKey);
