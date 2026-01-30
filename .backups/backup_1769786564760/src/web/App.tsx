@@ -110,27 +110,12 @@ function App() {
 
   const { status, sendMessage } = useWebSocket({ onMessage: handleMessage });
 
-  const handleSend = useCallback((text: string, images?: ContentPart[]) => {
-    if (sendMessage(text, images)) {
-      let content = text;
-      let contentParts: ContentPart[] | undefined;
-      
-      if (images && images.length > 0) {
-        contentParts = [
-          { type: 'text', text },
-          ...images
-        ];
-        // Le contenu texte simple est utilisé pour l'affichage fallback
-        if (!text.trim()) {
-          content = '📷 Image' + (images.length > 1 ? `s (${images.length})` : '');
-        }
-      }
-      
+  const handleSend = useCallback((text: string) => {
+    if (sendMessage(text)) {
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         type: 'user',
-        content,
-        contentParts,
+        content: text,
         timestamp: new Date()
       }]);
     }

@@ -1,5 +1,14 @@
 [
   {
+    "id": "backup_1769786564760",
+    "timestamp": "2026-01-30T15:22:44.786Z",
+    "description": "Modifier handleSend pour supporter les images",
+    "commitHash": "e8c72db",
+    "files": [
+      "src/web/App.tsx"
+    ]
+  },
+  {
     "id": "backup_1769786555438",
     "timestamp": "2026-01-30T15:22:35.469Z",
     "description": "Modifier useWebSocket pour supporter l'envoi d'images",
@@ -78,15 +87,6 @@
     "commitHash": "3812e2e",
     "files": [
       "src/web/components/ToolBadge.tsx"
-    ]
-  },
-  {
-    "id": "backup_1769785556416",
-    "timestamp": "2026-01-30T15:05:56.451Z",
-    "description": "Add more emoji mappings for camelCase tool names and additional tools",
-    "commitHash": "3812e2e",
-    "files": [
-      "src/web/src/components/ToolBadge.tsx"
     ]
   }
 ]
