@@ -86,6 +86,23 @@ export class Memory {
       );
     `);
 
+    // Table des embeddings de code source (pour retrieve_code)
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS code_embeddings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_path TEXT NOT NULL UNIQUE,
+        content TEXT NOT NULL,
+        content_hash TEXT NOT NULL,
+        embedding BLOB NOT NULL,
+        token_count INTEGER,
+        file_size INTEGER,
+        last_modified TEXT,
+        indexed_at TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_code_embeddings_path ON code_embeddings(file_path);
+      CREATE INDEX IF NOT EXISTS idx_code_embeddings_hash ON code_embeddings(content_hash);
+    `);
+
     // Table des connaissances
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS knowledge (
@@ -286,6 +303,82 @@ export class Memory {
 
   exportSession(sessionId?: string): Message[] {
     return this.getMessages(sessionId || this.currentSessionId, 10000);
+  }
+
+  // ============ Code Embeddings ============
+
+  addCodeEmbedding(
+    filePath: string,
+    content: string,
+    contentHash: string,
+    embedding: number[],
+    tokenCount?: number,
+    fileSize?: number,
+    lastModified?: string
+  ): number {
+    const buffer = Buffer.from(new Float64Array(embedding).buffer);
+    const stmt = this.db.prepare(`
+      INSERT OR REPLACE INTO code_embeddings 
+      (file_path, content, content_hash, embedding, token_count, file_size, last_modified, indexed_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `);
+    const result = stmt.run(
+      filePath,
+      content,
+      contentHash,
+      buffer,
+      tokenCount || 0,
+      fileSize || 0,
+      lastModified || new Date().toISOString()
+    );
+    return result.lastInsertRowid as number;
+  }
+
+  getCodeEmbedding(filePath: string): { id: number; file_path: string; content: string; content_hash: string; embedding: number[]; token_count: number; indexed_at: string } | null {
+    const row = this.db.prepare(`
+      SELECT id, file_path, content, content_hash, embedding, token_count, indexed_at
+      FROM code_embeddings WHERE file_path = ?
+    `).get(filePath) as { id: number; file_path: string; content: string; content_hash: string; embedding: Buffer; token_count: number; indexed_at: string } | undefined;
+    
+    if (!row) return null;
+    
+    // Convertir le buffer en array de nombres
+    const floatArray = new Float64Array(row.embedding.buffer, row.embedding.byteOffset, row.embedding.byteLength / 8);
+    
+    return {
+      ...row,
+      embedding: Array.from(floatArray)
+    };
+  }
+
+  getAllCodeEmbeddings(): Array<{ id: number; file_path: string; content: string; embedding: number[] }> {
+    const rows = this.db.prepare(`
+      SELECT id, file_path, content, embedding FROM code_embeddings
+    `).all() as Array<{ id: number; file_path: string; content: string; embedding: Buffer }>;
+    
+    return rows.map(row => {
+      const floatArray = new Float64Array(row.embedding.buffer, row.embedding.byteOffset, row.embedding.byteLength / 8);
+      return {
+        ...row,
+        embedding: Array.from(floatArray)
+      };
+    });
+  }
+
+  deleteCodeEmbedding(filePath: string): void {
+    this.db.prepare(`DELETE FROM code_embeddings WHERE file_path = ?`).run(filePath);
+  }
+
+  getCodeEmbeddingStats(): { total_files: number; total_tokens: number; last_indexed: string | null } {
+    const result = this.db.prepare(`
+      SELECT 
+        COUNT(*) as total_files,
+        SUM(token_count) as total_tokens,
+        MAX(indexed_at) as last_indexed
+      FROM code_embeddings
+    `).get() as { total_files: number; total_tokens: number; last_indexed: string | null };
+    
+    return result;
   }
 
   // ============ Cleanup ============
