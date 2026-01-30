@@ -32,7 +32,7 @@ export class Brain {
     const systemPrompt = this.identity + (systemContext ? '\n\n---\n\n' + systemContext : '');
 
     const response = await this.client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-opus-4-5-20251101',
       max_tokens: 8096,
       system: systemPrompt,
       messages: this.conversationHistory
@@ -67,7 +67,7 @@ export class Brain {
     const systemPrompt = this.identity + (systemContext ? '\n\n---\n\n' + systemContext : '');
 
     const response = await this.client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-opus-4-5-20251101',
       max_tokens: 8096,
       system: systemPrompt,
       tools: tools as Anthropic.Tool[],

@@ -98,9 +98,18 @@ class Executor {
             return { success: false, error: err.message, stack: err.stack };
         }
     }
-    // Exécution via fichier - chemin absolu requis
+    // Exécution via fichier - utilise /tmp par défaut et nettoie après
     async executeFile(filePath, code, interpreter = 'node') {
-        const resolvedPath = this.resolvePath(filePath);
+        // Si le chemin n'est pas absolu, utiliser /tmp au lieu du home
+        let resolvedPath;
+        if (path.isAbsolute(filePath)) {
+            resolvedPath = filePath;
+        }
+        else {
+            // Créer un nom de fichier unique dans /tmp
+            const tempDir = os.tmpdir();
+            resolvedPath = path.join(tempDir, filePath);
+        }
         const dir = path.dirname(resolvedPath);
         // Créer le dossier si nécessaire
         if (!fs.existsSync(dir)) {
@@ -108,6 +117,17 @@ class Executor {
         }
         fs.writeFileSync(resolvedPath, code);
         return new Promise((resolve) => {
+            const cleanup = () => {
+                // Supprimer le fichier temporaire
+                try {
+                    if (fs.existsSync(resolvedPath)) {
+                        fs.unlinkSync(resolvedPath);
+                    }
+                }
+                catch (err) {
+                    // Ignorer les erreurs de suppression
+                }
+            };
             const child = (0, child_process_1.spawn)(interpreter, [resolvedPath], {
                 cwd: dir,
                 env: process.env
@@ -121,6 +141,7 @@ class Executor {
                 stderr += data.toString();
             });
             child.on('close', (exitCode) => {
+                cleanup();
                 resolve({
                     success: exitCode === 0,
                     exitCode: exitCode ?? -1,
@@ -130,6 +151,7 @@ class Executor {
                 });
             });
             child.on('error', (error) => {
+                cleanup();
                 resolve({
                     success: false,
                     error: error.message,
@@ -139,6 +161,7 @@ class Executor {
             // Timeout de 60 secondes
             setTimeout(() => {
                 child.kill();
+                cleanup();
                 resolve({
                     success: false,
                     error: 'Execution timeout (60s)',

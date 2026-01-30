@@ -1,4 +1,10 @@
 node_modules/
+dist/
 .env
+.env.local
 *.log
 .DS_Store
+
+# Secrets (stockés dans ~/.dangerousbot/secrets/)
+# Ne jamais commiter de clés API
+data/config.json

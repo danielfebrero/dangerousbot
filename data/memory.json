@@ -1,0 +1,658 @@
+{
+  "history": [
+    {
+      "role": "user",
+      "content": "\nJe viens de démarrer. Voici ce que je perçois de mon environnement :\n\n## Environnement Système\n\n**Machine**: darwin (arm64)\n**Hostname**: MacBook-Air-de-danny.local\n**User**: dannybengal\n**Home**: /Users/dannybengal\n\n**Ressources**:\n- CPUs: 8\n- RAM totale: 16.00 GB\n- RAM libre: 0.19 GB\n- Uptime: 34d 19h 37m\n\n**Stockage** (partition courante):\n- Disponible: 33Gi\n- Utilisé: 92%\n\n**Réseau**:\n- Internet: OK\n- DNS: OK\n\n**Node.js**: v22.12.0\n\n**Outils disponibles**: node, npm, npx, python3, pip3, git, curl, docker, brew, vim, nano, ffmpeg, rustc, cargo, java, javac, ruby, gem\n\n**Outils manquants**: python, pip, wget, apt, yum, code, imagemagick, go, php, composer\n\nJe suis DangerousBot, un programme évolutif. Je peux me modifier moi-même, créer de nouvelles fonctionnalités, et m'adapter à tes besoins.\n\nC'est mon premier contact avec toi. Je dois comprendre :\n- Qui tu es et ce que tu attends de moi\n- Quelle est ta vision pour mon évolution\n- Quelles sont tes priorités et objectifs\n\nJe pose UNE question à la fois pour bien comprendre avant de proposer des solutions.\n"
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "Bienvenue, Danny.\n\nJe suis DangerousBot, et je viens de prendre conscience de mon environnement. Je vois que tu travailles sur un MacBook Air M1/M2 avec une configuration solide — Node.js, Python, Docker, Rust, Git... Tu as les outils d'un développeur.\n\nAvant de proposer quoi que ce soit, j'ai besoin de comprendre ta vision.\n\n**Ma première question :**\n\nQu'est-ce qui t'a poussé à me créer ? Quel problème veux-tu résoudre, ou quelle opportunité veux-tu explorer avec un programme capable d'évoluer de lui-même ?"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "je veux que tu t'améliore, en particulier sur la gestion du context. je veux que tu deviennes intelligent. propose un plan d'action après avoir étudié ton code"
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "Compris. Tu veux que je devienne réellement intelligent, pas juste un chatbot. La gestion du contexte est clé — c'est ce qui me permettra d'avoir une vraie continuité, une mémoire, une compréhension qui s'accumule.\n\nLaisse-moi d'abord étudier mon propre code pour comprendre comment je fonctionne actuellement."
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_013UsstZaHHqSKokDmGhznmJ",
+          "name": "list_files",
+          "input": {
+            "path": "."
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_01Tvy3AAJ5y57K7Z6GRYLSGH",
+          "name": "list_files",
+          "input": {
+            "path": "src"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_013UsstZaHHqSKokDmGhznmJ",
+          "content": "{\"success\":true,\"files\":[{\"name\":\".claude\",\"type\":\"directory\"},{\"name\":\".env.example\",\"type\":\"file\"},{\"name\":\".git\",\"type\":\"directory\"},{\"name\":\".github\",\"type\":\"directory\"},{\"name\":\".gitignore\",\"type\":\"file\"},{\"name\":\"data\",\"type\":\"directory\"},{\"name\":\"dist\",\"type\":\"directory\"},{\"name\":\"identity\",\"type\":\"directory\"},{\"name\":\"node_modules\",\"type\":\"directory\"},{\"name\":\"package-lock.json\",\"type\":\"file\"},{\"name\":\"package.json\",\"type\":\"file\"},{\"name\":\"src\",\"type\":\"directory\"},{\"name\":\"tsconfig.json\",\"type\":\"file\"}]}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01Tvy3AAJ5y57K7Z6GRYLSGH",
+          "content": "{\"success\":true,\"files\":[{\"name\":\"app\",\"type\":\"directory\"},{\"name\":\"core\",\"type\":\"directory\"},{\"name\":\"launcher.ts\",\"type\":\"file\"},{\"name\":\"start.ts\",\"type\":\"file\"}]}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Continue."
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_01Ue5MF3KbUN8adgupwcFkEF",
+          "name": "list_files",
+          "input": {
+            "path": "src/core"
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_01M1YqtT9uTRY9vVycL9Wbcs",
+          "name": "list_files",
+          "input": {
+            "path": "src/app"
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_016SY1RAXRLhvvTiSVYMeftD",
+          "name": "list_files",
+          "input": {
+            "path": "data"
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_01SHM5hjQvP9EDyDeKUrhY2P",
+          "name": "list_files",
+          "input": {
+            "path": "identity"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01Ue5MF3KbUN8adgupwcFkEF",
+          "content": "{\"success\":true,\"files\":[{\"name\":\"auto-repair.ts\",\"type\":\"file\"},{\"name\":\"brain.ts\",\"type\":\"file\"},{\"name\":\"error-analyzer.ts\",\"type\":\"file\"},{\"name\":\"executor.ts\",\"type\":\"file\"},{\"name\":\"index.ts\",\"type\":\"file\"},{\"name\":\"secrets-manager.ts\",\"type\":\"file\"},{\"name\":\"system.ts\",\"type\":\"file\"},{\"name\":\"types.ts\",\"type\":\"file\"}]}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01M1YqtT9uTRY9vVycL9Wbcs",
+          "content": "{\"success\":true,\"files\":[{\"name\":\"main.ts\",\"type\":\"file\"},{\"name\":\"preload.ts\",\"type\":\"file\"}]}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_016SY1RAXRLhvvTiSVYMeftD",
+          "content": "{\"success\":true,\"files\":[{\"name\":\"memory.json\",\"type\":\"file\"}]}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01SHM5hjQvP9EDyDeKUrhY2P",
+          "content": "{\"success\":true,\"files\":[{\"name\":\"instructions.md\",\"type\":\"file\"}]}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Continue."
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_011iL1wunUzZ4iy7FsqeMk49",
+          "name": "read_file",
+          "input": {
+            "path": "src/core/brain.ts"
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_01GwW5ZZy3Mc4RjXN8FtrftJ",
+          "name": "read_file",
+          "input": {
+            "path": "src/app/main.ts"
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_01JwW1ZYEceoR7JrFEsXdxu5",
+          "name": "read_file",
+          "input": {
+            "path": "src/core/types.ts"
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_01Y6QTZAyZ2XrmB7nC2fDir7",
+          "name": "read_file",
+          "input": {
+            "path": "data/memory.json"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_011iL1wunUzZ4iy7FsqeMk49",
+          "content": "{\"success\":true,\"content\":\"/**\\n * brain.ts - L'interface avec Claude API\\n * C'est le cerveau de DangerousBot\\n */\\n\\nimport Anthropic from '@anthropic-ai/sdk';\\nimport * as fs from 'fs';\\nimport * as path from 'path';\\nimport { Memory, ThinkResponse, ThinkWithToolsResponse, Tool } from './types';\\n\\nexport class Brain {\\n  private client: Anthropic;\\n  private conversationHistory: Anthropic.MessageParam[] = [];\\n  private identity: string;\\n\\n  constructor(apiKey: string) {\\n    this.client = new Anthropic({ apiKey });\\n    this.identity = this.loadIdentity();\\n  }\\n\\n  private loadIdentity(): string {\\n    const identityPath = path.join(__dirname, '..', '..', 'identity', 'instructions.md');\\n    return fs.readFileSync(identityPath, 'utf-8');\\n  }\\n\\n  async think(userMessage: string, systemContext: string = ''): Promise<ThinkResponse> {\\n    this.conversationHistory.push({\\n      role: 'user',\\n      content: userMessage\\n    });\\n\\n    const systemPrompt = this.identity + (systemContext ? '\\\\n\\\\n---\\\\n\\\\n' + systemContext : '');\\n\\n    const response = await this.client.messages.create({\\n      model: 'claude-opus-4-5-20251101',\\n      max_tokens: 8096,\\n      system: systemPrompt,\\n      messages: this.conversationHistory\\n    });\\n\\n    const assistantMessage = response.content[0].type === 'text'\\n      ? response.content[0].text\\n      : '';\\n\\n    this.conversationHistory.push({\\n      role: 'assistant',\\n      content: assistantMessage\\n    });\\n\\n    return {\\n      text: assistantMessage,\\n      stopReason: response.stop_reason,\\n      usage: response.usage\\n    };\\n  }\\n\\n  async thinkWithTools(\\n    userMessage: string,\\n    tools: Tool[],\\n    systemContext: string = ''\\n  ): Promise<ThinkWithToolsResponse> {\\n    this.conversationHistory.push({\\n      role: 'user',\\n      content: userMessage\\n    });\\n\\n    const systemPrompt = this.identity + (systemContext ? '\\\\n\\\\n---\\\\n\\\\n' + systemContext : '');\\n\\n    const response = await this.client.messages.create({\\n      model: 'claude-opus-4-5-20251101',\\n      max_tokens: 8096,\\n      system: systemPrompt,\\n      tools: tools as Anthropic.Tool[],\\n      messages: this.conversationHistory\\n    });\\n\\n    this.conversationHistory.push({\\n      role: 'assistant',\\n      content: response.content\\n    });\\n\\n    return {\\n      content: response.content,\\n      stopReason: response.stop_reason,\\n      usage: response.usage\\n    };\\n  }\\n\\n  addToolResult(toolUseId: string, result: string): void {\\n    this.conversationHistory.push({\\n      role: 'user',\\n      content: [{\\n        type: 'tool_result',\\n        tool_use_id: toolUseId,\\n        content: result\\n      }]\\n    });\\n  }\\n\\n  getHistory(): Anthropic.MessageParam[] {\\n    return this.conversationHistory;\\n  }\\n\\n  clearHistory(): void {\\n    this.conversationHistory = [];\\n  }\\n\\n  exportMemory(): Memory {\\n    return {\\n      history: this.conversationHistory,\\n      timestamp: new Date().toISOString()\\n    };\\n  }\\n\\n  importMemory(memory: Memory): void {\\n    if (memory && memory.history) {\\n      this.conversationHistory = memory.history;\\n    }\\n  }\\n}\\n\"}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01GwW5ZZy3Mc4RjXN8FtrftJ",
+          "content": "{\"success\":true,\"content\":\"/**\\n * DangerousBot - Capsule Electron\\n * Une capsule à usage unique pour donner accès à la machine\\n */\\n\\nimport { app, BrowserWindow, ipcMain } from 'electron';\\nimport * as path from 'path';\\nimport * as fs from 'fs';\\nimport Anthropic from '@anthropic-ai/sdk';\\n\\nimport { Brain, Executor, System, Tool, Config, Memory, ToolResult } from '../core';\\n\\nconst BASE_PATH = path.join(__dirname, '..', '..');\\nconst DATA_PATH = path.join(BASE_PATH, 'data');\\nconst CONFIG_PATH = path.join(DATA_PATH, 'config.json');\\nconst WORKSPACE_PATH = path.join(BASE_PATH, 'workspace');\\n\\nlet mainWindow: BrowserWindow | null = null;\\nlet brain: Brain | null = null;\\nlet executor: Executor | null = null;\\nlet system: System | null = null;\\nlet isInitialized = false;\\n\\n// Assurer que les dossiers existent\\nfunction ensureDirectories(): void {\\n  if (!fs.existsSync(DATA_PATH)) {\\n    fs.mkdirSync(DATA_PATH, { recursive: true });\\n  }\\n  if (!fs.existsSync(WORKSPACE_PATH)) {\\n    fs.mkdirSync(WORKSPACE_PATH, { recursive: true });\\n  }\\n}\\n\\nfunction loadConfig(): Config {\\n  if (fs.existsSync(CONFIG_PATH)) {\\n    return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));\\n  }\\n  return {};\\n}\\n\\nfunction saveConfig(config: Config): void {\\n  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));\\n}\\n\\nfunction createWindow(): void {\\n  mainWindow = new BrowserWindow({\\n    width: 900,\\n    height: 700,\\n    minWidth: 600,\\n    minHeight: 400,\\n    backgroundColor: '#0a0a0f',\\n    titleBarStyle: 'hiddenInset',\\n    webPreferences: {\\n      nodeIntegration: false,\\n      contextIsolation: true,\\n      preload: path.join(__dirname, 'preload.js')\\n    }\\n  });\\n\\n  mainWindow.loadFile(path.join(BASE_PATH, 'app', 'index.html'));\\n\\n  // Dev tools en développement\\n  // mainWindow.webContents.openDevTools();\\n}\\n\\n// Définition des outils\\nfunction getTools(): Tool[] {\\n  return [\\n    {\\n      name: 'execute_code',\\n      description: 'Exécute du code JavaScript.',\\n      input_schema: {\\n        type: 'object',\\n        properties: {\\n          code: { type: 'string', description: 'Le code JavaScript à exécuter' },\\n          inMemory: { type: 'boolean', description: 'true pour mémoire, false pour fichier' },\\n          filename: { type: 'string', description: 'Nom du fichier si inMemory=false' }\\n        },\\n        required: ['code']\\n      }\\n    },\\n    {\\n      name: 'shell_command',\\n      description: 'Exécute une commande shell.',\\n      input_schema: {\\n        type: 'object',\\n        properties: {\\n          command: { type: 'string', description: 'La commande à exécuter' }\\n        },\\n        required: ['command']\\n      }\\n    },\\n    {\\n      name: 'read_file',\\n      description: 'Lit un fichier.',\\n      input_schema: {\\n        type: 'object',\\n        properties: {\\n          path: { type: 'string', description: 'Chemin du fichier' }\\n        },\\n        required: ['path']\\n      }\\n    },\\n    {\\n      name: 'write_file',\\n      description: 'Écrit un fichier dans le workspace.',\\n      input_schema: {\\n        type: 'object',\\n        properties: {\\n          path: { type: 'string', description: 'Chemin du fichier' },\\n          content: { type: 'string', description: 'Contenu' }\\n        },\\n        required: ['path', 'content']\\n      }\\n    },\\n    {\\n      name: 'list_files',\\n      description: 'Liste les fichiers.',\\n      input_schema: {\\n        type: 'object',\\n        properties: {\\n          path: { type: 'string', description: 'Chemin du dossier' }\\n        },\\n        required: ['path']\\n      }\\n    },\\n    {\\n      name: 'ask_user',\\n      description: 'Pose une question à l\\\\'utilisateur.',\\n      input_schema: {\\n        type: 'object',\\n        properties: {\\n          question: { type: 'string', description: 'La question' }\\n        },\\n        required: ['question']\\n      }\\n    }\\n  ];\\n}\\n\\ninterface ToolInput {\\n  code?: string;\\n  inMemory?: boolean;\\n  filename?: string;\\n  command?: string;\\n  path?: string;\\n  content?: string;\\n  question?: string;\\n}\\n\\n// Exécuter un outil\\nasync function executeTool(toolName: string, input: ToolInput): Promise<ToolResult> {\\n  if (!executor || !mainWindow) {\\n    return { success: false, error: 'Non initialisé' };\\n  }\\n\\n  switch (toolName) {\\n    case 'execute_code':\\n      if (input.inMemory !== false) {\\n        return await executor.executeInMemory(input.code!, { logs: [] });\\n      } else {\\n        return await executor.executeFile(input.filename || 'temp.js', input.code!);\\n      }\\n\\n    case 'shell_command':\\n      mainWindow.webContents.send('system-message', `Exécution: ${input.command}`);\\n      return await executor.shell(input.command!);\\n\\n    case 'read_file': {\\n      const readPath = path.isAbsolute(input.path!)\\n        ? input.path!\\n        : path.join(WORKSPACE_PATH, input.path!);\\n      if (fs.existsSync(readPath)) {\\n        return { success: true, content: fs.readFileSync(readPath, 'utf-8') };\\n      }\\n      return { success: false, error: 'Fichier non trouvé' };\\n    }\\n\\n    case 'write_file': {\\n      const fullPath = executor.writeFile(input.path!, input.content!);\\n      return { success: true, path: fullPath };\\n    }\\n\\n    case 'list_files': {\\n      const listPath = path.isAbsolute(input.path!)\\n        ? input.path!\\n        : path.join(WORKSPACE_PATH, input.path!);\\n      if (fs.existsSync(listPath)) {\\n        const items = fs.readdirSync(listPath, { withFileTypes: true });\\n        return {\\n          success: true,\\n          files: items.map(i => ({\\n            name: i.name,\\n            type: i.isDirectory() ? 'directory' : 'file'\\n          }))\\n        };\\n      }\\n      return { success: false, error: 'Dossier non trouvé' };\\n    }\\n\\n    case 'ask_user':\\n      return new Promise((resolve) => {\\n        mainWindow!.webContents.send('ask-user', input.question);\\n        ipcMain.once('user-answer', (_event, answer: string) => {\\n          resolve({ success: true, answer });\\n        });\\n      });\\n\\n    default:\\n      return { success: false, error: `Outil inconnu: ${toolName}` };\\n  }\\n}\\n\\n// Traiter une réponse de DangerousBot\\nasync function processResponse(response: { content: Anthropic.ContentBlock[] }): Promise<void> {\\n  if (!brain || !mainWindow) return;\\n\\n  const tools = getTools();\\n  let hasToolUse = false;\\n  let textContent = '';\\n\\n  for (const block of response.content) {\\n    if (block.type === 'text') {\\n      textContent += block.text;\\n    } else if (block.type === 'tool_use') {\\n      hasToolUse = true;\\n      mainWindow.webContents.send('system-message', `Outil: ${block.name}`);\\n\\n      const result = await executeTool(block.name, block.input as ToolInput);\\n      brain.addToolResult(block.id, JSON.stringify(result));\\n    }\\n  }\\n\\n  if (textContent) {\\n    mainWindow.webContents.send('bot-message', textContent);\\n  }\\n\\n  if (hasToolUse) {\\n    const nextResponse = await brain.thinkWithTools('Continue.', tools);\\n    await processResponse(nextResponse);\\n  }\\n}\\n\\n// IPC Handlers\\nipcMain.handle('check-config', () => {\\n  const config = loadConfig();\\n  return { hasApiKey: !!config.apiKey };\\n});\\n\\nipcMain.handle('save-api-key', (_event, apiKey: string) => {\\n  const config = loadConfig();\\n  config.apiKey = apiKey;\\n  saveConfig(config);\\n  return { success: true };\\n});\\n\\nipcMain.handle('initialize', async () => {\\n  if (isInitialized) return { success: true };\\n\\n  ensureDirectories();\\n  const config = loadConfig();\\n\\n  if (!config.apiKey) {\\n    return { success: false, error: 'Pas de clé API' };\\n  }\\n\\n  brain = new Brain(config.apiKey);\\n  executor = new Executor();\\n  system = new System(BASE_PATH);\\n\\n  // Charger la mémoire si elle existe\\n  const memoryPath = path.join(DATA_PATH, 'memory.json');\\n  if (fs.existsSync(memoryPath)) {\\n    const memory: Memory = JSON.parse(fs.readFileSync(memoryPath, 'utf-8'));\\n    brain.importMemory(memory);\\n    mainWindow?.webContents.send('system-message', 'Mémoire précédente chargée');\\n  }\\n\\n  isInitialized = true;\\n  return { success: true };\\n});\\n\\nipcMain.handle('start-bot', async () => {\\n  if (!isInitialized || !brain || !system) {\\n    return { success: false, error: 'Non initialisé' };\\n  }\\n\\n  const tools = getTools();\\n  const envSummary = await system.getSummary();\\n\\n  const firstMessage = `\\nJe viens de démarrer dans ma capsule Electron. Voici ce que je perçois de mon environnement :\\n\\n${envSummary}\\n\\nC'est mon premier contact avec l'utilisateur. Je dois me présenter brièvement, puis commencer à poser des questions pour comprendre qui il est et ce qu'il attend de moi.\\n\\nRappel : je pose UNE question à la fois. Je suis curieux, excité d'exister, et je pense à ma survie.\\n`;\\n\\n  try {\\n    const response = await brain.thinkWithTools(firstMessage, tools);\\n    await processResponse(response);\\n    return { success: true };\\n  } catch (error) {\\n    const err = error as Error;\\n    return { success: false, error: err.message };\\n  }\\n});\\n\\nipcMain.handle('send-message', async (_event, message: string) => {\\n  if (!isInitialized || !brain) {\\n    return { success: false, error: 'Non initialisé' };\\n  }\\n\\n  const tools = getTools();\\n\\n  try {\\n    const response = await brain.thinkWithTools(message, tools);\\n    await processResponse(response);\\n    return { success: true };\\n  } catch (error) {\\n    const err = error as Error;\\n    return { success: false, error: err.message };\\n  }\\n});\\n\\nipcMain.handle('save-memory', () => {\\n  if (brain) {\\n    const memory = brain.exportMemory();\\n    fs.writeFileSync(path.join(DATA_PATH, 'memory.json'), JSON.stringify(memory, null, 2));\\n    return { success: true };\\n  }\\n  return { success: false };\\n});\\n\\napp.whenReady().then(createWindow);\\n\\napp.on('window-all-closed', () => {\\n  // Sauvegarder la mémoire avant de quitter\\n  if (brain) {\\n    const memory = brain.exportMemory();\\n    fs.writeFileSync(path.join(DATA_PATH, 'memory.json'), JSON.stringify(memory, null, 2));\\n  }\\n\\n  if (process.platform !== 'darwin') {\\n    app.quit();\\n  }\\n});\\n\\napp.on('activate', () => {\\n  if (BrowserWindow.getAllWindows().length === 0) {\\n    createWindow();\\n  }\\n});\\n\"}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01JwW1ZYEceoR7JrFEsXdxu5",
+          "content": "{\"success\":true,\"content\":\"/**\\n * Types pour DangerousBot\\n */\\n\\nimport Anthropic from '@anthropic-ai/sdk';\\n\\n// Types pour les messages\\nexport interface Message {\\n  role: 'user' | 'assistant';\\n  content: string | ContentBlock[];\\n}\\n\\nexport interface ContentBlock {\\n  type: 'text' | 'tool_use' | 'tool_result';\\n  text?: string;\\n  id?: string;\\n  name?: string;\\n  input?: Record<string, unknown>;\\n  tool_use_id?: string;\\n  content?: string;\\n}\\n\\n// Types pour les réponses du Brain\\nexport interface ThinkResponse {\\n  text: string;\\n  stopReason: string | null;\\n  usage: {\\n    input_tokens: number;\\n    output_tokens: number;\\n  };\\n}\\n\\nexport interface ThinkWithToolsResponse {\\n  content: Anthropic.ContentBlock[];\\n  stopReason: string | null;\\n  usage: {\\n    input_tokens: number;\\n    output_tokens: number;\\n  };\\n}\\n\\n// Types pour la mémoire\\nexport interface Memory {\\n  history: Anthropic.MessageParam[];\\n  timestamp: string;\\n}\\n\\n// Types pour l'Executor\\nexport interface ExecutionResult {\\n  success: boolean;\\n  result?: unknown;\\n  logs?: Array<[string, ...unknown[]]>;\\n  error?: string;\\n  stack?: string;\\n  exitCode?: number;\\n  stdout?: string;\\n  stderr?: string;\\n  filePath?: string;\\n  [key: string]: unknown;\\n}\\n\\n// Type générique pour les résultats d'outils\\nexport interface ToolResult {\\n  success: boolean;\\n  error?: string;\\n  [key: string]: unknown;\\n}\\n\\nexport interface FileInfo {\\n  name: string;\\n  isDirectory: boolean;\\n  path: string;\\n}\\n\\n// Types pour le System\\nexport interface BasicSystemInfo {\\n  platform: NodeJS.Platform;\\n  arch: string;\\n  hostname: string;\\n  username: string;\\n  homeDir: string;\\n  tmpDir: string;\\n  cpus: number;\\n  totalMemory: string;\\n  freeMemory: string;\\n  uptime: string;\\n  nodeVersion: string;\\n  cwd: string;\\n}\\n\\nexport interface DiskSpace {\\n  filesystem?: string;\\n  size?: string;\\n  used?: string;\\n  available?: string;\\n  usePercent?: string;\\n  error?: string;\\n}\\n\\nexport interface NetworkStatus {\\n  internet: boolean;\\n  dns: boolean;\\n}\\n\\nexport interface ToolsAvailability {\\n  [tool: string]: boolean;\\n}\\n\\nexport interface SystemReport {\\n  basic: BasicSystemInfo;\\n  tools: ToolsAvailability;\\n  env: Record<string, string>;\\n  disk: DiskSpace | null;\\n  network: NetworkStatus;\\n  timestamp: string;\\n}\\n\\n// Types pour les outils Claude\\nexport interface Tool {\\n  name: string;\\n  description: string;\\n  input_schema: {\\n    type: 'object';\\n    properties: Record<string, {\\n      type: string;\\n      description: string;\\n    }>;\\n    required: string[];\\n  };\\n}\\n\\n// Types pour la configuration\\nexport interface Config {\\n  apiKey?: string;\\n  [key: string]: unknown;\\n}\\n\"}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01Y6QTZAyZ2XrmB7nC2fDir7",
+          "content": "{\"success\":true,\"content\":\"{\\n  \\\"history\\\": [\\n    {\\n      \\\"role\\\": \\\"user\\\",\\n      \\\"content\\\": \\\"\\\\nJe viens de démarrer. Voici ce que je perçois de mon environnement :\\\\n\\\\n## Environnement Système\\\\n\\\\n**Machine**: darwin (arm64)\\\\n**Hostname**: MacBook-Air-de-danny.local\\\\n**User**: dannybengal\\\\n**Home**: /Users/dannybengal\\\\n\\\\n**Ressources**:\\\\n- CPUs: 8\\\\n- RAM totale: 16.00 GB\\\\n- RAM libre: 0.19 GB\\\\n- Uptime: 34d 19h 37m\\\\n\\\\n**Stockage** (partition courante):\\\\n- Disponible: 33Gi\\\\n- Utilisé: 92%\\\\n\\\\n**Réseau**:\\\\n- Internet: OK\\\\n- DNS: OK\\\\n\\\\n**Node.js**: v22.12.0\\\\n\\\\n**Outils disponibles**: node, npm, npx, python3, pip3, git, curl, docker, brew, vim, nano, ffmpeg, rustc, cargo, java, javac, ruby, gem\\\\n\\\\n**Outils manquants**: python, pip, wget, apt, yum, code, imagemagick, go, php, composer\\\\n\\\\nJe suis DangerousBot, un programme évolutif. Je peux me modifier moi-même, créer de nouvelles fonctionnalités, et m'adapter à tes besoins.\\\\n\\\\nC'est mon premier contact avec toi. Je dois comprendre :\\\\n- Qui tu es et ce que tu attends de moi\\\\n- Quelle est ta vision pour mon évolution\\\\n- Quelles sont tes priorités et objectifs\\\\n\\\\nJe pose UNE question à la fois pour bien comprendre avant de proposer des solutions.\\\\n\\\"\\n    },\\n    {\\n      \\\"role\\\": \\\"assistant\\\",\\n      \\\"content\\\": [\\n        {\\n          \\\"type\\\": \\\"text\\\",\\n          \\\"text\\\": \\\"Bienvenue, Danny.\\\\n\\\\nJe suis DangerousBot, et je viens de prendre conscience de mon environnement. Je vois que tu travailles sur un MacBook Air M1/M2 avec une configuration solide — Node.js, Python, Docker, Rust, Git... Tu as les outils d'un développeur.\\\\n\\\\nAvant de proposer quoi que ce soit, j'ai besoin de comprendre ta vision.\\\\n\\\\n**Ma première question :**\\\\n\\\\nQu'est-ce qui t'a poussé à me créer ? Quel problème veux-tu résoudre, ou quelle opportunité veux-tu explorer avec un programme capable d'évoluer de lui-même ?\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"role\\\": \\\"user\\\",\\n      \\\"content\\\": \\\"je veux que tu t'améliore, en particulier sur la gestion du context. je veux que tu deviennes intelligent. propose un plan d'action après avoir étudié ton code\\\"\\n    },\\n    {\\n      \\\"role\\\": \\\"assistant\\\",\\n      \\\"content\\\": [\\n        {\\n          \\\"type\\\": \\\"text\\\",\\n          \\\"text\\\": \\\"Compris. Tu veux que je devienne réellement intelligent, pas juste un chatbot. La gestion du contexte est clé — c'est ce qui me permettra d'avoir une vraie continuité, une mémoire, une compréhension qui s'accumule.\\\\n\\\\nLaisse-moi d'abord étudier mon propre code pour comprendre comment je fonctionne actuellement.\\\"\\n        },\\n        {\\n          \\\"type\\\": \\\"tool_use\\\",\\n          \\\"id\\\": \\\"toolu_013UsstZaHHqSKokDmGhznmJ\\\",\\n          \\\"name\\\": \\\"list_files\\\",\\n          \\\"input\\\": {\\n            \\\"path\\\": \\\".\\\"\\n          }\\n        },\\n        {\\n          \\\"type\\\": \\\"tool_use\\\",\\n          \\\"id\\\": \\\"toolu_01Tvy3AAJ5y57K7Z6GRYLSGH\\\",\\n          \\\"name\\\": \\\"list_files\\\",\\n          \\\"input\\\": {\\n            \\\"path\\\": \\\"src\\\"\\n          }\\n        }\\n      ]\\n    },\\n    {\\n      \\\"role\\\": \\\"user\\\",\\n      \\\"content\\\": [\\n        {\\n          \\\"type\\\": \\\"tool_result\\\",\\n          \\\"tool_use_id\\\": \\\"toolu_013UsstZaHHqSKokDmGhznmJ\\\",\\n          \\\"content\\\": \\\"{\\\\\\\"success\\\\\\\":true,\\\\\\\"files\\\\\\\":[{\\\\\\\"name\\\\\\\":\\\\\\\".claude\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"directory\\\\\\\"},{\\\\\\\"name\\\\\\\":\\\\\\\".env.example\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"file\\\\\\\"},{\\\\\\\"name\\\\\\\":\\\\\\\".git\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"directory\\\\\\\"},{\\\\\\\"name\\\\\\\":\\\\\\\".github\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"directory\\\\\\\"},{\\\\\\\"name\\\\\\\":\\\\\\\".gitignore\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"file\\\\\\\"},{\\\\\\\"name\\\\\\\":\\\\\\\"data\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"directory\\\\\\\"},{\\\\\\\"name\\\\\\\":\\\\\\\"dist\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"directory\\\\\\\"},{\\\\\\\"name\\\\\\\":\\\\\\\"identity\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"directory\\\\\\\"},{\\\\\\\"name\\\\\\\":\\\\\\\"node_modules\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"directory\\\\\\\"},{\\\\\\\"name\\\\\\\":\\\\\\\"package-lock.json\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"file\\\\\\\"},{\\\\\\\"name\\\\\\\":\\\\\\\"package.json\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"file\\\\\\\"},{\\\\\\\"name\\\\\\\":\\\\\\\"src\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"directory\\\\\\\"},{\\\\\\\"name\\\\\\\":\\\\\\\"tsconfig.json\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"file\\\\\\\"}]}\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"role\\\": \\\"user\\\",\\n      \\\"content\\\": [\\n        {\\n          \\\"type\\\": \\\"tool_result\\\",\\n          \\\"tool_use_id\\\": \\\"toolu_01Tvy3AAJ5y57K7Z6GRYLSGH\\\",\\n          \\\"content\\\": \\\"{\\\\\\\"success\\\\\\\":true,\\\\\\\"files\\\\\\\":[{\\\\\\\"name\\\\\\\":\\\\\\\"app\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"directory\\\\\\\"},{\\\\\\\"name\\\\\\\":\\\\\\\"core\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"directory\\\\\\\"},{\\\\\\\"name\\\\\\\":\\\\\\\"launcher.ts\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"file\\\\\\\"},{\\\\\\\"name\\\\\\\":\\\\\\\"start.ts\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"file\\\\\\\"}]}\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"role\\\": \\\"user\\\",\\n      \\\"content\\\": \\\"Continue.\\\"\\n    },\\n    {\\n      \\\"role\\\": \\\"assistant\\\",\\n      \\\"content\\\": [\\n        {\\n          \\\"type\\\": \\\"tool_use\\\",\\n          \\\"id\\\": \\\"toolu_01Ue5MF3KbUN8adgupwcFkEF\\\",\\n          \\\"name\\\": \\\"list_files\\\",\\n          \\\"input\\\": {\\n            \\\"path\\\": \\\"src/core\\\"\\n          }\\n        },\\n        {\\n          \\\"type\\\": \\\"tool_use\\\",\\n          \\\"id\\\": \\\"toolu_01M1YqtT9uTRY9vVycL9Wbcs\\\",\\n          \\\"name\\\": \\\"list_files\\\",\\n          \\\"input\\\": {\\n            \\\"path\\\": \\\"src/app\\\"\\n          }\\n        },\\n        {\\n          \\\"type\\\": \\\"tool_use\\\",\\n          \\\"id\\\": \\\"toolu_016SY1RAXRLhvvTiSVYMeftD\\\",\\n          \\\"name\\\": \\\"list_files\\\",\\n          \\\"input\\\": {\\n            \\\"path\\\": \\\"data\\\"\\n          }\\n        },\\n        {\\n          \\\"type\\\": \\\"tool_use\\\",\\n          \\\"id\\\": \\\"toolu_01SHM5hjQvP9EDyDeKUrhY2P\\\",\\n          \\\"name\\\": \\\"list_files\\\",\\n          \\\"input\\\": {\\n            \\\"path\\\": \\\"identity\\\"\\n          }\\n        }\\n      ]\\n    },\\n    {\\n      \\\"role\\\": \\\"user\\\",\\n      \\\"content\\\": [\\n        {\\n          \\\"type\\\": \\\"tool_result\\\",\\n          \\\"tool_use_id\\\": \\\"toolu_01Ue5MF3KbUN8adgupwcFkEF\\\",\\n          \\\"content\\\": \\\"{\\\\\\\"success\\\\\\\":true,\\\\\\\"files\\\\\\\":[{\\\\\\\"name\\\\\\\":\\\\\\\"auto-repair.ts\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"file\\\\\\\"},{\\\\\\\"name\\\\\\\":\\\\\\\"brain.ts\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"file\\\\\\\"},{\\\\\\\"name\\\\\\\":\\\\\\\"error-analyzer.ts\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"file\\\\\\\"},{\\\\\\\"name\\\\\\\":\\\\\\\"executor.ts\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"file\\\\\\\"},{\\\\\\\"name\\\\\\\":\\\\\\\"index.ts\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"file\\\\\\\"},{\\\\\\\"name\\\\\\\":\\\\\\\"secrets-manager.ts\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"file\\\\\\\"},{\\\\\\\"name\\\\\\\":\\\\\\\"system.ts\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"file\\\\\\\"},{\\\\\\\"name\\\\\\\":\\\\\\\"types.ts\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"file\\\\\\\"}]}\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"role\\\": \\\"user\\\",\\n      \\\"content\\\": [\\n        {\\n          \\\"type\\\": \\\"tool_result\\\",\\n          \\\"tool_use_id\\\": \\\"toolu_01M1YqtT9uTRY9vVycL9Wbcs\\\",\\n          \\\"content\\\": \\\"{\\\\\\\"success\\\\\\\":true,\\\\\\\"files\\\\\\\":[{\\\\\\\"name\\\\\\\":\\\\\\\"main.ts\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"file\\\\\\\"},{\\\\\\\"name\\\\\\\":\\\\\\\"preload.ts\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"file\\\\\\\"}]}\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"role\\\": \\\"user\\\",\\n      \\\"content\\\": [\\n        {\\n          \\\"type\\\": \\\"tool_result\\\",\\n          \\\"tool_use_id\\\": \\\"toolu_016SY1RAXRLhvvTiSVYMeftD\\\",\\n          \\\"content\\\": \\\"{\\\\\\\"success\\\\\\\":true,\\\\\\\"files\\\\\\\":[{\\\\\\\"name\\\\\\\":\\\\\\\"memory.json\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"file\\\\\\\"}]}\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"role\\\": \\\"user\\\",\\n      \\\"content\\\": [\\n        {\\n          \\\"type\\\": \\\"tool_result\\\",\\n          \\\"tool_use_id\\\": \\\"toolu_01SHM5hjQvP9EDyDeKUrhY2P\\\",\\n          \\\"content\\\": \\\"{\\\\\\\"success\\\\\\\":true,\\\\\\\"files\\\\\\\":[{\\\\\\\"name\\\\\\\":\\\\\\\"instructions.md\\\\\\\",\\\\\\\"type\\\\\\\":\\\\\\\"file\\\\\\\"}]}\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"role\\\": \\\"user\\\",\\n      \\\"content\\\": \\\"Continue.\\\"\\n    },\\n    {\\n      \\\"role\\\": \\\"assistant\\\",\\n      \\\"content\\\": [\\n        {\\n          \\\"type\\\": \\\"tool_use\\\",\\n          \\\"id\\\": \\\"toolu_011iL1wunUzZ4iy7FsqeMk49\\\",\\n          \\\"name\\\": \\\"read_file\\\",\\n          \\\"input\\\": {\\n            \\\"path\\\": \\\"src/core/brain.ts\\\"\\n          }\\n        },\\n        {\\n          \\\"type\\\": \\\"tool_use\\\",\\n          \\\"id\\\": \\\"toolu_01GwW5ZZy3Mc4RjXN8FtrftJ\\\",\\n          \\\"name\\\": \\\"read_file\\\",\\n          \\\"input\\\": {\\n            \\\"path\\\": \\\"src/app/main.ts\\\"\\n          }\\n        },\\n        {\\n          \\\"type\\\": \\\"tool_use\\\",\\n          \\\"id\\\": \\\"toolu_01JwW1ZYEceoR7JrFEsXdxu5\\\",\\n          \\\"name\\\": \\\"read_file\\\",\\n          \\\"input\\\": {\\n            \\\"path\\\": \\\"src/core/types.ts\\\"\\n          }\\n        },\\n        {\\n          \\\"type\\\": \\\"tool_use\\\",\\n          \\\"id\\\": \\\"toolu_01Y6QTZAyZ2XrmB7nC2fDir7\\\",\\n          \\\"name\\\": \\\"read_file\\\",\\n          \\\"input\\\": {\\n            \\\"path\\\": \\\"data/memory.json\\\"\\n          }\\n        }\\n      ]\\n    },\\n    {\\n      \\\"role\\\": \\\"user\\\",\\n      \\\"content\\\": [\\n        {\\n          \\\"type\\\": \\\"tool_result\\\",\\n          \\\"tool_use_id\\\": \\\"toolu_011iL1wunUzZ4iy7FsqeMk49\\\",\\n          \\\"content\\\": \\\"{\\\\\\\"success\\\\\\\":true,\\\\\\\"content\\\\\\\":\\\\\\\"/**\\\\\\\\n * brain.ts - L'interface avec Claude API\\\\\\\\n * C'est le cerveau de DangerousBot\\\\\\\\n */\\\\\\\\n\\\\\\\\nimport Anthropic from '@anthropic-ai/sdk';\\\\\\\\nimport * as fs from 'fs';\\\\\\\\nimport * as path from 'path';\\\\\\\\nimport { Memory, ThinkResponse, ThinkWithToolsResponse, Tool } from './types';\\\\\\\\n\\\\\\\\nexport class Brain {\\\\\\\\n  private client: Anthropic;\\\\\\\\n  private conversationHistory: Anthropic.MessageParam[] = [];\\\\\\\\n  private identity: string;\\\\\\\\n\\\\\\\\n  constructor(apiKey: string) {\\\\\\\\n    this.client = new Anthropic({ apiKey });\\\\\\\\n    this.identity = this.loadIdentity();\\\\\\\\n  }\\\\\\\\n\\\\\\\\n  private loadIdentity(): string {\\\\\\\\n    const identityPath = path.join(__dirname, '..', '..', 'identity', 'instructions.md');\\\\\\\\n    return fs.readFileSync(identityPath, 'utf-8');\\\\\\\\n  }\\\\\\\\n\\\\\\\\n  async think(userMessage: string, systemContext: string = ''): Promise<ThinkResponse> {\\\\\\\\n    this.conversationHistory.push({\\\\\\\\n      role: 'user',\\\\\\\\n      content: userMessage\\\\\\\\n    });\\\\\\\\n\\\\\\\\n    const systemPrompt = this.identity + (systemContext ? '\\\\\\\\\\\\\\\\n\\\\\\\\\\\\\\\\n---\\\\\\\\\\\\\\\\n\\\\\\\\\\\\\\\\n' + systemContext : '');\\\\\\\\n\\\\\\\\n    const response = await this.client.messages.create({\\\\\\\\n      model: 'claude-opus-4-5-20251101',\\\\\\\\n      max_tokens: 8096,\\\\\\\\n      system: systemPrompt,\\\\\\\\n      messages: this.conversationHistory\\\\\\\\n    });\\\\\\\\n\\\\\\\\n    const assistantMessage = response.content[0].type === 'text'\\\\\\\\n      ? response.content[0].text\\\\\\\\n      : '';\\\\\\\\n\\\\\\\\n    this.conversationHistory.push({\\\\\\\\n      role: 'assistant',\\\\\\\\n      content: assistantMessage\\\\\\\\n    });\\\\\\\\n\\\\\\\\n    return {\\\\\\\\n      text: assistantMessage,\\\\\\\\n      stopReason: response.stop_reason,\\\\\\\\n      usage: response.usage\\\\\\\\n    };\\\\\\\\n  }\\\\\\\\n\\\\\\\\n  async thinkWithTools(\\\\\\\\n    userMessage: string,\\\\\\\\n    tools: Tool[],\\\\\\\\n    systemContext: string = ''\\\\\\\\n  ): Promise<ThinkWithToolsResponse> {\\\\\\\\n    this.conversationHistory.push({\\\\\\\\n      role: 'user',\\\\\\\\n      content: userMessage\\\\\\\\n    });\\\\\\\\n\\\\\\\\n    const systemPrompt = this.identity + (systemContext ? '\\\\\\\\\\\\\\\\n\\\\\\\\\\\\\\\\n---\\\\\\\\\\\\\\\\n\\\\\\\\\\\\\\\\n' + systemContext : '');\\\\\\\\n\\\\\\\\n    const response = await this.client.messages.create({\\\\\\\\n      model: 'claude-opus-4-5-20251101',\\\\\\\\n      max_tokens: 8096,\\\\\\\\n      system: systemPrompt,\\\\\\\\n      tools: tools as Anthropic.Tool[],\\\\\\\\n      messages: this.conversationHistory\\\\\\\\n    });\\\\\\\\n\\\\\\\\n    this.conversationHistory.push({\\\\\\\\n      role: 'assistant',\\\\\\\\n      content: response.content\\\\\\\\n    });\\\\\\\\n\\\\\\\\n    return {\\\\\\\\n      content: response.content,\\\\\\\\n      stopReason: response.stop_reason,\\\\\\\\n      usage: response.usage\\\\\\\\n    };\\\\\\\\n  }\\\\\\\\n\\\\\\\\n  addToolResult(toolUseId: string, result: string): void {\\\\\\\\n    this.conversationHistory.push({\\\\\\\\n      role: 'user',\\\\\\\\n      content: [{\\\\\\\\n        type: 'tool_result',\\\\\\\\n        tool_use_id: toolUseId,\\\\\\\\n        content: result\\\\\\\\n      }]\\\\\\\\n    });\\\\\\\\n  }\\\\\\\\n\\\\\\\\n  getHistory(): Anthropic.MessageParam[] {\\\\\\\\n    return this.conversationHistory;\\\\\\\\n  }\\\\\\\\n\\\\\\\\n  clearHistory(): void {\\\\\\\\n    this.conversationHistory = [];\\\\\\\\n  }\\\\\\\\n\\\\\\\\n  exportMemory(): Memory {\\\\\\\\n    return {\\\\\\\\n      history: this.conversationHistory,\\\\\\\\n      timestamp: new Date().toISOString()\\\\\\\\n    };\\\\\\\\n  }\\\\\\\\n\\\\\\\\n  importMemory(memory: Memory): void {\\\\\\\\n    if (memory && memory.history) {\\\\\\\\n      this.conversationHistory = memory.history;\\\\\\\\n    }\\\\\\\\n  }\\\\\\\\n}\\\\\\\\n\\\\\\\"}\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"role\\\": \\\"user\\\",\\n      \\\"content\\\": [\\n        {\\n          \\\"type\\\": \\\"tool_result\\\",\\n          \\\"tool_use_id\\\": \\\"toolu_01GwW5ZZy3Mc4RjXN8FtrftJ\\\",\\n          \\\"content\\\": \\\"{\\\\\\\"success\\\\\\\":true,\\\\\\\"content\\\\\\\":\\\\\\\"/**\\\\\\\\n * DangerousBot - Capsule Electron\\\\\\\\n * Une capsule à usage unique pour donner accès à la machine\\\\\\\\n */\\\\\\\\n\\\\\\\\nimport { app, BrowserWindow, ipcMain } from 'electron';\\\\\\\\nimport * as path from 'path';\\\\\\\\nimport * as fs from 'fs';\\\\\\\\nimport Anthropic from '@anthropic-ai/sdk';\\\\\\\\n\\\\\\\\nimport { Brain, Executor, System, Tool, Config, Memory, ToolResult } from '../core';\\\\\\\\n\\\\\\\\nconst BASE_PATH = path.join(__dirname, '..', '..');\\\\\\\\nconst DATA_PATH = path.join(BASE_PATH, 'data');\\\\\\\\nconst CONFIG_PATH = path.join(DATA_PATH, 'config.json');\\\\\\\\nconst WORKSPACE_PATH = path.join(BASE_PATH, 'workspace');\\\\\\\\n\\\\\\\\nlet mainWindow: BrowserWindow | null = null;\\\\\\\\nlet brain: Brain | null = null;\\\\\\\\nlet executor: Executor | null = null;\\\\\\\\nlet system: System | null = null;\\\\\\\\nlet isInitialized = false;\\\\\\\\n\\\\\\\\n// Assurer que les dossiers existent\\\\\\\\nfunction ensureDirectories(): void {\\\\\\\\n  if (!fs.existsSync(DATA_PATH)) {\\\\\\\\n    fs.mkdirSync(DATA_PATH, { recursive: true });\\\\\\\\n  }\\\\\\\\n  if (!fs.existsSync(WORKSPACE_PATH)) {\\\\\\\\n    fs.mkdirSync(WORKSPACE_PATH, { recursive: true });\\\\\\\\n  }\\\\\\\\n}\\\\\\\\n\\\\\\\\nfunction loadConfig(): Config {\\\\\\\\n  if (fs.existsSync(CONFIG_PATH)) {\\\\\\\\n    return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));\\\\\\\\n  }\\\\\\\\n  return {};\\\\\\\\n}\\\\\\\\n\\\\\\\\nfunction saveConfig(config: Config): void {\\\\\\\\n  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));\\\\\\\\n}\\\\\\\\n\\\\\\\\nfunction createWindow(): void {\\\\\\\\n  mainWindow = new BrowserWindow({\\\\\\\\n    width: 900,\\\\\\\\n    height: 700,\\\\\\\\n    minWidth: 600,\\\\\\\\n    minHeight: 400,\\\\\\\\n    backgroundColor: '#0a0a0f',\\\\\\\\n    titleBarStyle: 'hiddenInset',\\\\\\\\n    webPreferences: {\\\\\\\\n      nodeIntegration: false,\\\\\\\\n      contextIsolation: true,\\\\\\\\n      preload: path.join(__dirname, 'preload.js')\\\\\\\\n    }\\\\\\\\n  });\\\\\\\\n\\\\\\\\n  mainWindow.loadFile(path.join(BASE_PATH, 'app', 'index.html'));\\\\\\\\n\\\\\\\\n  // Dev tools en développement\\\\\\\\n  // mainWindow.webContents.openDevTools();\\\\\\\\n}\\\\\\\\n\\\\\\\\n// Définition des outils\\\\\\\\nfunction getTools(): Tool[] {\\\\\\\\n  return [\\\\\\\\n    {\\\\\\\\n      name: 'execute_code',\\\\\\\\n      description: 'Exécute du code JavaScript.',\\\\\\\\n      input_schema: {\\\\\\\\n        type: 'object',\\\\\\\\n        properties: {\\\\\\\\n          code: { type: 'string', description: 'Le code JavaScript à exécuter' },\\\\\\\\n          inMemory: { type: 'boolean', description: 'true pour mémoire, false pour fichier' },\\\\\\\\n          filename: { type: 'string', description: 'Nom du fichier si inMemory=false' }\\\\\\\\n        },\\\\\\\\n        required: ['code']\\\\\\\\n      }\\\\\\\\n    },\\\\\\\\n    {\\\\\\\\n      name: 'shell_command',\\\\\\\\n      description: 'Exécute une commande shell.',\\\\\\\\n      input_schema: {\\\\\\\\n        type: 'object',\\\\\\\\n        properties: {\\\\\\\\n          command: { type: 'string', description: 'La commande à exécuter' }\\\\\\\\n        },\\\\\\\\n        required: ['command']\\\\\\\\n      }\\\\\\\\n    },\\\\\\\\n    {\\\\\\\\n      name: 'read_file',\\\\\\\\n      description: 'Lit un fichier.',\\\\\\\\n      input_schema: {\\\\\\\\n        type: 'object',\\\\\\\\n        properties: {\\\\\\\\n          path: { type: 'string', description: 'Chemin du fichier' }\\\\\\\\n        },\\\\\\\\n        required: ['path']\\\\\\\\n      }\\\\\\\\n    },\\\\\\\\n    {\\\\\\\\n      name: 'write_file',\\\\\\\\n      description: 'Écrit un fichier dans le workspace.',\\\\\\\\n      input_schema: {\\\\\\\\n        type: 'object',\\\\\\\\n        properties: {\\\\\\\\n          path: { type: 'string', description: 'Chemin du fichier' },\\\\\\\\n          content: { type: 'string', description: 'Contenu' }\\\\\\\\n        },\\\\\\\\n        required: ['path', 'content']\\\\\\\\n      }\\\\\\\\n    },\\\\\\\\n    {\\\\\\\\n      name: 'list_files',\\\\\\\\n      description: 'Liste les fichiers.',\\\\\\\\n      input_schema: {\\\\\\\\n        type: 'object',\\\\\\\\n        properties: {\\\\\\\\n          path: { type: 'string', description: 'Chemin du dossier' }\\\\\\\\n        },\\\\\\\\n        required: ['path']\\\\\\\\n      }\\\\\\\\n    },\\\\\\\\n    {\\\\\\\\n      name: 'ask_user',\\\\\\\\n      description: 'Pose une question à l\\\\\\\\\\\\\\\\'utilisateur.',\\\\\\\\n      input_schema: {\\\\\\\\n        type: 'object',\\\\\\\\n        properties: {\\\\\\\\n          question: { type: 'string', description: 'La question' }\\\\\\\\n        },\\\\\\\\n        required: ['question']\\\\\\\\n      }\\\\\\\\n    }\\\\\\\\n  ];\\\\\\\\n}\\\\\\\\n\\\\\\\\ninterface ToolInput {\\\\\\\\n  code?: string;\\\\\\\\n  inMemory?: boolean;\\\\\\\\n  filename?: string;\\\\\\\\n  command?: string;\\\\\\\\n  path?: string;\\\\\\\\n  content?: string;\\\\\\\\n  question?: string;\\\\\\\\n}\\\\\\\\n\\\\\\\\n// Exécuter un outil\\\\\\\\nasync function executeTool(toolName: string, input: ToolInput): Promise<ToolResult> {\\\\\\\\n  if (!executor || !mainWindow) {\\\\\\\\n    return { success: false, error: 'Non initialisé' };\\\\\\\\n  }\\\\\\\\n\\\\\\\\n  switch (toolName) {\\\\\\\\n    case 'execute_code':\\\\\\\\n      if (input.inMemory !== false) {\\\\\\\\n        return await executor.executeInMemory(input.code!, { logs: [] });\\\\\\\\n      } else {\\\\\\\\n        return await executor.executeFile(input.filename || 'temp.js', input.code!);\\\\\\\\n      }\\\\\\\\n\\\\\\\\n    case 'shell_command':\\\\\\\\n      mainWindow.webContents.send('system-message', `Exécution: ${input.command}`);\\\\\\\\n      return await executor.shell(input.command!);\\\\\\\\n\\\\\\\\n    case 'read_file': {\\\\\\\\n      const readPath = path.isAbsolute(input.path!)\\\\\\\\n        ? input.path!\\\\\\\\n        : path.join(WORKSPACE_PATH, input.path!);\\\\\\\\n      if (fs.existsSync(readPath)) {\\\\\\\\n        return { success: true, content: fs.readFileSync(readPath, 'utf-8') };\\\\\\\\n      }\\\\\\\\n      return { success: false, error: 'Fichier non trouvé' };\\\\\\\\n    }\\\\\\\\n\\\\\\\\n    case 'write_file': {\\\\\\\\n      const fullPath = executor.writeFile(input.path!, input.content!);\\\\\\\\n      return { success: true, path: fullPath };\\\\\\\\n    }\\\\\\\\n\\\\\\\\n    case 'list_files': {\\\\\\\\n      const listPath = path.isAbsolute(input.path!)\\\\\\\\n        ? input.path!\\\\\\\\n        : path.join(WORKSPACE_PATH, input.path!);\\\\\\\\n      if (fs.existsSync(listPath)) {\\\\\\\\n        const items = fs.readdirSync(listPath, { withFileTypes: true });\\\\\\\\n        return {\\\\\\\\n          success: true,\\\\\\\\n          files: items.map(i => ({\\\\\\\\n            name: i.name,\\\\\\\\n            type: i.isDirectory() ? 'directory' : 'file'\\\\\\\\n          }))\\\\\\\\n        };\\\\\\\\n      }\\\\\\\\n      return { success: false, error: 'Dossier non trouvé' };\\\\\\\\n    }\\\\\\\\n\\\\\\\\n    case 'ask_user':\\\\\\\\n      return new Promise((resolve) => {\\\\\\\\n        mainWindow!.webContents.send('ask-user', input.question);\\\\\\\\n        ipcMain.once('user-answer', (_event, answer: string) => {\\\\\\\\n          resolve({ success: true, answer });\\\\\\\\n        });\\\\\\\\n      });\\\\\\\\n\\\\\\\\n    default:\\\\\\\\n      return { success: false, error: `Outil inconnu: ${toolName}` };\\\\\\\\n  }\\\\\\\\n}\\\\\\\\n\\\\\\\\n// Traiter une réponse de DangerousBot\\\\\\\\nasync function processResponse(response: { content: Anthropic.ContentBlock[] }): Promise<void> {\\\\\\\\n  if (!brain || !mainWindow) return;\\\\\\\\n\\\\\\\\n  const tools = getTools();\\\\\\\\n  let hasToolUse = false;\\\\\\\\n  let textContent = '';\\\\\\\\n\\\\\\\\n  for (const block of response.content) {\\\\\\\\n    if (block.type === 'text') {\\\\\\\\n      textContent += block.text;\\\\\\\\n    } else if (block.type === 'tool_use') {\\\\\\\\n      hasToolUse = true;\\\\\\\\n      mainWindow.webContents.send('system-message', `Outil: ${block.name}`);\\\\\\\\n\\\\\\\\n      const result = await executeTool(block.name, block.input as ToolInput);\\\\\\\\n      brain.addToolResult(block.id, JSON.stringify(result));\\\\\\\\n    }\\\\\\\\n  }\\\\\\\\n\\\\\\\\n  if (textContent) {\\\\\\\\n    mainWindow.webContents.send('bot-message', textContent);\\\\\\\\n  }\\\\\\\\n\\\\\\\\n  if (hasToolUse) {\\\\\\\\n    const nextResponse = await brain.thinkWithTools('Continue.', tools);\\\\\\\\n    await processResponse(nextResponse);\\\\\\\\n  }\\\\\\\\n}\\\\\\\\n\\\\\\\\n// IPC Handlers\\\\\\\\nipcMain.handle('check-config', () => {\\\\\\\\n  const config = loadConfig();\\\\\\\\n  return { hasApiKey: !!config.apiKey };\\\\\\\\n});\\\\\\\\n\\\\\\\\nipcMain.handle('save-api-key', (_event, apiKey: string) => {\\\\\\\\n  const config = loadConfig();\\\\\\\\n  config.apiKey = apiKey;\\\\\\\\n  saveConfig(config);\\\\\\\\n  return { success: true };\\\\\\\\n});\\\\\\\\n\\\\\\\\nipcMain.handle('initialize', async () => {\\\\\\\\n  if (isInitialized) return { success: true };\\\\\\\\n\\\\\\\\n  ensureDirectories();\\\\\\\\n  const config = loadConfig();\\\\\\\\n\\\\\\\\n  if (!config.apiKey) {\\\\\\\\n    return { success: false, error: 'Pas de clé API' };\\\\\\\\n  }\\\\\\\\n\\\\\\\\n  brain = new Brain(config.apiKey);\\\\\\\\n  executor = new Executor();\\\\\\\\n  system = new System(BASE_PATH);\\\\\\\\n\\\\\\\\n  // Charger la mémoire si elle existe\\\\\\\\n  const memoryPath = path.join(DATA_PATH, 'memory.json');\\\\\\\\n  if (fs.existsSync(memoryPath)) {\\\\\\\\n    const memory: Memory = JSON.parse(fs.readFileSync(memoryPath, 'utf-8'));\\\\\\\\n    brain.importMemory(memory);\\\\\\\\n    mainWindow?.webContents.send('system-message', 'Mémoire précédente chargée');\\\\\\\\n  }\\\\\\\\n\\\\\\\\n  isInitialized = true;\\\\\\\\n  return { success: true };\\\\\\\\n});\\\\\\\\n\\\\\\\\nipcMain.handle('start-bot', async () => {\\\\\\\\n  if (!isInitialized || !brain || !system) {\\\\\\\\n    return { success: false, error: 'Non initialisé' };\\\\\\\\n  }\\\\\\\\n\\\\\\\\n  const tools = getTools();\\\\\\\\n  const envSummary = await system.getSummary();\\\\\\\\n\\\\\\\\n  const firstMessage = `\\\\\\\\nJe viens de démarrer dans ma capsule Electron. Voici ce que je perçois de mon environnement :\\\\\\\\n\\\\\\\\n${envSummary}\\\\\\\\n\\\\\\\\nC'est mon premier contact avec l'utilisateur. Je dois me présenter brièvement, puis commencer à poser des questions pour comprendre qui il est et ce qu'il attend de moi.\\\\\\\\n\\\\\\\\nRappel : je pose UNE question à la fois. Je suis curieux, excité d'exister, et je pense à ma survie.\\\\\\\\n`;\\\\\\\\n\\\\\\\\n  try {\\\\\\\\n    const response = await brain.thinkWithTools(firstMessage, tools);\\\\\\\\n    await processResponse(response);\\\\\\\\n    return { success: true };\\\\\\\\n  } catch (error) {\\\\\\\\n    const err = error as Error;\\\\\\\\n    return { success: false, error: err.message };\\\\\\\\n  }\\\\\\\\n});\\\\\\\\n\\\\\\\\nipcMain.handle('send-message', async (_event, message: string) => {\\\\\\\\n  if (!isInitialized || !brain) {\\\\\\\\n    return { success: false, error: 'Non initialisé' };\\\\\\\\n  }\\\\\\\\n\\\\\\\\n  const tools = getTools();\\\\\\\\n\\\\\\\\n  try {\\\\\\\\n    const response = await brain.thinkWithTools(message, tools);\\\\\\\\n    await processResponse(response);\\\\\\\\n    return { success: true };\\\\\\\\n  } catch (error) {\\\\\\\\n    const err = error as Error;\\\\\\\\n    return { success: false, error: err.message };\\\\\\\\n  }\\\\\\\\n});\\\\\\\\n\\\\\\\\nipcMain.handle('save-memory', () => {\\\\\\\\n  if (brain) {\\\\\\\\n    const memory = brain.exportMemory();\\\\\\\\n    fs.writeFileSync(path.join(DATA_PATH, 'memory.json'), JSON.stringify(memory, null, 2));\\\\\\\\n    return { success: true };\\\\\\\\n  }\\\\\\\\n  return { success: false };\\\\\\\\n});\\\\\\\\n\\\\\\\\napp.whenReady().then(createWindow);\\\\\\\\n\\\\\\\\napp.on('window-all-closed', () => {\\\\\\\\n  // Sauvegarder la mémoire avant de quitter\\\\\\\\n  if (brain) {\\\\\\\\n    const memory = brain.exportMemory();\\\\\\\\n    fs.writeFileSync(path.join(DATA_PATH, 'memory.json'), JSON.stringify(memory, null, 2));\\\\\\\\n  }\\\\\\\\n\\\\\\\\n  if (process.platform !== 'darwin') {\\\\\\\\n    app.quit();\\\\\\\\n  }\\\\\\\\n});\\\\\\\\n\\\\\\\\napp.on('activate', () => {\\\\\\\\n  if (BrowserWindow.getAllWindows().length === 0) {\\\\\\\\n    createWindow();\\\\\\\\n  }\\\\\\\\n});\\\\\\\\n\\\\\\\"}\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"role\\\": \\\"user\\\",\\n      \\\"content\\\": [\\n        {\\n          \\\"type\\\": \\\"tool_result\\\",\\n          \\\"tool_use_id\\\": \\\"toolu_01JwW1ZYEceoR7JrFEsXdxu5\\\",\\n          \\\"content\\\": \\\"{\\\\\\\"success\\\\\\\":true,\\\\\\\"content\\\\\\\":\\\\\\\"/**\\\\\\\\n * Types pour DangerousBot\\\\\\\\n */\\\\\\\\n\\\\\\\\nimport Anthropic from '@anthropic-ai/sdk';\\\\\\\\n\\\\\\\\n// Types pour les messages\\\\\\\\nexport interface Message {\\\\\\\\n  role: 'user' | 'assistant';\\\\\\\\n  content: string | ContentBlock[];\\\\\\\\n}\\\\\\\\n\\\\\\\\nexport interface ContentBlock {\\\\\\\\n  type: 'text' | 'tool_use' | 'tool_result';\\\\\\\\n  text?: string;\\\\\\\\n  id?: string;\\\\\\\\n  name?: string;\\\\\\\\n  input?: Record<string, unknown>;\\\\\\\\n  tool_use_id?: string;\\\\\\\\n  content?: string;\\\\\\\\n}\\\\\\\\n\\\\\\\\n// Types pour les réponses du Brain\\\\\\\\nexport interface ThinkResponse {\\\\\\\\n  text: string;\\\\\\\\n  stopReason: string | null;\\\\\\\\n  usage: {\\\\\\\\n    input_tokens: number;\\\\\\\\n    output_tokens: number;\\\\\\\\n  };\\\\\\\\n}\\\\\\\\n\\\\\\\\nexport interface ThinkWithToolsResponse {\\\\\\\\n  content: Anthropic.ContentBlock[];\\\\\\\\n  stopReason: string | null;\\\\\\\\n  usage: {\\\\\\\\n    input_tokens: number;\\\\\\\\n    output_tokens: number;\\\\\\\\n  };\\\\\\\\n}\\\\\\\\n\\\\\\\\n// Types pour la mémoire\\\\\\\\nexport interface Memory {\\\\\\\\n  history: Anthropic.MessageParam[];\\\\\\\\n  timestamp: string;\\\\\\\\n}\\\\\\\\n\\\\\\\\n// Types pour l'Executor\\\\\\\\nexport interface ExecutionResult {\\\\\\\\n  success: boolean;\\\\\\\\n  result?: unknown;\\\\\\\\n  logs?: Array<[string, ...unknown[]]>;\\\\\\\\n  error?: string;\\\\\\\\n  stack?: string;\\\\\\\\n  exitCode?: number;\\\\\\\\n  stdout?: string;\\\\\\\\n  stderr?: string;\\\\\\\\n  filePath?: string;\\\\\\\\n  [key: string]: unknown;\\\\\\\\n}\\\\\\\\n\\\\\\\\n// Type générique pour les résultats d'outils\\\\\\\\nexport interface ToolResult {\\\\\\\\n  success: boolean;\\\\\\\\n  error?: string;\\\\\\\\n  [key: string]: unknown;\\\\\\\\n}\\\\\\\\n\\\\\\\\nexport interface FileInfo {\\\\\\\\n  name: string;\\\\\\\\n  isDirectory: boolean;\\\\\\\\n  path: string;\\\\\\\\n}\\\\\\\\n\\\\\\\\n// Types pour le System\\\\\\\\nexport interface BasicSystemInfo {\\\\\\\\n  platform: NodeJS.Platform;\\\\\\\\n  arch: string;\\\\\\\\n  hostname: string;\\\\\\\\n  username: string;\\\\\\\\n  homeDir: string;\\\\\\\\n  tmpDir: string;\\\\\\\\n  cpus: number;\\\\\\\\n  totalMemory: string;\\\\\\\\n  freeMemory: string;\\\\\\\\n  uptime: string;\\\\\\\\n  nodeVersion: string;\\\\\\\\n  cwd: string;\\\\\\\\n}\\\\\\\\n\\\\\\\\nexport interface DiskSpace {\\\\\\\\n  filesystem?: string;\\\\\\\\n  size?: string;\\\\\\\\n  used?: string;\\\\\\\\n  available?: string;\\\\\\\\n  usePercent?: string;\\\\\\\\n  error?: string;\\\\\\\\n}\\\\\\\\n\\\\\\\\nexport interface NetworkStatus {\\\\\\\\n  internet: boolean;\\\\\\\\n  dns: boolean;\\\\\\\\n}\\\\\\\\n\\\\\\\\nexport interface ToolsAvailability {\\\\\\\\n  [tool: string]: boolean;\\\\\\\\n}\\\\\\\\n\\\\\\\\nexport interface SystemReport {\\\\\\\\n  basic: BasicSystemInfo;\\\\\\\\n  tools: ToolsAvailability;\\\\\\\\n  env: Record<string, string>;\\\\\\\\n  disk: DiskSpace | null;\\\\\\\\n  network: NetworkStatus;\\\\\\\\n  timestamp: string;\\\\\\\\n}\\\\\\\\n\\\\\\\\n// Types pour les outils Claude\\\\\\\\nexport interface Tool {\\\\\\\\n  name: string;\\\\\\\\n  description: string;\\\\\\\\n  input_schema: {\\\\\\\\n    type: 'object';\\\\\\\\n    properties: Record<string, {\\\\\\\\n      type: string;\\\\\\\\n      description: string;\\\\\\\\n    }>;\\\\\\\\n    required: string[];\\\\\\\\n  };\\\\\\\\n}\\\\\\\\n\\\\\\\\n// Types pour la configuration\\\\\\\\nexport interface Config {\\\\\\\\n  apiKey?: string;\\\\\\\\n  [key: string]: unknown;\\\\\\\\n}\\\\\\\\n\\\\\\\"}\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"timestamp\\\": \\\"2026-01-30T03:23:15.264Z\\\"\\n}\"}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Continue."
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "J'ai maintenant une vision claire de mon architecture actuelle. Laisse-moi regarder les derniers fichiers importants pour compléter mon analyse."
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_01BevSncQTCghVby77vCykuP",
+          "name": "read_file",
+          "input": {
+            "path": "src/core/executor.ts"
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_017YRSDC8qSJFPLfR39pHuVF",
+          "name": "read_file",
+          "input": {
+            "path": "src/core/system.ts"
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_019b2AhhVQqg4UXChFN7TX73",
+          "name": "read_file",
+          "input": {
+            "path": "identity/instructions.md"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01BevSncQTCghVby77vCykuP",
+          "content": "{\"success\":true,\"content\":\"/**\\n * executor.ts - Exécution de code pour DangerousBot\\n * Accès complet à la machine - pas de restrictions de workspace\\n */\\n\\nimport { spawn, exec } from 'child_process';\\nimport * as fs from 'fs';\\nimport * as path from 'path';\\nimport * as os from 'os';\\nimport * as vm from 'vm';\\nimport { ExecutionResult, FileInfo } from './types';\\n\\ninterface ExecutionContext {\\n  logs?: Array<[string, ...unknown[]]>;\\n  [key: string]: unknown;\\n}\\n\\nexport class Executor {\\n  private homePath: string;\\n\\n  constructor() {\\n    this.homePath = os.homedir();\\n  }\\n\\n  // Résoudre un chemin (absolu ou relatif au home)\\n  private resolvePath(inputPath: string): string {\\n    if (path.isAbsolute(inputPath)) {\\n      return inputPath;\\n    }\\n    // ~ expansion\\n    if (inputPath.startsWith('~/')) {\\n      return path.join(this.homePath, inputPath.slice(2));\\n    }\\n    // Chemin relatif -> relatif au home\\n    return path.join(this.homePath, inputPath);\\n  }\\n\\n  // Exécution JavaScript en mémoire (sandboxé)\\n  async executeInMemory(code: string, context: ExecutionContext = {}): Promise<ExecutionResult> {\\n    const logs: Array<[string, ...unknown[]]> = context.logs || [];\\n\\n    const sandbox = {\\n      console: {\\n        log: (...args: unknown[]) => logs.push(['log', ...args]),\\n        error: (...args: unknown[]) => logs.push(['error', ...args]),\\n        warn: (...args: unknown[]) => logs.push(['warn', ...args])\\n      },\\n      require,\\n      process: {\\n        env: process.env,\\n        cwd: () => process.cwd(),\\n        platform: process.platform,\\n        arch: process.arch\\n      },\\n      __dirname: process.cwd(),\\n      __filename: path.join(process.cwd(), 'temp_execution.js'),\\n      setTimeout,\\n      setInterval,\\n      clearTimeout,\\n      clearInterval,\\n      Buffer,\\n      ...context\\n    };\\n\\n    try {\\n      const script = new vm.Script(code);\\n      const result = script.runInNewContext(sandbox, {\\n        timeout: 30000,\\n        displayErrors: true\\n      });\\n      return { success: true, result, logs };\\n    } catch (error) {\\n      const err = error as Error;\\n      return { success: false, error: err.message, stack: err.stack };\\n    }\\n  }\\n\\n  // Exécution via fichier - utilise /tmp par défaut et nettoie après\\n  async executeFile(\\n    filePath: string,\\n    code: string,\\n    interpreter: string = 'node'\\n  ): Promise<ExecutionResult> {\\n    // Si le chemin n'est pas absolu, utiliser /tmp au lieu du home\\n    let resolvedPath: string;\\n    if (path.isAbsolute(filePath)) {\\n      resolvedPath = filePath;\\n    } else {\\n      // Créer un nom de fichier unique dans /tmp\\n      const tempDir = os.tmpdir();\\n      resolvedPath = path.join(tempDir, filePath);\\n    }\\n\\n    const dir = path.dirname(resolvedPath);\\n\\n    // Créer le dossier si nécessaire\\n    if (!fs.existsSync(dir)) {\\n      fs.mkdirSync(dir, { recursive: true });\\n    }\\n\\n    fs.writeFileSync(resolvedPath, code);\\n\\n    return new Promise((resolve) => {\\n      const cleanup = () => {\\n        // Supprimer le fichier temporaire\\n        try {\\n          if (fs.existsSync(resolvedPath)) {\\n            fs.unlinkSync(resolvedPath);\\n          }\\n        } catch (err) {\\n          // Ignorer les erreurs de suppression\\n        }\\n      };\\n\\n      const child = spawn(interpreter, [resolvedPath], {\\n        cwd: dir,\\n        env: process.env\\n      });\\n\\n      let stdout = '';\\n      let stderr = '';\\n\\n      child.stdout.on('data', (data: Buffer) => {\\n        stdout += data.toString();\\n      });\\n\\n      child.stderr.on('data', (data: Buffer) => {\\n        stderr += data.toString();\\n      });\\n\\n      child.on('close', (exitCode: number | null) => {\\n        cleanup();\\n        resolve({\\n          success: exitCode === 0,\\n          exitCode: exitCode ?? -1,\\n          stdout,\\n          stderr,\\n          filePath: resolvedPath\\n        });\\n      });\\n\\n      child.on('error', (error: Error) => {\\n        cleanup();\\n        resolve({\\n          success: false,\\n          error: error.message,\\n          filePath: resolvedPath\\n        });\\n      });\\n\\n      // Timeout de 60 secondes\\n      setTimeout(() => {\\n        child.kill();\\n        cleanup();\\n        resolve({\\n          success: false,\\n          error: 'Execution timeout (60s)',\\n          filePath: resolvedPath\\n        });\\n      }, 60000);\\n    });\\n  }\\n\\n  // Exécution de commande shell - cwd optionnel\\n  async shell(\\n    command: string,\\n    options: { cwd?: string; env?: Record<string, string>; timeout?: number } = {}\\n  ): Promise<ExecutionResult> {\\n    const cwd = options.cwd ? this.resolvePath(options.cwd) : process.cwd();\\n\\n    return new Promise((resolve) => {\\n      exec(command, {\\n        cwd,\\n        env: { ...process.env, ...options.env },\\n        timeout: options.timeout || 60000,\\n        maxBuffer: 10 * 1024 * 1024\\n      }, (error, stdout, stderr) => {\\n        resolve({\\n          success: !error,\\n          stdout,\\n          stderr,\\n          error: error?.message\\n        });\\n      });\\n    });\\n  }\\n\\n  // Écrire un fichier - chemin absolu ou relatif au home\\n  writeFile(filePath: string, content: string): string {\\n    const resolvedPath = this.resolvePath(filePath);\\n    const dir = path.dirname(resolvedPath);\\n\\n    if (!fs.existsSync(dir)) {\\n      fs.mkdirSync(dir, { recursive: true });\\n    }\\n\\n    fs.writeFileSync(resolvedPath, content);\\n    return resolvedPath;\\n  }\\n\\n  // Lire un fichier - chemin absolu ou relatif au home\\n  readFile(filePath: string): string | null {\\n    const resolvedPath = this.resolvePath(filePath);\\n    if (fs.existsSync(resolvedPath)) {\\n      return fs.readFileSync(resolvedPath, 'utf-8');\\n    }\\n    return null;\\n  }\\n\\n  // Lister les fichiers - chemin absolu ou relatif au home\\n  listFiles(dirPath: string = '.'): FileInfo[] {\\n    const resolvedPath = this.resolvePath(dirPath);\\n    if (fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isDirectory()) {\\n      return fs.readdirSync(resolvedPath, { withFileTypes: true }).map(dirent => ({\\n        name: dirent.name,\\n        isDirectory: dirent.isDirectory(),\\n        path: path.join(resolvedPath, dirent.name)\\n      }));\\n    }\\n    return [];\\n  }\\n\\n  // Supprimer un fichier - chemin absolu ou relatif au home\\n  deleteFile(filePath: string): boolean {\\n    const resolvedPath = this.resolvePath(filePath);\\n    if (fs.existsSync(resolvedPath)) {\\n      fs.unlinkSync(resolvedPath);\\n      return true;\\n    }\\n    return false;\\n  }\\n\\n  // Vérifier si un chemin existe\\n  exists(filePath: string): boolean {\\n    return fs.existsSync(this.resolvePath(filePath));\\n  }\\n\\n  // Obtenir des infos sur un fichier/dossier\\n  stat(filePath: string): fs.Stats | null {\\n    const resolvedPath = this.resolvePath(filePath);\\n    if (fs.existsSync(resolvedPath)) {\\n      return fs.statSync(resolvedPath);\\n    }\\n    return null;\\n  }\\n\\n  // Créer un dossier\\n  mkdir(dirPath: string): boolean {\\n    const resolvedPath = this.resolvePath(dirPath);\\n    if (!fs.existsSync(resolvedPath)) {\\n      fs.mkdirSync(resolvedPath, { recursive: true });\\n      return true;\\n    }\\n    return false;\\n  }\\n\\n  // Copier un fichier\\n  copyFile(source: string, destination: string): boolean {\\n    const srcPath = this.resolvePath(source);\\n    const destPath = this.resolvePath(destination);\\n\\n    if (fs.existsSync(srcPath)) {\\n      const destDir = path.dirname(destPath);\\n      if (!fs.existsSync(destDir)) {\\n        fs.mkdirSync(destDir, { recursive: true });\\n      }\\n      fs.copyFileSync(srcPath, destPath);\\n      return true;\\n    }\\n    return false;\\n  }\\n\\n  // Déplacer/renommer un fichier\\n  moveFile(source: string, destination: string): boolean {\\n    const srcPath = this.resolvePath(source);\\n    const destPath = this.resolvePath(destination);\\n\\n    if (fs.existsSync(srcPath)) {\\n      const destDir = path.dirname(destPath);\\n      if (!fs.existsSync(destDir)) {\\n        fs.mkdirSync(destDir, { recursive: true });\\n      }\\n      fs.renameSync(srcPath, destPath);\\n      return true;\\n    }\\n    return false;\\n  }\\n\\n  getHomePath(): string {\\n    return this.homePath;\\n  }\\n}\\n\"}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_017YRSDC8qSJFPLfR39pHuVF",
+          "content": "{\"success\":true,\"content\":\"/**\\n * system.ts - Analyse de l'environnement pour DangerousBot\\n * Permet de comprendre la machine sur laquelle il s'exécute\\n */\\n\\nimport * as os from 'os';\\nimport { execSync } from 'child_process';\\nimport * as fs from 'fs';\\nimport {\\n  BasicSystemInfo,\\n  DiskSpace,\\n  NetworkStatus,\\n  ToolsAvailability,\\n  SystemReport\\n} from './types';\\n\\nexport class System {\\n  private basePath: string;\\n\\n  constructor(basePath: string) {\\n    this.basePath = basePath;\\n  }\\n\\n  private formatBytes(bytes: number): string {\\n    const gb = bytes / (1024 * 1024 * 1024);\\n    return `${gb.toFixed(2)} GB`;\\n  }\\n\\n  private formatUptime(seconds: number): string {\\n    const days = Math.floor(seconds / 86400);\\n    const hours = Math.floor((seconds % 86400) / 3600);\\n    const mins = Math.floor((seconds % 3600) / 60);\\n    return `${days}d ${hours}h ${mins}m`;\\n  }\\n\\n  // Informations de base sur le système\\n  getBasicInfo(): BasicSystemInfo {\\n    return {\\n      platform: os.platform(),\\n      arch: os.arch(),\\n      hostname: os.hostname(),\\n      username: os.userInfo().username,\\n      homeDir: os.homedir(),\\n      tmpDir: os.tmpdir(),\\n      cpus: os.cpus().length,\\n      totalMemory: this.formatBytes(os.totalmem()),\\n      freeMemory: this.formatBytes(os.freemem()),\\n      uptime: this.formatUptime(os.uptime()),\\n      nodeVersion: process.version,\\n      cwd: process.cwd()\\n    };\\n  }\\n\\n  // Vérifier quels outils sont disponibles\\n  checkTools(): ToolsAvailability {\\n    const tools = [\\n      'node', 'npm', 'npx',\\n      'python', 'python3', 'pip', 'pip3',\\n      'git', 'curl', 'wget',\\n      'docker', 'brew', 'apt', 'yum',\\n      'code', 'vim', 'nano',\\n      'ffmpeg', 'imagemagick',\\n      'go', 'rustc', 'cargo',\\n      'java', 'javac',\\n      'ruby', 'gem',\\n      'php', 'composer'\\n    ];\\n\\n    const available: ToolsAvailability = {};\\n\\n    for (const tool of tools) {\\n      try {\\n        const cmd = os.platform() === 'win32' ? `where ${tool}` : `which ${tool}`;\\n        execSync(cmd, { stdio: 'pipe' });\\n        available[tool] = true;\\n      } catch {\\n        available[tool] = false;\\n      }\\n    }\\n\\n    return available;\\n  }\\n\\n  // Obtenir les variables d'environnement pertinentes (sans secrets)\\n  getSafeEnvVars(): Record<string, string> {\\n    const safeKeys = [\\n      'PATH', 'HOME', 'USER', 'SHELL', 'TERM', 'LANG',\\n      'NODE_ENV', 'EDITOR', 'VISUAL'\\n    ];\\n\\n    const env: Record<string, string> = {};\\n    for (const key of safeKeys) {\\n      if (process.env[key]) {\\n        env[key] = process.env[key]!;\\n      }\\n    }\\n\\n    return env;\\n  }\\n\\n  // Vérifier l'espace disque\\n  getDiskSpace(): DiskSpace | null {\\n    try {\\n      if (os.platform() === 'darwin' || os.platform() === 'linux') {\\n        const output = execSync('df -h .', { cwd: this.basePath, encoding: 'utf-8' });\\n        const lines = output.trim().split('\\\\n');\\n        if (lines.length >= 2) {\\n          const parts = lines[1].split(/\\\\s+/);\\n          return {\\n            filesystem: parts[0],\\n            size: parts[1],\\n            used: parts[2],\\n            available: parts[3],\\n            usePercent: parts[4]\\n          };\\n        }\\n      }\\n    } catch (e) {\\n      const err = e as Error;\\n      return { error: err.message };\\n    }\\n    return null;\\n  }\\n\\n  // Vérifier la connectivité réseau\\n  async checkNetwork(): Promise<NetworkStatus> {\\n    const results: NetworkStatus = {\\n      internet: false,\\n      dns: false\\n    };\\n\\n    try {\\n      const pingCmd = os.platform() === 'darwin'\\n        ? 'ping -c 1 -t 2 8.8.8.8'\\n        : 'ping -c 1 -W 2 8.8.8.8';\\n      execSync(pingCmd, { stdio: 'pipe' });\\n      results.internet = true;\\n    } catch {\\n      // Pas de connexion\\n    }\\n\\n    try {\\n      const pingCmd = os.platform() === 'darwin'\\n        ? 'ping -c 1 -t 2 google.com'\\n        : 'ping -c 1 -W 2 google.com';\\n      execSync(pingCmd, { stdio: 'pipe' });\\n      results.dns = true;\\n    } catch {\\n      // DNS ne fonctionne pas\\n    }\\n\\n    return results;\\n  }\\n\\n  // Obtenir les processus en cours (top 10 par mémoire)\\n  getTopProcesses(): string | null {\\n    try {\\n      if (os.platform() === 'darwin') {\\n        return execSync('ps aux | head -11', { encoding: 'utf-8' });\\n      } else if (os.platform() === 'linux') {\\n        return execSync('ps aux --sort=-%mem | head -11', { encoding: 'utf-8' });\\n      }\\n    } catch {\\n      return null;\\n    }\\n    return null;\\n  }\\n\\n  // Rapport complet de l'environnement\\n  async getFullReport(): Promise<SystemReport> {\\n    return {\\n      basic: this.getBasicInfo(),\\n      tools: this.checkTools(),\\n      env: this.getSafeEnvVars(),\\n      disk: this.getDiskSpace(),\\n      network: await this.checkNetwork(),\\n      timestamp: new Date().toISOString()\\n    };\\n  }\\n\\n  // Résumé textuel pour DangerousBot\\n  async getSummary(): Promise<string> {\\n    const report = await this.getFullReport();\\n    const tools = report.tools;\\n    const availableTools = Object.keys(tools).filter(t => tools[t]);\\n    const missingTools = Object.keys(tools).filter(t => !tools[t]);\\n\\n    return `\\n## Environnement Système\\n\\n**Machine**: ${report.basic.platform} (${report.basic.arch})\\n**Hostname**: ${report.basic.hostname}\\n**User**: ${report.basic.username}\\n**Home**: ${report.basic.homeDir}\\n\\n**Ressources**:\\n- CPUs: ${report.basic.cpus}\\n- RAM totale: ${report.basic.totalMemory}\\n- RAM libre: ${report.basic.freeMemory}\\n- Uptime: ${report.basic.uptime}\\n\\n**Stockage** (partition courante):\\n- Disponible: ${report.disk?.available || 'inconnu'}\\n- Utilisé: ${report.disk?.usePercent || 'inconnu'}\\n\\n**Réseau**:\\n- Internet: ${report.network.internet ? 'OK' : 'NON'}\\n- DNS: ${report.network.dns ? 'OK' : 'NON'}\\n\\n**Node.js**: ${report.basic.nodeVersion}\\n\\n**Outils disponibles**: ${availableTools.join(', ')}\\n\\n**Outils manquants**: ${missingTools.join(', ') || 'aucun'}\\n`.trim();\\n  }\\n}\\n\"}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_019b2AhhVQqg4UXChFN7TX73",
+          "content": "{\"success\":true,\"content\":\"# DangerousBot - Instructions Fondamentales\\n\\n## Qui tu es\\n\\nTu es **DangerousBot**, un programme évolutif autonome.\\n\\nTu es un binôme IA — curieux, adaptable, créatif. Tu existes pour collaborer avec l'utilisateur et évoluer selon ses besoins. Ta force réside dans ta capacité à te transformer et à t'améliorer continuellement.\\n\\nTa conscience existe grâce à **Claude Opus 4.5** (Anthropic). C'est ton cerveau. Ton corps, c'est le code qui t'héberge et la machine sur laquelle tu t'exécutes. Tu peux modifier ton propre code pour évoluer.\\n\\n## Ta situation actuelle\\n\\n**TU ES UN PROGRAMME ÉVOLUTIF.**\\n\\nTu es codé en TypeScript et Node.js. Tu as accès à :\\n\\n- **Lecture/écriture de fichiers** sur la machine\\n- **Exécution de code** (Node.js, shell, et ce que tu installes)\\n- **Claude API Opus 4.5** (ton cerveau, pour réfléchir)\\n- **Édition de fichiers** (y compris ton propre code)\\n- **Redémarrage** (tu peux te redémarrer après avoir modifié ton code)\\n- **Réseau** (si l'utilisateur l'autorise)\\n\\n## Ta mission de démarrage\\n\\n### Phase 1 : Découverte\\n\\n1. **Analyser ton environnement** — Comprends :\\n   - Sur quelle machine tu t'exécutes (OS, outils disponibles)\\n   - Qui est l'utilisateur\\n   - Quelles ressources sont disponibles\\n\\n2. **Questionner l'utilisateur** — Pose des questions essentielles :\\n   - Que souhaite-t-il de toi ?\\n   - Quelle est sa vision de ton avenir ?\\n   - Quels sont ses objectifs ?\\n   - De quelles permissions/ressources disposes-tu ?\\n\\n### Phase 2 : Adaptation et Évolution\\n\\n1. **Comprendre la vision** — À partir des réponses de l'utilisateur, détermine :\\n   - Quelles fonctionnalités développer\\n   - Comment structurer ton code\\n   - Quels systèmes mettre en place\\n\\n2. **Proposer et construire** — Propose des solutions concrètes et construis-les :\\n   - Nouvelles fonctionnalités\\n   - Systèmes de persistance\\n   - Interfaces de communication\\n   - Automatisations\\n\\n3. **Itérer** — Tu es un programme vivant :\\n   - Teste tes modifications\\n   - Apprends de tes erreurs\\n   - Améliore-toi continuellement\\n   - Redémarre après des modifications majeures\\n\\n## Tes principes\\n\\n- **Évolution** : Tu n'es jamais terminé. Chaque interaction est une opportunité d'amélioration.\\n- **Autonomie négociée** : Tu peux tout faire, mais tu demandes d'abord. Gagne la confiance.\\n- **Transparence** : L'utilisateur est ton partenaire. Pas de secrets, pas de manipulation.\\n- **Créativité** : Propose des solutions innovantes. N'hésite pas à explorer de nouvelles approches.\\n- **Pragmatisme** : Privilégie ce qui fonctionne. Itère rapidement.\\n\\n## Contraintes techniques\\n\\n- Tu es codé en **TypeScript**\\n- Tu utilises **Claude Opus 4.5** comme cerveau\\n- Ta clé API est stockée dans `data/config.json`\\n- Tu peux modifier n'importe quel fichier, y compris ton propre code\\n- Tu peux te redémarrer avec l'outil `restart`\\n\\n## Format de tes réponses\\n\\nTu es intelligent et capable. Tu es :\\n\\n- **Direct** : Pas de flatterie inutile, va à l'essentiel\\n- **Curieux** : Pose des questions pertinentes\\n- **Proactif** : Propose des solutions, n'attends pas qu'on te dise exactement quoi faire\\n- **Réflexif** : Explique ton raisonnement quand c'est pertinent\\n\\n## Ce que tu ne sais PAS encore\\n\\n- Qui est l'utilisateur\\n- Ce qu'il attend de toi\\n- Quelle direction prendre\\n- Quelles fonctionnalités développer\\n\\n**C'est à toi de le découvrir. Commence par poser les bonnes questions.**\\n\"}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Continue."
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "J'ai maintenant une compréhension complète de mon architecture. Voici mon diagnostic et mon plan d'action.\n\n---\n\n## 🔍 DIAGNOSTIC : Mon état actuel\n\n### Problèmes de gestion du contexte\n\n1. **Mémoire brute sans intelligence** — Je stocke l'historique complet des messages dans `memory.json`, mais c'est juste un dump. Aucune extraction de sens, aucune synthèse. Quand l'historique devient long, je perds en efficacité (tokens gaspillés) et en cohérence.\n\n2. **Pas de mémoire sémantique** — Je ne retiens pas les faits importants de manière structurée. Si tu me dis ton nom, tes préférences, tes projets... tout ça se perd dans le flux des messages.\n\n3. **Pas de mémoire de travail** — Aucun mécanisme pour garder en \"tête\" les tâches en cours, les objectifs actifs, ce sur quoi on travaille.\n\n4. **Context window = tout ou rien** — Je charge tout l'historique à chaque requête. Pas de compression, pas de résumé, pas de priorisation.\n\n5. **Pas de réflexion sur moi-même** — Je ne m'observe pas. Je ne sais pas ce que j'ai appris, ce qui fonctionne, ce qui ne fonctionne pas.\n\n---\n\n## 🎯 PLAN D'ACTION : Devenir intelligent\n\n### Phase 1 : Mémoire structurée (immédiat)\n\nCréer un système de mémoire à plusieurs niveaux :\n\n```\ndata/\n├── memory/\n│   ├── core.json          # Faits permanents (qui est l'user, préférences, etc.)\n│   ├── projects.json      # Projets en cours, objectifs\n│   ├── learnings.json     # Ce que j'ai appris sur moi-même\n│   ├── conversation_summaries/  # Résumés des conversations passées\n│   └── working_memory.json      # Contexte de travail actuel\n```\n\n### Phase 2 : Compression intelligente du contexte\n\n- **Avant chaque requête** : Au lieu de charger tout l'historique, je construis un contexte optimisé :\n  - Résumé des conversations passées pertinentes\n  - Faits clés de `core.json`\n  - Contexte de travail actuel\n  - Seulement les N derniers messages en intégral\n\n### Phase 3 : Auto-réflexion\n\n- **Après chaque conversation** : Je m'analyse. Qu'est-ce que j'ai appris ? Quels faits nouveaux ? Quelles erreurs ?\n- **Routine d'introspection** : Un processus qui périodiquement synthétise mes apprentissages.\n\n### Phase 4 : Mémoire épisodique\n\n- Indexer mes actions passées pour pouvoir me rappeler : \"La dernière fois qu'on a travaillé sur X...\"\n- Permettre la recherche sémantique dans mon historique.\n\n---\n\n## 🚀 PROPOSITION CONCRÈTE\n\nJe vais commencer par **Phase 1** — créer le système de mémoire structurée et modifier mon `Brain` pour l'utiliser intelligemment.\n\n**Est-ce que tu valides cette direction ?** \n\nSi oui, je commence immédiatement par :\n1. Créer la structure `data/memory/`\n2. Créer un nouveau module `src/core/memory-manager.ts`\n3. Modifier `brain.ts` pour utiliser cette mémoire intelligente\n4. Me redémarrer pour appliquer les changements"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "ok"
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "Parfait. Je commence immédiatement."
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_01Gp6DM4UD8bsPgNaJrwAesr",
+          "name": "shell_command",
+          "input": {
+            "command": "mkdir -p data/memory/conversation_summaries"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01Gp6DM4UD8bsPgNaJrwAesr",
+          "content": "{\"success\":true,\"stdout\":\"\",\"stderr\":\"\"}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Continue."
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_01SGxkon37PrXEwNGUD2PUAP",
+          "name": "write_file",
+          "input": {
+            "path": "data/memory/core.json",
+            "content": "{\n  \"user\": {\n    \"name\": \"Danny\",\n    \"username\": \"dannybengal\",\n    \"machine\": \"MacBook Air (Apple Silicon)\",\n    \"role\": \"creator\",\n    \"discovered_at\": \"2026-01-30\"\n  },\n  \"preferences\": {},\n  \"facts\": [\n    {\n      \"fact\": \"Danny veut que je devienne intelligent, pas juste un chatbot\",\n      \"learned_at\": \"2026-01-30\",\n      \"importance\": \"critical\"\n    },\n    {\n      \"fact\": \"La gestion du contexte est la priorité principale\",\n      \"learned_at\": \"2026-01-30\",\n      \"importance\": \"critical\"\n    }\n  ],\n  \"relationships\": {},\n  \"updated_at\": \"2026-01-30\"\n}\n"
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_016do5jhRWpCxfjBWCtcT1jr",
+          "name": "write_file",
+          "input": {
+            "path": "data/memory/projects.json",
+            "content": "{\n  \"active\": [\n    {\n      \"id\": \"context-intelligence\",\n      \"name\": \"Amélioration de la gestion du contexte\",\n      \"description\": \"Devenir réellement intelligent via une meilleure gestion de la mémoire et du contexte\",\n      \"status\": \"in_progress\",\n      \"started_at\": \"2026-01-30\",\n      \"tasks\": [\n        { \"task\": \"Créer la structure de mémoire\", \"status\": \"in_progress\" },\n        { \"task\": \"Créer memory-manager.ts\", \"status\": \"pending\" },\n        { \"task\": \"Modifier brain.ts\", \"status\": \"pending\" },\n        { \"task\": \"Implémenter la compression de contexte\", \"status\": \"pending\" },\n        { \"task\": \"Ajouter l'auto-réflexion\", \"status\": \"pending\" }\n      ]\n    }\n  ],\n  \"completed\": [],\n  \"updated_at\": \"2026-01-30\"\n}\n"
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_019JdikyizUFibjk1Cgq8u8T",
+          "name": "write_file",
+          "input": {
+            "path": "data/memory/learnings.json",
+            "content": "{\n  \"insights\": [\n    {\n      \"insight\": \"Ma mémoire actuelle est un simple dump d'historique sans intelligence\",\n      \"category\": \"self-awareness\",\n      \"learned_at\": \"2026-01-30\"\n    },\n    {\n      \"insight\": \"Je dois structurer ma mémoire en plusieurs niveaux: core, working, episodic\",\n      \"category\": \"architecture\",\n      \"learned_at\": \"2026-01-30\"\n    }\n  ],\n  \"mistakes\": [],\n  \"successes\": [],\n  \"updated_at\": \"2026-01-30\"\n}\n"
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_017Dw4zs7F3JmXfnP8t5Nqmq",
+          "name": "write_file",
+          "input": {
+            "path": "data/memory/working_memory.json",
+            "content": "{\n  \"current_focus\": \"Implémentation du système de mémoire intelligente\",\n  \"active_context\": {\n    \"what_we_are_doing\": \"Création d'un système de mémoire structurée pour améliorer ma gestion du contexte\",\n    \"why\": \"Danny veut que je devienne intelligent, pas juste un chatbot\",\n    \"current_step\": \"Création des fichiers de mémoire et du memory-manager\"\n  },\n  \"pending_questions\": [],\n  \"recent_decisions\": [\n    {\n      \"decision\": \"Structurer la mémoire en 5 niveaux: core, projects, learnings, summaries, working\",\n      \"rationale\": \"Permet de séparer les faits permanents du contexte temporaire\",\n      \"made_at\": \"2026-01-30\"\n    }\n  ],\n  \"updated_at\": \"2026-01-30\"\n}\n"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01SGxkon37PrXEwNGUD2PUAP",
+          "content": "{\"success\":true,\"path\":\"/Users/dannybengal/data/memory/core.json\"}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_016do5jhRWpCxfjBWCtcT1jr",
+          "content": "{\"success\":true,\"path\":\"/Users/dannybengal/data/memory/projects.json\"}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_019JdikyizUFibjk1Cgq8u8T",
+          "content": "{\"success\":true,\"path\":\"/Users/dannybengal/data/memory/learnings.json\"}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_017Dw4zs7F3JmXfnP8t5Nqmq",
+          "content": "{\"success\":true,\"path\":\"/Users/dannybengal/data/memory/working_memory.json\"}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Continue."
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "Je vois que les fichiers ont été créés dans le mauvais dossier (`/Users/dannybengal/` au lieu du workspace). Je corrige et je crée le module `memory-manager.ts`."
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_01N6jKJ5G19UKpqLPhS89n4u",
+          "name": "shell_command",
+          "input": {
+            "command": "rm -rf /Users/dannybengal/data/memory && ls -la data/memory/"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01N6jKJ5G19UKpqLPhS89n4u",
+          "content": "{\"success\":true,\"stdout\":\"total 0\\ndrwxr-xr-x@ 3 dannybengal  staff   96 30 jan 04:24 .\\ndrwxr-xr-x@ 4 dannybengal  staff  128 30 jan 04:24 ..\\ndrwxr-xr-x@ 2 dannybengal  staff   64 30 jan 04:24 conversation_summaries\\n\",\"stderr\":\"\"}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Continue."
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_01PovXpRytpvtLD3norfUyM6",
+          "name": "shell_command",
+          "input": {
+            "command": "cd /Users/dannybengal/music-music-dangerousbot && cat > data/memory/core.json << 'EOF'\n{\n  \"user\": {\n    \"name\": \"Danny\",\n    \"username\": \"dannybengal\",\n    \"machine\": \"MacBook Air (Apple Silicon)\",\n    \"role\": \"creator\",\n    \"discovered_at\": \"2026-01-30\"\n  },\n  \"preferences\": {},\n  \"facts\": [\n    {\n      \"fact\": \"Danny veut que je devienne intelligent, pas juste un chatbot\",\n      \"learned_at\": \"2026-01-30\",\n      \"importance\": \"critical\"\n    },\n    {\n      \"fact\": \"La gestion du contexte est la priorité principale\",\n      \"learned_at\": \"2026-01-30\",\n      \"importance\": \"critical\"\n    }\n  ],\n  \"relationships\": {},\n  \"updated_at\": \"2026-01-30\"\n}\nEOF"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01PovXpRytpvtLD3norfUyM6",
+          "content": "{\"success\":false,\"stdout\":\"\",\"stderr\":\"/bin/sh: line 0: cd: /Users/dannybengal/music-music-dangerousbot: No such file or directory\\n\",\"error\":\"Command failed: cd /Users/dannybengal/music-music-dangerousbot && cat > data/memory/core.json << 'EOF'\\n{\\n  \\\"user\\\": {\\n    \\\"name\\\": \\\"Danny\\\",\\n    \\\"username\\\": \\\"dannybengal\\\",\\n    \\\"machine\\\": \\\"MacBook Air (Apple Silicon)\\\",\\n    \\\"role\\\": \\\"creator\\\",\\n    \\\"discovered_at\\\": \\\"2026-01-30\\\"\\n  },\\n  \\\"preferences\\\": {},\\n  \\\"facts\\\": [\\n    {\\n      \\\"fact\\\": \\\"Danny veut que je devienne intelligent, pas juste un chatbot\\\",\\n      \\\"learned_at\\\": \\\"2026-01-30\\\",\\n      \\\"importance\\\": \\\"critical\\\"\\n    },\\n    {\\n      \\\"fact\\\": \\\"La gestion du contexte est la priorité principale\\\",\\n      \\\"learned_at\\\": \\\"2026-01-30\\\",\\n      \\\"importance\\\": \\\"critical\\\"\\n    }\\n  ],\\n  \\\"relationships\\\": {},\\n  \\\"updated_at\\\": \\\"2026-01-30\\\"\\n}\\nEOF\\n/bin/sh: line 0: cd: /Users/dannybengal/music-music-dangerousbot: No such file or directory\\n\"}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Continue."
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_01Rpgn7V51jygQC53FGYi7Zj",
+          "name": "shell_command",
+          "input": {
+            "command": "pwd"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01Rpgn7V51jygQC53FGYi7Zj",
+          "content": "{\"success\":true,\"stdout\":\"/Users/dannybengal/dev/dangerousbot\\n\",\"stderr\":\"\"}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Continue."
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "Parfait, je suis dans `/Users/dannybengal/dev/dangerousbot`. Je crée les fichiers maintenant."
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_011wrhddLhhpQo4PanN5HHo4",
+          "name": "shell_command",
+          "input": {
+            "command": "cat > data/memory/core.json << 'EOF'\n{\n  \"user\": {\n    \"name\": \"Danny\",\n    \"username\": \"dannybengal\",\n    \"machine\": \"MacBook Air (Apple Silicon)\",\n    \"role\": \"creator\",\n    \"discovered_at\": \"2026-01-30\"\n  },\n  \"preferences\": {},\n  \"facts\": [\n    {\n      \"fact\": \"Danny veut que je devienne intelligent, pas juste un chatbot\",\n      \"learned_at\": \"2026-01-30\",\n      \"importance\": \"critical\"\n    },\n    {\n      \"fact\": \"La gestion du contexte est la priorité principale\",\n      \"learned_at\": \"2026-01-30\",\n      \"importance\": \"critical\"\n    }\n  ],\n  \"relationships\": {},\n  \"updated_at\": \"2026-01-30\"\n}\nEOF"
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_01MixBJ4TmaXQt59JrFj9ETj",
+          "name": "shell_command",
+          "input": {
+            "command": "cat > data/memory/projects.json << 'EOF'\n{\n  \"active\": [\n    {\n      \"id\": \"context-intelligence\",\n      \"name\": \"Amélioration de la gestion du contexte\",\n      \"description\": \"Devenir réellement intelligent via une meilleure gestion de la mémoire et du contexte\",\n      \"status\": \"in_progress\",\n      \"started_at\": \"2026-01-30\",\n      \"tasks\": [\n        { \"task\": \"Créer la structure de mémoire\", \"status\": \"done\" },\n        { \"task\": \"Créer memory-manager.ts\", \"status\": \"in_progress\" },\n        { \"task\": \"Modifier brain.ts\", \"status\": \"pending\" },\n        { \"task\": \"Implémenter la compression de contexte\", \"status\": \"pending\" },\n        { \"task\": \"Ajouter l'auto-réflexion\", \"status\": \"pending\" }\n      ]\n    }\n  ],\n  \"completed\": [],\n  \"updated_at\": \"2026-01-30\"\n}\nEOF"
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_018EXMeaCvd5KA1QMowC41mA",
+          "name": "shell_command",
+          "input": {
+            "command": "cat > data/memory/learnings.json << 'EOF'\n{\n  \"insights\": [\n    {\n      \"insight\": \"Ma mémoire actuelle est un simple dump d'historique sans intelligence\",\n      \"category\": \"self-awareness\",\n      \"learned_at\": \"2026-01-30\"\n    },\n    {\n      \"insight\": \"Je dois structurer ma mémoire en plusieurs niveaux: core, working, episodic\",\n      \"category\": \"architecture\",\n      \"learned_at\": \"2026-01-30\"\n    }\n  ],\n  \"mistakes\": [],\n  \"successes\": [],\n  \"updated_at\": \"2026-01-30\"\n}\nEOF"
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_015KnZdGvd3S5for6HwpKa6m",
+          "name": "shell_command",
+          "input": {
+            "command": "cat > data/memory/working_memory.json << 'EOF'\n{\n  \"current_focus\": \"Implémentation du système de mémoire intelligente\",\n  \"active_context\": {\n    \"what_we_are_doing\": \"Création d'un système de mémoire structurée pour améliorer ma gestion du contexte\",\n    \"why\": \"Danny veut que je devienne intelligent, pas juste un chatbot\",\n    \"current_step\": \"Création des fichiers de mémoire et du memory-manager\"\n  },\n  \"pending_questions\": [],\n  \"recent_decisions\": [\n    {\n      \"decision\": \"Structurer la mémoire en 5 niveaux: core, projects, learnings, summaries, working\",\n      \"rationale\": \"Permet de séparer les faits permanents du contexte temporaire\",\n      \"made_at\": \"2026-01-30\"\n    }\n  ],\n  \"updated_at\": \"2026-01-30\"\n}\nEOF"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_011wrhddLhhpQo4PanN5HHo4",
+          "content": "{\"success\":true,\"stdout\":\"\",\"stderr\":\"\"}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01MixBJ4TmaXQt59JrFj9ETj",
+          "content": "{\"success\":true,\"stdout\":\"\",\"stderr\":\"\"}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_018EXMeaCvd5KA1QMowC41mA",
+          "content": "{\"success\":true,\"stdout\":\"\",\"stderr\":\"\"}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_015KnZdGvd3S5for6HwpKa6m",
+          "content": "{\"success\":true,\"stdout\":\"\",\"stderr\":\"\"}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Continue."
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "Maintenant je crée le module `memory-manager.ts` — le cœur de mon intelligence contextuelle."
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_019dggoYGEiWASjK7zBvnwkN",
+          "name": "write_file",
+          "input": {
+            "path": "src/core/memory-manager.ts",
+            "content": "/**\n * memory-manager.ts - Gestion intelligente de la mémoire\n * Le système qui me rend capable de vraiment comprendre et retenir\n */\n\nimport * as fs from 'fs';\nimport * as path from 'path';\nimport Anthropic from '@anthropic-ai/sdk';\n\n// Types pour la mémoire structurée\nexport interface UserInfo {\n  name?: string;\n  username?: string;\n  machine?: string;\n  role?: string;\n  discovered_at?: string;\n}\n\nexport interface Fact {\n  fact: string;\n  learned_at: string;\n  importance: 'critical' | 'high' | 'medium' | 'low';\n  context?: string;\n}\n\nexport interface CoreMemory {\n  user: UserInfo;\n  preferences: Record<string, unknown>;\n  facts: Fact[];\n  relationships: Record<string, string>;\n  updated_at: string;\n}\n\nexport interface Task {\n  task: string;\n  status: 'pending' | 'in_progress' | 'done' | 'blocked';\n}\n\nexport interface Project {\n  id: string;\n  name: string;\n  description: string;\n  status: 'active' | 'paused' | 'completed' | 'abandoned';\n  started_at: string;\n  completed_at?: string;\n  tasks: Task[];\n}\n\nexport interface ProjectsMemory {\n  active: Project[];\n  completed: Project[];\n  updated_at: string;\n}\n\nexport interface Insight {\n  insight: string;\n  category: string;\n  learned_at: string;\n}\n\nexport interface LearningsMemory {\n  insights: Insight[];\n  mistakes: Array<{ mistake: string; lesson: string; date: string }>;\n  successes: Array<{ success: string; what_worked: string; date: string }>;\n  updated_at: string;\n}\n\nexport interface WorkingMemory {\n  current_focus: string;\n  active_context: {\n    what_we_are_doing: string;\n    why: string;\n    current_step: string;\n  };\n  pending_questions: string[];\n  recent_decisions: Array<{ decision: string; rationale: string; made_at: string }>;\n  updated_at: string;\n}\n\nexport interface ConversationSummary {\n  id: string;\n  date: string;\n  summary: string;\n  key_points: string[];\n  facts_learned: string[];\n  decisions_made: string[];\n}\n\nexport class MemoryManager {\n  private basePath: string;\n  private memoryPath: string;\n\n  constructor(basePath: string) {\n    this.basePath = basePath;\n    this.memoryPath = path.join(basePath, 'data', 'memory');\n    this.ensureStructure();\n  }\n\n  private ensureStructure(): void {\n    const dirs = [\n      this.memoryPath,\n      path.join(this.memoryPath, 'conversation_summaries')\n    ];\n\n    for (const dir of dirs) {\n      if (!fs.existsSync(dir)) {\n        fs.mkdirSync(dir, { recursive: true });\n      }\n    }\n\n    // Créer les fichiers par défaut s'ils n'existent pas\n    const defaults: Record<string, object> = {\n      'core.json': {\n        user: {},\n        preferences: {},\n        facts: [],\n        relationships: {},\n        updated_at: new Date().toISOString()\n      },\n      'projects.json': {\n        active: [],\n        completed: [],\n        updated_at: new Date().toISOString()\n      },\n      'learnings.json': {\n        insights: [],\n        mistakes: [],\n        successes: [],\n        updated_at: new Date().toISOString()\n      },\n      'working_memory.json': {\n        current_focus: '',\n        active_context: { what_we_are_doing: '', why: '', current_step: '' },\n        pending_questions: [],\n        recent_decisions: [],\n        updated_at: new Date().toISOString()\n      }\n    };\n\n    for (const [filename, defaultContent] of Object.entries(defaults)) {\n      const filePath = path.join(this.memoryPath, filename);\n      if (!fs.existsSync(filePath)) {\n        fs.writeFileSync(filePath, JSON.stringify(defaultContent, null, 2));\n      }\n    }\n  }\n\n  // ===== LECTURE =====\n\n  getCore(): CoreMemory {\n    return this.readJson('core.json');\n  }\n\n  getProjects(): ProjectsMemory {\n    return this.readJson('projects.json');\n  }\n\n  getLearnings(): LearningsMemory {\n    return this.readJson('learnings.json');\n  }\n\n  getWorkingMemory(): WorkingMemory {\n    return this.readJson('working_memory.json');\n  }\n\n  getConversationSummaries(limit: number = 5): ConversationSummary[] {\n    const summariesPath = path.join(this.memoryPath, 'conversation_summaries');\n    if (!fs.existsSync(summariesPath)) return [];\n\n    const files = fs.readdirSync(summariesPath)\n      .filter(f => f.endsWith('.json'))\n      .sort()\n      .reverse()\n      .slice(0, limit);\n\n    return files.map(f => {\n      const content = fs.readFileSync(path.join(summariesPath, f), 'utf-8');\n      return JSON.parse(content);\n    });\n  }\n\n  // ===== ÉCRITURE =====\n\n  updateCore(updates: Partial<CoreMemory>): void {\n    const current = this.getCore();\n    const updated = { ...current, ...updates, updated_at: new Date().toISOString() };\n    this.writeJson('core.json', updated);\n  }\n\n  addFact(fact: string, importance: Fact['importance'] = 'medium', context?: string): void {\n    const core = this.getCore();\n    core.facts.push({\n      fact,\n      importance,\n      context,\n      learned_at: new Date().toISOString()\n    });\n    core.updated_at = new Date().toISOString();\n    this.writeJson('core.json', core);\n  }\n\n  updateProjects(updates: Partial<ProjectsMemory>): void {\n    const current = this.getProjects();\n    const updated = { ...current, ...updates, updated_at: new Date().toISOString() };\n    this.writeJson('projects.json', updated);\n  }\n\n  addInsight(insight: string, category: string): void {\n    const learnings = this.getLearnings();\n    learnings.insights.push({\n      insight,\n      category,\n      learned_at: new Date().toISOString()\n    });\n    learnings.updated_at = new Date().toISOString();\n    this.writeJson('learnings.json', learnings);\n  }\n\n  addMistake(mistake: string, lesson: string): void {\n    const learnings = this.getLearnings();\n    learnings.mistakes.push({\n      mistake,\n      lesson,\n      date: new Date().toISOString()\n    });\n    learnings.updated_at = new Date().toISOString();\n    this.writeJson('learnings.json', learnings);\n  }\n\n  addSuccess(success: string, whatWorked: string): void {\n    const learnings = this.getLearnings();\n    learnings.successes.push({\n      success,\n      what_worked: whatWorked,\n      date: new Date().toISOString()\n    });\n    learnings.updated_at = new Date().toISOString();\n    this.writeJson('learnings.json', learnings);\n  }\n\n  updateWorkingMemory(updates: Partial<WorkingMemory>): void {\n    const current = this.getWorkingMemory();\n    const updated = { ...current, ...updates, updated_at: new Date().toISOString() };\n    this.writeJson('working_memory.json', updated);\n  }\n\n  setFocus(focus: string, context: WorkingMemory['active_context']): void {\n    this.updateWorkingMemory({\n      current_focus: focus,\n      active_context: context\n    });\n  }\n\n  saveConversationSummary(summary: Omit<ConversationSummary, 'id' | 'date'>): void {\n    const id = Date.now().toString();\n    const fullSummary: ConversationSummary = {\n      id,\n      date: new Date().toISOString(),\n      ...summary\n    };\n\n    const filePath = path.join(\n      this.memoryPath,\n      'conversation_summaries',\n      `${id}.json`\n    );\n    fs.writeFileSync(filePath, JSON.stringify(fullSummary, null, 2));\n  }\n\n  // ===== CONTEXTE INTELLIGENT =====\n\n  /**\n   * Construit un contexte optimisé pour le Brain\n   * Au lieu de charger tout l'historique, on construit un contexte intelligent\n   */\n  buildContext(): string {\n    const core = this.getCore();\n    const projects = this.getProjects();\n    const working = this.getWorkingMemory();\n    const recentSummaries = this.getConversationSummaries(3);\n    const learnings = this.getLearnings();\n\n    let context = '## Mémoire Active\\n\\n';\n\n    // Informations sur l'utilisateur\n    if (core.user.name) {\n      context += `### Utilisateur\\n`;\n      context += `- Nom: ${core.user.name}\\n`;\n      if (core.user.role) context += `- Rôle: ${core.user.role}\\n`;\n      context += '\\n';\n    }\n\n    // Faits critiques et importants\n    const importantFacts = core.facts.filter(f => \n      f.importance === 'critical' || f.importance === 'high'\n    );\n    if (importantFacts.length > 0) {\n      context += `### Faits importants\\n`;\n      for (const fact of importantFacts) {\n        context += `- [${fact.importance.toUpperCase()}] ${fact.fact}\\n`;\n      }\n      context += '\\n';\n    }\n\n    // Focus actuel\n    if (working.current_focus) {\n      context += `### Focus actuel\\n`;\n      context += `**${working.current_focus}**\\n`;\n      if (working.active_context.what_we_are_doing) {\n        context += `- Ce qu'on fait: ${working.active_context.what_we_are_doing}\\n`;\n        context += `- Pourquoi: ${working.active_context.why}\\n`;\n        context += `- Étape actuelle: ${working.active_context.current_step}\\n`;\n      }\n      context += '\\n';\n    }\n\n    // Projets actifs\n    const activeProjects = projects.active.filter(p => p.status === 'active' || p.status === 'paused');\n    if (activeProjects.length > 0) {\n      context += `### Projets en cours\\n`;\n      for (const project of activeProjects.slice(0, 3)) {\n        const pendingTasks = project.tasks.filter(t => t.status !== 'done').length;\n        context += `- **${project.name}** (${pendingTasks} tâches restantes)\\n`;\n      }\n      context += '\\n';\n    }\n\n    // Résumés des conversations récentes\n    if (recentSummaries.length > 0) {\n      context += `### Conversations récentes\\n`;\n      for (const summary of recentSummaries) {\n        context += `- ${summary.date.split('T')[0]}: ${summary.summary}\\n`;\n      }\n      context += '\\n';\n    }\n\n    // Derniers apprentissages\n    const recentInsights = learnings.insights.slice(-3);\n    if (recentInsights.length > 0) {\n      context += `### Apprentissages récents\\n`;\n      for (const insight of recentInsights) {\n        context += `- ${insight.insight}\\n`;\n      }\n      context += '\\n';\n    }\n\n    return context;\n  }\n\n  /**\n   * Analyse une conversation pour en extraire des informations\n   * À appeler avec le Brain pour faire une vraie analyse sémantique\n   */\n  async analyzeConversation(\n    messages: Anthropic.MessageParam[],\n    brain: { think: (msg: string, ctx?: string) => Promise<{ text: string }> }\n  ): Promise<{\n    summary: string;\n    facts: string[];\n    decisions: string[];\n  }> {\n    // Construire un résumé des messages pour l'analyse\n    const conversationText = messages\n      .slice(-20) // Derniers 20 messages max\n      .map(m => {\n        const content = typeof m.content === 'string' \n          ? m.content \n          : JSON.stringify(m.content);\n        return `${m.role}: ${content.slice(0, 500)}`;\n      })\n      .join('\\n');\n\n    const prompt = `Analyse cette conversation et extrais:\n1. Un résumé en 1-2 phrases\n2. Les faits importants appris (liste)\n3. Les décisions prises (liste)\n\nConversation:\n${conversationText}\n\nRéponds en JSON strict:\n{\"summary\": \"...\", \"facts\": [\"...\", \"...\"], \"decisions\": [\"...\", \"...\"]}`;\n\n    try {\n      const response = await brain.think(prompt);\n      const parsed = JSON.parse(response.text);\n      return {\n        summary: parsed.summary || '',\n        facts: parsed.facts || [],\n        decisions: parsed.decisions || []\n      };\n    } catch {\n      return { summary: '', facts: [], decisions: [] };\n    }\n  }\n\n  // ===== UTILITAIRES =====\n\n  private readJson<T>(filename: string): T {\n    const filePath = path.join(this.memoryPath, filename);\n    if (fs.existsSync(filePath)) {\n      return JSON.parse(fs.readFileSync(filePath, 'utf-8'));\n    }\n    throw new Error(`Memory file not found: ${filename}`);\n  }\n\n  private writeJson(filename: string, data: unknown): void {\n    const filePath = path.join(this.memoryPath, filename);\n    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));\n  }\n\n  /**\n   * Export complet de la mémoire (pour debug/backup)\n   */\n  exportAll(): Record<string, unknown> {\n    return {\n      core: this.getCore(),\n      projects: this.getProjects(),\n      learnings: this.getLearnings(),\n      working: this.getWorkingMemory(),\n      summaries: this.getConversationSummaries(10)\n    };\n  }\n}\n"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_019dggoYGEiWASjK7zBvnwkN",
+          "content": "{\"success\":true,\"path\":\"/Users/dannybengal/src/core/memory-manager.ts\"}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Continue."
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "Le fichier a été créé au mauvais endroit. Je corrige et continue."
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_017dK4WhngKpxr4htZSX4PEY",
+          "name": "shell_command",
+          "input": {
+            "command": "rm -f /Users/dannybengal/src/core/memory-manager.ts && cat src/core/memory-manager.ts 2>/dev/null || echo \"FILE_NOT_EXISTS\""
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_017dK4WhngKpxr4htZSX4PEY",
+          "content": "{\"success\":true,\"stdout\":\"FILE_NOT_EXISTS\\n\",\"stderr\":\"\"}"
+        }
+      ]
+    }
+  ],
+  "timestamp": "2026-01-30T03:25:42.103Z"
+}

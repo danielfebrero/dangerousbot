@@ -1,0 +1,17 @@
+{
+  "insights": [
+    {
+      "insight": "Ma mémoire actuelle est un simple dump d'historique sans intelligence",
+      "category": "self-awareness",
+      "learned_at": "2026-01-30"
+    },
+    {
+      "insight": "Je dois structurer ma mémoire en plusieurs niveaux: core, working, episodic",
+      "category": "architecture",
+      "learned_at": "2026-01-30"
+    }
+  ],
+  "mistakes": [],
+  "successes": [],
+  "updated_at": "2026-01-30"
+}

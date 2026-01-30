@@ -75,13 +75,22 @@ export class Executor {
     }
   }
 
-  // Exécution via fichier - chemin absolu requis
+  // Exécution via fichier - utilise /tmp par défaut et nettoie après
   async executeFile(
     filePath: string,
     code: string,
     interpreter: string = 'node'
   ): Promise<ExecutionResult> {
-    const resolvedPath = this.resolvePath(filePath);
+    // Si le chemin n'est pas absolu, utiliser /tmp au lieu du home
+    let resolvedPath: string;
+    if (path.isAbsolute(filePath)) {
+      resolvedPath = filePath;
+    } else {
+      // Créer un nom de fichier unique dans /tmp
+      const tempDir = os.tmpdir();
+      resolvedPath = path.join(tempDir, filePath);
+    }
+
     const dir = path.dirname(resolvedPath);
 
     // Créer le dossier si nécessaire
@@ -92,6 +101,17 @@ export class Executor {
     fs.writeFileSync(resolvedPath, code);
 
     return new Promise((resolve) => {
+      const cleanup = () => {
+        // Supprimer le fichier temporaire
+        try {
+          if (fs.existsSync(resolvedPath)) {
+            fs.unlinkSync(resolvedPath);
+          }
+        } catch (err) {
+          // Ignorer les erreurs de suppression
+        }
+      };
+
       const child = spawn(interpreter, [resolvedPath], {
         cwd: dir,
         env: process.env
@@ -109,6 +129,7 @@ export class Executor {
       });
 
       child.on('close', (exitCode: number | null) => {
+        cleanup();
         resolve({
           success: exitCode === 0,
           exitCode: exitCode ?? -1,
@@ -119,6 +140,7 @@ export class Executor {
       });
 
       child.on('error', (error: Error) => {
+        cleanup();
         resolve({
           success: false,
           error: error.message,
@@ -129,6 +151,7 @@ export class Executor {
       // Timeout de 60 secondes
       setTimeout(() => {
         child.kill();
+        cleanup();
         resolve({
           success: false,
           error: 'Execution timeout (60s)',

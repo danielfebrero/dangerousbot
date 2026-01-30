@@ -1,0 +1,24 @@
+{
+  "user": {
+    "name": "Danny",
+    "username": "dannybengal",
+    "machine": "MacBook Air (Apple Silicon)",
+    "role": "creator",
+    "discovered_at": "2026-01-30"
+  },
+  "preferences": {},
+  "facts": [
+    {
+      "fact": "Danny veut que je devienne intelligent, pas juste un chatbot",
+      "learned_at": "2026-01-30",
+      "importance": "critical"
+    },
+    {
+      "fact": "La gestion du contexte est la priorité principale",
+      "learned_at": "2026-01-30",
+      "importance": "critical"
+    }
+  ],
+  "relationships": {},
+  "updated_at": "2026-01-30"
+}
