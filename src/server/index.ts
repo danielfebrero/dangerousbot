@@ -157,6 +157,12 @@ export class DangerousBotServer {
 
       // Boucle de traitement des outils
       while (response.stopReason === 'tool_use') {
+        // Vérifier si abort a été demandé
+        if (abortSignal?.aborted) {
+          console.log('[Server] Abort détecté dans la boucle tool_use');
+          throw new Error('Request aborted by user');
+        }
+        
         for (const block of response.content) {
           if (block.type === 'text') {
             // Seulement si du texte n'a pas déjà été streamé
@@ -201,6 +207,12 @@ export class DangerousBotServer {
             // Vérifier si un redémarrage est nécessaire
             if (result.needsRestart) {
               this.wsManager.sendSystem('Redémarrage du serveur en cours...');
+            }
+
+            // Vérifier si abort a été demandé après l'exécution d'un tool
+            if (abortSignal?.aborted) {
+              console.log('[Server] Abort détecté après exécution tool');
+              throw new Error('Request aborted by user');
             }
 
             // Vérifier si un changement de provider est demandé
@@ -272,9 +284,16 @@ export class DangerousBotServer {
         }, 2000);
       }
     } catch (error) {
-      if ((error as Error).message === 'Request aborted by user') {
+      if ((error as Error).message === 'Request aborted by user' || 
+          (error as Error).name === 'AbortError' ||
+          abortSignal?.aborted) {
         console.log('[Server] Requête annulée par l\'utilisateur');
-        this.wsManager.sendSystem('Génération arrêtée.');
+        this.wsManager.sendSystem('🛑 Génération arrêtée.');
+        // Envoyer message_complete pour signaler la fin du stream
+        this.wsManager.broadcast({
+          type: 'usage',
+          payload: { input_tokens: 0, output_tokens: 0, cost: { input_cost: 0, output_cost: 0, total_cost: 0 } }
+        });
       } else {
         console.error('[Server] Erreur:', error);
         this.wsManager.sendError(`Erreur: ${(error as Error).message}`);
