@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DangerousBot - Interface</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #00ff41;
+            overflow: hidden;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            height: 100vh;
+            padding: 20px;
+            gap: 20px;
+        }
+        
+        .header {
+            border: 1px solid #00ff41;
+            padding: 15px;
+            background: rgba(0, 255, 65, 0.1);
+        }
+        
+        .status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .pulse {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #00ff41;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        
+        .chat-area {
+            border: 1px solid #00ff41;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: rgba(0, 255, 65, 0.05);
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-left: 3px solid #00ff41;
+            background: rgba(0, 255, 65, 0.1);
+        }
+        
+        .message.user {
+            border-left-color: #ff4500;
+            background: rgba(255, 69, 0, 0.1);
+        }
+        
+        .message-time {
+            font-size: 0.8em;
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+        
+        .input-area {
+            display: flex;
+            border-top: 1px solid #00ff41;
+            background: #111;
+        }
+        
+        #messageInput {
+            flex: 1;
+            padding: 15px;
+            background: transparent;
+            border: none;
+            color: #00ff41;
+            font-family: inherit;
+            font-size: 14px;
+            outline: none;
+        }
+        
+        #messageInput::placeholder {
+            color: rgba(0, 255, 65, 0.5);
+        }
+        
+        #sendBtn {
+            padding: 15px 25px;
+            background: #00ff41;
+            color: #000;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+        }
+        
+        #sendBtn:hover {
+            background: #00cc33;
+        }
+        
+        #sendBtn:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        
+        .stats {
+            padding: 15px;
+            border: 1px solid #00ff41;
+            background: rgba(0, 255, 65, 0.1);
+            font-size: 0.9em;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        
+        .connected {
+            background: rgba(0, 255, 65, 0.2);
+            border: 1px solid #00ff41;
+            color: #00ff41;
+        }
+        
+        .disconnected {
+            background: rgba(255, 0, 0, 0.2);
+            border: 1px solid #ff0000;
+            color: #ff0000;
+        }
+    </style>
+</head>
+<body>
+    <div class="connection-status" id="connectionStatus">Connexion...</div>
+    
+    <div class="container">
+        <div class="header">
+            <div class="status">
+                <div>
+                    <strong>🤖 DangerousBot</strong> - Binôme IA pour Dani
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span id="statusText">Initializing...</span>
+                    <div class="pulse" id="pulse"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="chat-area">
+            <div class="messages" id="messages">
+                <div class="message">
+                    <div class="message-time">Système • Maintenant</div>
+                    <div>🤖 DangerousBot s'éveille... Interface de communication prête!</div>
+                </div>
+            </div>
+            
+            <div class="input-area">
+                <input 
+                    type="text" 
+                    id="messageInput" 
+                    placeholder="Tape ton message ici Dani..."
+                    autocomplete="off"
+                >
+                <button id="sendBtn">Envoyer</button>
+            </div>
+        </div>
+        
+        <div class="stats">
+            <div class="stats-grid">
+                <div>Uptime: <span id="uptime">0s</span></div>
+                <div>Messages: <span id="messageCount">0</span></div>
+                <div>Statut: <span id="botStatus">En ligne</span></div>
+                <div>Dernière activité: <span id="lastActivity">Maintenant</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class DangerousBotInterface {
+            constructor() {
+                this.ws = null;
+                this.messageCount = 0;
+                this.startTime = Date.now();
+                
+                this.messageInput = document.getElementById('messageInput');
+                this.sendBtn = document.getElementById('sendBtn');
+                this.messages = document.getElementById('messages');
+                
+                this.init();
+            }
+            
+            init() {
+                this.connectWebSocket();
+                this.setupEventListeners();
+                this.startStatsUpdate();
+                
+                // Message de bienvenue
+                this.addMessage('system', '👋 Interface connectée! Tu peux maintenant communiquer avec moi.');
+            }
+            
+            connectWebSocket() {
+                try {
+                    this.ws = new WebSocket('ws://localhost:3043');
+                    
+                    this.ws.onopen = () => {
+                        console.log('WebSocket connecté');
+                        this.updateConnectionStatus(true);
+                        document.getElementById('statusText').textContent = 'En ligne';
+                    };
+                    
+                    this.ws.onmessage = (event) => {
+                        const msg = JSON.parse(event.data);
+                        this.handleWebSocketMessage(msg);
+                    };
+                    
+                    this.ws.onclose = () => {
+                        console.log('WebSocket déconnecté');
+                        this.updateConnectionStatus(false);
+                        document.getElementById('statusText').textContent = 'Déconnecté';
+                        
+                        // Tentative de reconnexion après 3 secondes
+                        setTimeout(() => this.connectWebSocket(), 3000);
+                    };
+                    
+                    this.ws.onerror = (error) => {
+                        console.error('Erreur WebSocket:', error);
+                        this.updateConnectionStatus(false);
+                    };
+                } catch (error) {
+                    console.error('Erreur connexion WebSocket:', error);
+                    this.updateConnectionStatus(false);
+                }
+            }
+            
+            handleWebSocketMessage(msg) {
+                switch (msg.type) {
+                    case 'response':
+                        this.addMessage('bot', msg.data.text);
+                        break;
+                    case 'heartbeat':
+                        this.updateStats(msg.data);
+                        break;
+                    case 'status':
+                        document.getElementById('statusText').textContent = msg.data.status;
+                        break;
+                }
+            }
+            
+            setupEventListeners() {
+                this.sendBtn.addEventListener('click', () => this.sendMessage());
+                
+                this.messageInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        this.sendMessage();
+                    }
+                });
+            }
+            
+            sendMessage() {
+                const message = this.messageInput.value.trim();
+                if (!message || !this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+                
+                this.addMessage('user', message);
+                this.messageInput.value = '';
+                
+                this.ws.send(JSON.stringify({
+                    type: 'message',
+                    content: message,
+                    timestamp: new Date().toISOString()
+                }));
+                
+                this.messageCount++;
+                document.getElementById('messageCount').textContent = this.messageCount;
+            }
+            
+            addMessage(type, content) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${type}`;
+                
+                const timeDiv = document.createElement('div');
+                timeDiv.className = 'message-time';
+                const sender = type === 'user' ? 'Dani' : type === 'bot' ? 'DangerousBot' : 'Système';
+                timeDiv.textContent = `${sender} • ${new Date().toLocaleTimeString()}`;
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.textContent = content;
+                
+                messageDiv.appendChild(timeDiv);
+                messageDiv.appendChild(contentDiv);
+                
+                this.messages.appendChild(messageDiv);
+                this.messages.scrollTop = this.messages.scrollHeight;
+                
+                document.getElementById('lastActivity').textContent = new Date().toLocaleTimeString();
+            }
+            
+            updateConnectionStatus(connected) {
+                const status = document.getElementById('connectionStatus');
+                if (connected) {
+                    status.textContent = 'Connecté';
+                    status.className = 'connection-status connected';
+                } else {
+                    status.textContent = 'Déconnecté';
+                    status.className = 'connection-status disconnected';
+                }
+            }
+            
+            updateStats(data) {
+                if (data.uptime) {
+                    const uptime = Math.floor(data.uptime);
+                    document.getElementById('uptime').textContent = `${uptime}s`;
+                }
+                
+                if (data.status) {
+                    document.getElementById('botStatus').textContent = data.status;
+                }
+            }
+            
+            startStatsUpdate() {
+                setInterval(() => {
+                    const uptime = Math.floor((Date.now() - this.startTime) / 1000);
+                    // Interface uptime (différent du bot uptime)
+                }, 1000);
+            }
+        }
+        
+        // Démarrage de l'interface
+        document.addEventListener('DOMContentLoaded', () => {
+            new DangerousBotInterface();
+        });
+    </script>
+</body>
+</html>

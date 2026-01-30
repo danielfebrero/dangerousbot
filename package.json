@@ -1,0 +1,23 @@
+{
+  "name": "dangerousbot",
+  "version": "0.1.0",
+  "description": "DangerousBot - Binôme IA persistant pour Dani",
+  "main": "core/daemon.js",
+  "scripts": {
+    "start": "node core/daemon.js",
+    "dev": "nodemon core/daemon.js",
+    "install-daemon": "node scripts/install-daemon.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.14.2",
+    "chokidar": "^3.5.3",
+    "node-cron": "^3.0.3",
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "author": "DangerousBot",
+  "license": "MIT"
+}

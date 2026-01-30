@@ -1,0 +1,13 @@
+{
+  "identity": {
+    "name": "DangerousBot",
+    "version": "0.1.0",
+    "birthTime": "2026-01-30T00:31:18.263Z",
+    "status": "alive"
+  },
+  "user": {
+    "name": "Dani"
+  },
+  "sessions": [],
+  "heartbeats": []
+}
