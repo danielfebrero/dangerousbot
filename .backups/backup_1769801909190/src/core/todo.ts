@@ -3,7 +3,7 @@
  * Stockage SQLite avec deux tables: projects et tasks
  */
 
-import { DatabaseSync } from 'better-sqlite3';
+import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 
@@ -43,7 +43,7 @@ export type TodoAction =
   | { type: 'reorder_tasks'; project_id: number; task_ids: number[] };
 
 export class TodoManager {
-  private db: DatabaseSync;
+  private db: Database.Database;
   private dbPath: string;
 
   constructor(dataDir: string = './data') {
@@ -54,7 +54,7 @@ export class TodoManager {
       fs.mkdirSync(dataDir, { recursive: true });
     }
     
-    this.db = new DatabaseSync(this.dbPath);
+    this.db = new Database(this.dbPath);
     this.initTables();
   }
 

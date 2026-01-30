@@ -6,7 +6,7 @@ import { MessageList } from './components/MessageList';
 import { MessageInput } from './components/MessageInput';
 import { ToolPanel } from './components/ToolPanel';
 import { ToolPanelToggle } from './components/ToolPanelToggle';
-import { Message, WSMessage, TokenUsage, ContentPart } from './types';
+import { Message, WSMessage, TokenUsage, ContentPart, ToolCallExecution } from './types';
 import './styles/global.css';
 
 function App() {
@@ -30,6 +30,10 @@ function App() {
 
   // Track tool execution IDs for matching results
   const toolExecutionMapRef = useRef<Record<string, string>>({});
+  
+  // Track active tool executions for chat display
+  const [activeToolExecutions, setActiveToolExecutions] = useState<ToolCallExecution[]>([]);
+  const activeToolExecutionsRef = useRef<ToolCallExecution[]>([]);
 
   // Header auto-hide on scroll
   useEffect(() => {
@@ -160,24 +164,27 @@ function App() {
         const execId = addExecution(toolName, toolInput);
         toolExecutionMapRef.current[toolName] = execId;
 
-        // Add to messages - only update existing streaming message, don't create new one
-        setMessages(prev => {
-          const lastMessage = prev[prev.length - 1];
-
-          if (lastMessage && lastMessage.type === 'bot' && lastMessage.id === streamingMessageIdRef.current) {
-            const updatedMessages = [...prev];
-            const existingToolCalls = lastMessage.toolCalls || [];
-            updatedMessages[updatedMessages.length - 1] = {
-              ...lastMessage,
-              toolCalls: [...existingToolCalls, { name: toolName, input: toolInput }]
-            };
-            return updatedMessages;
-          }
-
-          // Don't create empty message if no streaming message exists
-          // Tool call will be shown in the next bot message
-          return prev;
-        });
+        // Create a new tool execution message in the chat
+        const newExecution: ToolCallExecution = {
+          id: execId,
+          toolName: toolName,
+          input: toolInput,
+          status: 'running',
+          startTime: new Date()
+        };
+        
+        // Add to active executions
+        activeToolExecutionsRef.current = [...activeToolExecutionsRef.current, newExecution];
+        setActiveToolExecutions(activeToolExecutionsRef.current);
+        
+        // Add as a separate message in the chat
+        setMessages(prev => [...prev, {
+          id: execId,
+          type: 'tool_execution',
+          content: '',
+          toolExecution: newExecution,
+          timestamp: new Date()
+        }]);
         break;
 
       case 'tool_result':
@@ -186,11 +193,48 @@ function App() {
         const resultExecId = toolExecutionMapRef.current[resultToolName];
         if (resultExecId) {
           const result = wsMessage.payload.result;
-          if (result?.success === false || result?.error) {
+          const isError = result?.success === false || result?.error;
+          
+          if (isError) {
             failExecution(resultExecId, result.error || 'Unknown error');
           } else {
             completeExecution(resultExecId, result);
           }
+          
+          // Update the tool execution message in chat
+          setMessages(prev => {
+            return prev.map(msg => {
+              if (msg.type === 'tool_execution' && msg.toolExecution?.id === resultExecId) {
+                return {
+                  ...msg,
+                  toolExecution: {
+                    ...msg.toolExecution,
+                    status: isError ? 'error' : 'completed',
+                    output: isError ? undefined : result,
+                    error: isError ? (result.error || 'Unknown error') : undefined,
+                    endTime: new Date()
+                  }
+                };
+              }
+              return msg;
+            });
+          });
+          
+          // Update active executions ref
+          activeToolExecutionsRef.current = activeToolExecutionsRef.current.map(exec => {
+            if (exec.id === resultExecId) {
+              return {
+                ...exec,
+                status: isError ? 'error' : 'completed',
+                output: isError ? undefined : result,
+                error: isError ? (result.error || 'Unknown error') : undefined,
+                endTime: new Date()
+              };
+            }
+            return exec;
+          });
+          setActiveToolExecutions(activeToolExecutionsRef.current);
+          
           delete toolExecutionMapRef.current[resultToolName];
         }
         break;

@@ -12,3 +12,9 @@ server:
   port: 8080
   bind_address: "0.0.0.0"
   secret_key: "dangerousbot_secret_key_change_me"
+  
+ui:
+  static_use_hash: false
+
+result_proxy:
+  url: ""

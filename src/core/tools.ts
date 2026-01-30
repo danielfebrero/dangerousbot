@@ -591,7 +591,8 @@ export class ToolExecutor {
 
           const response = await fetch(`${searxngUrl}/search?${params.toString()}`, {
             headers: {
-              'Accept': 'application/json'
+              'Accept': 'application/json',
+              'X-Forwarded-For': '127.0.0.1'
             }
           });
 
