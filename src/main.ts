@@ -103,6 +103,56 @@ function getOpenRouterKey(): string | undefined {
   return undefined;
 }
 
+// Vérifier si SearxNG est déjà en cours d'exécution
+async function isSearxNGRunning(): Promise<boolean> {
+  try {
+    const response = await fetch('http://localhost:8080/healthz', { 
+      method: 'GET',
+      signal: AbortSignal.timeout(2000)
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+// Démarrer SearxNG
+async function startSearxNG(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const { spawn } = require('child_process');
+    const path = require('path');
+    
+    const projectRoot = path.resolve(__dirname, '..');
+    const searxngScript = path.join(projectRoot, 'searxng.sh');
+    
+    print('🚀 Démarrage de SearxNG...', 'cyan');
+    
+    const child = spawn('bash', [searxngScript, 'start'], {
+      detached: true,
+      stdio: 'pipe'
+    });
+    
+    child.on('error', (err: Error) => {
+      print(`⚠ Erreur lors du démarrage de SearxNG: ${err.message}`, 'yellow');
+      resolve(false);
+    });
+    
+    child.on('exit', (code: number) => {
+      if (code === 0) {
+        resolve(true);
+      } else {
+        print(`⚠ SearxNG a retourné le code ${code}`, 'yellow');
+        resolve(false);
+      }
+    });
+    
+    // Timeout de 10 secondes
+    setTimeout(() => {
+      resolve(true); // On assume que ça a marché si pas d'erreur rapide
+    }, 10000);
+  });
+}
+
 // Sauvegarder une clé OpenRouter
 function saveOpenRouterKey(apiKey: string): void {
   ensureDirectories();
@@ -156,6 +206,21 @@ async function main(): Promise<void> {
   }
 
   print('✓ Clé API configurée', 'green');
+
+  // Vérifier et démarrer SearxNG si nécessaire
+  const searxngRunning = await isSearxNGRunning();
+  if (searxngRunning) {
+    print('✓ SearxNG déjà en cours d\'exécution', 'green');
+  } else {
+    const started = await startSearxNG();
+    if (started) {
+      print('✓ SearxNG démarré', 'green');
+      // Attendre un peu que le service soit prêt
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    } else {
+      print('⚠ Impossible de démarrer SearxNG (fonctionnalité recherche désactivée)', 'yellow');
+    }
+  }
 
   // Initialiser la mémoire
   const memory = getMemory();

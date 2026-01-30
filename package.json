@@ -11,6 +11,8 @@
     "start": "NODE_ENV=production node dist/dangerousbot.js",
     "start:daemon": "./start.sh",
     "setup": "tsx src/cli/setup.ts",
+    "setup:keys": "tsx src/cli/setup-keys.ts",
+    "setup:keys:status": "tsx src/cli/setup-keys.ts --status",
     "searxng": "./searxng.sh",
     "searxng:start": "./searxng.sh start",
     "searxng:stop": "./searxng.sh stop",
