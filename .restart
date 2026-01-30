@@ -1,1 +1,1 @@
-{"reason":"Added support for streaming responses","timestamp":"2026-01-30T17:25:22.606Z"}
+{"reason":"Fixed duplicate tool calls and empty messages bug","timestamp":"2026-01-30T17:30:09.194Z"}

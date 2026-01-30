@@ -40,11 +40,11 @@ export function getToolDefinitions(): Tool[] {
     },
     {
       name: 'read_file',
-      description: 'Lit le contenu d\'un fichier.',
+      description: 'Lit le contenu d\'un fichier. Pour les images (png, jpg, gif, webp, etc.), retourne les données en base64 pour les modèles multimodaux.',
       input_schema: {
         type: 'object',
         properties: {
-          path: { type: 'string', description: 'Chemin du fichier (relatif au projet ou absolu)' }
+          path: { type: 'string', description: 'Chemin du fichier (relatif au projet ou absolu). Supporte les images pour les modèles multimodaux.' }
         },
         required: ['path']
       }
@@ -130,16 +130,13 @@ export function getToolDefinitions(): Tool[] {
     },
     {
       name: 'self_update',
-      description: 'Modifie le code source de DangerousBot, versionne, compile et redémarre. ATTENTION: outil puissant.',
+      description: 'Compile et redémarre DangerousBot. À utiliser après avoir modifié des fichiers avec edit_file/write_file. Effectue: validation TypeScript, build, et redémarrage avec rollback automatique en cas d\'échec.',
       input_schema: {
         type: 'object',
         properties: {
-          file: { type: 'string', description: 'Fichier à modifier (relatif à src/)' },
-          old_code: { type: 'string', description: 'Code à remplacer' },
-          new_code: { type: 'string', description: 'Nouveau code' },
-          description: { type: 'string', description: 'Description de la modification' }
+          reason: { type: 'string', description: 'Raison du redémarrage (optionnel)' }
         },
-        required: ['file', 'old_code', 'new_code', 'description']
+        required: []
       }
     },
     {
@@ -167,6 +164,17 @@ export function getToolDefinitions(): Tool[] {
           }
         },
         required: ['provider']
+      }
+    },
+    {
+      name: 'web_search',
+      description: 'Effectue une recherche web pour obtenir des informations récentes et à jour. Disponible uniquement avec le provider Kimi. Utilise la fonction builtin $web_search de Kimi.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'La requête de recherche (optionnel - Kimi génère les paramètres automatiquement)' }
+        },
+        required: []
       }
     }
   ];
@@ -220,6 +228,30 @@ export class ToolExecutor {
 
       case 'read_file': {
         const filePath = input.path as string;
+        
+        // Vérifier si c'est une image
+        const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg'];
+        const ext = filePath.toLowerCase().slice(filePath.lastIndexOf('.'));
+        
+        if (imageExts.includes(ext)) {
+          // Lire comme image pour les modèles multimodaux
+          const imageResult = this.executor.readImage(filePath);
+          if (imageResult.success && imageResult.data && imageResult.media_type) {
+            return {
+              success: true,
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: imageResult.media_type,
+                data: imageResult.data
+              },
+              message: `Image lue: ${filePath}`
+            };
+          }
+          return imageResult;
+        }
+        
+        // Lire comme texte
         return this.executor.readFile(filePath);
       }
 
@@ -261,12 +293,8 @@ export class ToolExecutor {
       }
 
       case 'self_update': {
-        const file = input.file as string;
-        const oldCode = input.old_code as string;
-        const newCode = input.new_code as string;
-        const description = input.description as string;
-        const filePath = `src/${file}`;
-
+        const description = (input.reason as string) || 'Mise à jour du système';
+        
         // Utiliser le système de rollback si disponible
         const rollbackManager = getRollbackManager();
         
@@ -275,13 +303,13 @@ export class ToolExecutor {
           const result = await rollbackManager.safeUpdate(
             description,
             async () => {
-              // Appliquer les modifications
-              const editResult = this.executor.editFile(filePath, oldCode, newCode);
-              if (!editResult.success) {
-                throw new Error(`Échec modification: ${editResult.error}`);
+              // Juste compiler - les modifications ont déjà été faites via edit_file/write_file
+              const buildResult = await this.executor.shell('npm run build');
+              if (!buildResult.success) {
+                throw new Error(`Échec compilation: ${buildResult.error}`);
               }
             },
-            [filePath]
+            [] // Pas de fichiers spécifiques à sauvegarder (déjà versionnés via edit_file)
           );
 
           if (!result.success) {
@@ -297,9 +325,19 @@ export class ToolExecutor {
           // Versionner après succès
           const versionResult = await this.versioning.commitChanges(description);
 
+          // Programmer le redémarrage (créer le fichier .restart)
+          const fs = await import('fs');
+          const path = await import('path');
+          const restartFile = path.join(process.cwd(), '.restart');
+          fs.writeFileSync(restartFile, JSON.stringify({
+            reason: description,
+            timestamp: new Date().toISOString()
+          }));
+          (global as any).__pendingRestart = { reason: description };
+
           return {
             success: true,
-            message: `✅ ${result.message}`,
+            message: `✅ ${result.message} - Redémarrage programmé`,
             version: versionResult.version,
             backupId: result.backupId,
             needsRestart: true
@@ -308,27 +346,31 @@ export class ToolExecutor {
           // Mode legacy sans rollback
           console.warn('[self_update] RollbackManager non disponible, mode legacy');
 
-          // 1. Modifier le fichier
-          const editResult = this.executor.editFile(filePath, oldCode, newCode);
-          if (!editResult.success) {
-            return editResult;
+          // 1. Compiler
+          const buildResult = await this.executor.shell('npm run build');
+          if (!buildResult.success) {
+            return { success: false, error: `Erreur de compilation: ${buildResult.error}` };
           }
 
           // 2. Versionner
           const versionResult = await this.versioning.commitChanges(description);
           if (!versionResult.success) {
-            return { success: false, error: `Modification OK mais erreur de versioning: ${versionResult.error}` };
+            return { success: false, error: `Build OK mais erreur de versioning: ${versionResult.error}` };
           }
 
-          // 3. Compiler
-          const buildResult = await this.executor.shell('npm run build');
-          if (!buildResult.success) {
-            return { success: false, error: `Modification OK mais erreur de compilation: ${buildResult.error}` };
-          }
+          // 3. Programmer le redémarrage (créer le fichier .restart)
+          const fs = await import('fs');
+          const path = await import('path');
+          const restartFile = path.join(process.cwd(), '.restart');
+          fs.writeFileSync(restartFile, JSON.stringify({
+            reason: description,
+            timestamp: new Date().toISOString()
+          }));
+          (global as any).__pendingRestart = { reason: description };
 
           return {
             success: true,
-            message: 'Code modifié, versionné et compilé. Redémarrage nécessaire.',
+            message: 'Build réussi et redémarrage programmé.',
             version: versionResult.version,
             needsRestart: true
           };
@@ -392,7 +434,7 @@ export class ToolExecutor {
 
       case 'switch_provider': {
         const provider = input.provider as ProviderType;
-        
+
         // Valider le provider
         if (provider !== 'claude' && provider !== 'kimi') {
           return { success: false, error: `Provider inconnu: ${provider}. Utilise 'claude' ou 'kimi'.` };
@@ -408,6 +450,19 @@ export class ToolExecutor {
           success: true,
           message: `Provider changé vers: ${provider}. Le prochain message utilisera ce provider.`,
           provider
+        };
+      }
+
+      // web_search est la builtin function de Kimi pour la recherche web
+      // On retourne simplement les arguments tels quels - Kimi exécute la recherche
+      case 'web_search': {
+        // Passthrough: Kimi a généré les arguments, on les retourne tels quels
+        // Kimi exécutera la recherche web quand il recevra ce résultat
+        // Le flag _webSearchPassthrough indique à server/index.ts de ne pas wrapper le résultat
+        return {
+          success: true,
+          _webSearchPassthrough: true,
+          arguments: input
         };
       }
 
