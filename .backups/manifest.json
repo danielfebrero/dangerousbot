@@ -1,5 +1,14 @@
 [
   {
+    "id": "backup_1769786801203",
+    "timestamp": "2026-01-30T15:26:41.249Z",
+    "description": "Simplify self_update tool to only build/restart without file modification parameters",
+    "commitHash": "5f7db10",
+    "files": [
+      "src/core/tools.ts"
+    ]
+  },
+  {
     "id": "backup_1769786672382",
     "timestamp": "2026-01-30T15:24:32.410Z",
     "description": "Modifier think pour accepter les images",
@@ -78,15 +87,6 @@
     "commitHash": "a3e53a5",
     "files": [
       "src/web/hooks/useWebSocket.ts"
-    ]
-  },
-  {
-    "id": "backup_1769786525541",
-    "timestamp": "2026-01-30T15:22:05.582Z",
-    "description": "Ajouter support upload d'images dans l'input",
-    "commitHash": "03efade",
-    "files": [
-      "src/web/components/MessageInput.tsx"
     ]
   }
 ]

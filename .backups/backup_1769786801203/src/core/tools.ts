@@ -130,13 +130,16 @@ export function getToolDefinitions(): Tool[] {
     },
     {
       name: 'self_update',
-      description: 'Compile et redémarre DangerousBot. À utiliser après avoir modifié des fichiers avec edit_file/write_file. Effectue: validation TypeScript, build, et redémarrage avec rollback automatique en cas d\'échec.',
+      description: 'Modifie le code source de DangerousBot, versionne, compile et redémarre. ATTENTION: outil puissant.',
       input_schema: {
         type: 'object',
         properties: {
-          reason: { type: 'string', description: 'Raison du redémarrage (optionnel)' }
+          file: { type: 'string', description: 'Fichier à modifier (relatif à src/)' },
+          old_code: { type: 'string', description: 'Code à remplacer' },
+          new_code: { type: 'string', description: 'Nouveau code' },
+          description: { type: 'string', description: 'Description de la modification' }
         },
-        required: []
+        required: ['file', 'old_code', 'new_code', 'description']
       }
     },
     {
