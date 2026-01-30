@@ -14,7 +14,7 @@ export type ProviderType = 'claude' | 'kimi';
 
 export const PROVIDER = {
   /** Provider actif ('claude' ou 'kimi') - modifiable à chaud */
-  ACTIVE: 'claude' as ProviderType,
+  ACTIVE: 'kimi' as ProviderType,
 } as const;
 
 // ============================================================================

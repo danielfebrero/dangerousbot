@@ -84,10 +84,17 @@ function saveApiKey(filePath: string, apiKey: string): void {
 function getApiKeyStatus(): ApiKeyConfig[] {
   return [
     {
+      name: 'Moonshot AI (Kimi) - Provider par défaut',
+      key: 'kimi',
+      file: API_KEY_FILES.kimi,
+      required: true,
+      description: 'Pour Kimi K2.5 - https://platform.moonshot.ai'
+    },
+    {
       name: 'Anthropic (Claude)',
       key: 'anthropic',
       file: API_KEY_FILES.anthropic,
-      required: true,
+      required: false,
       description: 'Pour Claude Opus/Sonnet - https://console.anthropic.com'
     },
     {
@@ -103,13 +110,6 @@ function getApiKeyStatus(): ApiKeyConfig[] {
       file: API_KEY_FILES.mistral,
       required: false,
       description: 'Pour second regard et TTS - https://console.mistral.ai'
-    },
-    {
-      name: 'Moonshot AI (Kimi)',
-      key: 'kimi',
-      file: API_KEY_FILES.kimi,
-      required: false,
-      description: 'Pour Kimi K2.5 - https://platform.moonshot.ai'
     }
   ];
 }
