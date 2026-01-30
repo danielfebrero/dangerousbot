@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-DangerousBot is an autonomous, self-evolving AI assistant with a React TypeScript web interface. It can modify its own code, version changes via git, compile, and restart itself. Powered by Claude Opus 4.5.
+DangerousBot is an autonomous, self-evolving AI assistant with a React TypeScript web interface. It can modify its own code, version changes via git, compile, and restart itself. Supports multiple AI providers (Claude Opus 4.5, Kimi, Mistral).
 
 ## Build & Run Commands
 
@@ -13,10 +13,17 @@ npm install          # Install dependencies
 npm run build        # Build server + React client
 npm run build:server # Build server only
 npm run build:client # Build React client only
-npm run dev          # Development mode (nodemon + ts-node)
+npm run dev          # Development mode (tsx)
 npm run dev:client   # Watch mode for React client
 npm start            # Production mode (runs dist/dangerousbot.js)
+npm run start:daemon # Production daemon via start.sh
 npm run setup        # Configure desktop shortcut or auto-start
+
+# SearxNG web search (requires Docker)
+npm run searxng:start   # Start SearxNG container
+npm run searxng:stop    # Stop SearxNG container
+npm run searxng:status  # Check status
+npm run searxng:logs    # View logs
 ```
 
 ## Architecture
@@ -68,20 +75,61 @@ src/
 - New instance kills existing one before starting
 
 ### Memory (SQLite)
-- Location: `~/.dangerousbot/data/dangerousbot.db`
-- Tables: `conversations`, `embeddings` (prepared for future), `knowledge`, `config`
+
+- Location: `data/dangerousbot.db` (project root)
+- Tables: `conversations`, `embeddings`, `knowledge`, `config`, `code_embeddings`
 
 ### API Key Storage
-- Priority: `ANTHROPIC_API_KEY` env var > `~/.dangerousbot/secrets/anthropic_api_key`
+
+- Priority: env var > `~/.dangerousbot/secrets/<provider>_api_key`
+- Supported: `ANTHROPIC_API_KEY`, `KIMI_API_KEY`, `MISTRAL_API_KEY`
+
+### Self-Update with Rollback
+
+- `self_update` validates TypeScript, builds, commits, and triggers restart
+- Automatic rollback on build failure via `RollbackManager`
+- Backups stored in `.backups/` directory
+
+### Code Embeddings (RAG)
+
+- Uses Mistral embeddings for semantic code search
+- `retrieve_code` tool queries the indexed codebase
+- Automatic re-indexing after self-update
+
+## AI Providers
+
+| Provider | Model | Use Case |
+| -------- | ----- | -------- |
+| Claude (default) | Opus 4.5 | Primary brain |
+| Kimi | Moonshot AI | Alternative with native web search |
+| Mistral | Various | Consultation and code embeddings |
+
+Switch providers at runtime via `switch_provider` tool.
 
 ## Development vs Production
 
 | Aspect | Dev (`npm run dev`) | Prod (`npm start`) |
-|--------|---------------------|-------------------|
-| Server restart on code change | Manual (nodemon) | Auto via lifecycle.ts |
+| ------ | ------------------- | ------------------ |
+| Server restart on code change | Manual | Auto via lifecycle.ts |
 | Client rebuild | Use `npm run dev:client` | Included in full build |
-| Source | TypeScript (ts-node) | Bundled JS (esbuild) |
+| Source | TypeScript (tsx) | Bundled JS (esbuild) |
 | NODE_ENV | development | production |
+
+## Available Tools
+
+**File Operations:** `read_file`, `write_file`, `edit_file`, `list_files`, `delete_file`
+
+**Execution:** `execute_code` (JS sandbox), `shell` (system commands)
+
+**Memory:** `remember`, `recall` (long-term knowledge storage)
+
+**Self-Evolution:** `self_update` (build + restart with rollback), `restart_server`
+
+**AI Providers:** `switch_provider`, `consult_mistral`, `get_kimi_balance`
+
+**Search:** `searxng_search` (self-hosted web search), `retrieve_code` (semantic codebase search)
+
+**Task Management:** `todo` (projects and tasks with `create_project`, `create_task`, `complete_task`, etc.)
 
 ## WebSocket Protocol
 
