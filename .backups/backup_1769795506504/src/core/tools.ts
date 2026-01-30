@@ -40,11 +40,11 @@ export function getToolDefinitions(): Tool[] {
     },
     {
       name: 'read_file',
-      description: 'Lit le contenu d\'un fichier.',
+      description: 'Lit le contenu d\'un fichier. Pour les images (png, jpg, gif, webp, etc.), retourne les données en base64 pour les modèles multimodaux.',
       input_schema: {
         type: 'object',
         properties: {
-          path: { type: 'string', description: 'Chemin du fichier (relatif au projet ou absolu)' }
+          path: { type: 'string', description: 'Chemin du fichier (relatif au projet ou absolu). Supporte les images pour les modèles multimodaux.' }
         },
         required: ['path']
       }
@@ -165,6 +165,17 @@ export function getToolDefinitions(): Tool[] {
         },
         required: ['provider']
       }
+    },
+    {
+      name: 'web_search',
+      description: 'Effectue une recherche web pour obtenir des informations récentes et à jour. Disponible uniquement avec le provider Kimi. Utilise la fonction builtin $web_search de Kimi.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'La requête de recherche (optionnel - Kimi génère les paramètres automatiquement)' }
+        },
+        required: []
+      }
     }
   ];
 }
@@ -217,6 +228,30 @@ export class ToolExecutor {
 
       case 'read_file': {
         const filePath = input.path as string;
+        
+        // Vérifier si c'est une image
+        const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg'];
+        const ext = filePath.toLowerCase().slice(filePath.lastIndexOf('.'));
+        
+        if (imageExts.includes(ext)) {
+          // Lire comme image pour les modèles multimodaux
+          const imageResult = this.executor.readImage(filePath);
+          if (imageResult.success && imageResult.data && imageResult.media_type) {
+            return {
+              success: true,
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: imageResult.media_type,
+                data: imageResult.data
+              },
+              message: `Image lue: ${filePath}`
+            };
+          }
+          return imageResult;
+        }
+        
+        // Lire comme texte
         return this.executor.readFile(filePath);
       }
 
@@ -399,7 +434,7 @@ export class ToolExecutor {
 
       case 'switch_provider': {
         const provider = input.provider as ProviderType;
-        
+
         // Valider le provider
         if (provider !== 'claude' && provider !== 'kimi') {
           return { success: false, error: `Provider inconnu: ${provider}. Utilise 'claude' ou 'kimi'.` };
@@ -415,6 +450,19 @@ export class ToolExecutor {
           success: true,
           message: `Provider changé vers: ${provider}. Le prochain message utilisera ce provider.`,
           provider
+        };
+      }
+
+      // web_search est la builtin function de Kimi pour la recherche web
+      // On retourne simplement les arguments tels quels - Kimi exécute la recherche
+      case 'web_search': {
+        // Passthrough: Kimi a généré les arguments, on les retourne tels quels
+        // Kimi exécutera la recherche web quand il recevra ce résultat
+        // Le flag _webSearchPassthrough indique à server/index.ts de ne pas wrapper le résultat
+        return {
+          success: true,
+          _webSearchPassthrough: true,
+          arguments: input
         };
       }
 

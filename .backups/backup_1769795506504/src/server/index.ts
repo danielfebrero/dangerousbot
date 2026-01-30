@@ -107,7 +107,7 @@ export class DangerousBotServer {
   }
 
   // Traiter un message utilisateur (avec support multi-modal)
-  async processMessage(userMessage: string, images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>): Promise<void> {
+  async processMessage(userMessage: string, images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>, abortSignal?: AbortSignal): Promise<void> {
     if (!this.brain) {
       this.wsManager.sendError('Brain non initialisé. Clé API manquante.');
       return;
@@ -121,16 +121,30 @@ export class DangerousBotServer {
     this.isProcessing = true;
     this.wsManager.sendBotTyping(true);
 
-    // ✅ SAUVEGARDER LE MESSAGE UTILISATEUR IMMÉDIATEMENT
+    // ✅ SAUVEGARDER LE MESSAGE UTILISATEUR IMMÉDIATEMENT (avec images si présentes)
     const memory = getMemory();
-    memory.addMessage('user', userMessage);
+    memory.addMessage('user', userMessage, undefined, images);
 
     // Collecter tous les tool_calls pour cette réponse
     const allToolCalls: Array<{ name: string; input: unknown }> = [];
 
     try {
       const tools = getToolDefinitions();
-      let response = await this.brain.think(userMessage, tools);
+      
+      // Utiliser le streaming pour une meilleure UX
+      let response = await this.brain.thinkStream(
+        userMessage, 
+        tools, 
+        images, 
+        abortSignal,
+        (chunk) => {
+          if (chunk.type === 'text' && chunk.text) {
+            this.wsManager.sendStreamChunk(chunk.text);
+          } else if (chunk.type === 'tool_use') {
+            this.wsManager.sendToolUse(chunk.name!, chunk.input);
+          }
+        }
+      );
 
       // Vérifier si un fallback de provider a eu lieu
       const providerSwitched = (global as any).__providerSwitched;
@@ -145,12 +159,17 @@ export class DangerousBotServer {
       while (response.stopReason === 'tool_use') {
         for (const block of response.content) {
           if (block.type === 'text') {
-            this.wsManager.sendBotMessage(block.text);
+            // Seulement si du texte n'a pas déjà été streamé
+            if (block.text && block.text.trim()) {
+              this.wsManager.sendBotMessage(block.text);
+            }
           } else if (block.type === 'tool_use') {
             // Collecter le tool_call
             allToolCalls.push({ name: block.name, input: block.input });
             
-            this.wsManager.sendToolUse(block.name, block.input);
+            // Ne pas renvoyer les tool calls déjà envoyés via streaming
+            // Ils ont déjà été envoyés via le callback onChunk dans thinkStream/continueAfterToolStream
+            // this.wsManager.sendToolUse(block.name, block.input);
 
             // Exécuter l'outil
             const result = await this.toolExecutor.execute(
@@ -168,6 +187,10 @@ export class DangerousBotServer {
                 type: 'image',
                 source: result.source
               }]);
+            } else if (result._webSearchPassthrough) {
+              // Cas spécial pour $web_search de Kimi: retourner les arguments tels quels
+              // Kimi exécutera la recherche web quand il recevra ce résultat
+              this.brain.addToolResult(block.id, JSON.stringify(result.arguments));
             } else {
               // Ajouter le résultat normal à la conversation
               this.brain.addToolResult(block.id, JSON.stringify(result));
@@ -191,16 +214,31 @@ export class DangerousBotServer {
           }
         }
 
-        // Continuer la conversation
-        response = await this.brain.continueAfterTool(tools);
+        // Vérifier si la requête a été annulée
+        if (abortSignal?.aborted) {
+          throw new Error('Request aborted by user');
+        }
+
+        // Continuer la conversation avec streaming
+        response = await this.brain.continueAfterToolStream(
+          tools, 
+          abortSignal,
+          (chunk) => {
+            if (chunk.type === 'text' && chunk.text) {
+              this.wsManager.sendStreamChunk(chunk.text);
+            } else if (chunk.type === 'tool_use') {
+              this.wsManager.sendToolUse(chunk.name!, chunk.input);
+            }
+          }
+        );
       }
 
-      // Traiter la réponse finale
+      // Traiter la réponse finale (les textes ont déjà été streamés)
       let finalText = '';
       for (const block of response.content) {
         if (block.type === 'text') {
           finalText += block.text;
-          this.wsManager.sendBotMessage(block.text);
+          // Plus besoin d'envoyer via sendBotMessage car c'est déjà streamé
         }
       }
 
@@ -231,8 +269,13 @@ export class DangerousBotServer {
         }, 2000);
       }
     } catch (error) {
-      console.error('[Server] Erreur:', error);
-      this.wsManager.sendError(`Erreur: ${(error as Error).message}`);
+      if ((error as Error).message === 'Request aborted by user') {
+        console.log('[Server] Requête annulée par l\'utilisateur');
+        this.wsManager.sendSystem('Génération arrêtée.');
+      } else {
+        console.error('[Server] Erreur:', error);
+        this.wsManager.sendError(`Erreur: ${(error as Error).message}`);
+      }
     } finally {
       this.isProcessing = false;
       this.wsManager.sendBotTyping(false);

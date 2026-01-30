@@ -56,8 +56,8 @@ export function MessageInput({ onSend, onStop, isProcessing, disabled, tokenUsag
     setSelectedImages(prev => prev.filter((_, i) => i !== index));
   }, []);
 
-  const handleSubmit = useCallback((e?: React.FormEvent) => {
-    e?.preventDefault();
+  const handleSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
     const trimmed = text.trim();
     if ((trimmed || selectedImages.length > 0) && !disabled) {
       onSend(trimmed, selectedImages.length > 0 ? selectedImages : undefined);
@@ -69,7 +69,7 @@ export function MessageInput({ onSend, onStop, isProcessing, disabled, tokenUsag
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit();
+      handleSubmit(e);
     }
   }, [handleSubmit]);
 
@@ -80,10 +80,6 @@ export function MessageInput({ onSend, onStop, isProcessing, disabled, tokenUsag
       textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 150) + 'px';
     }
   }, [text]);
-
-  const handleAttachClick = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
 
   return (
     <div className="message-input-container">
@@ -124,7 +120,7 @@ export function MessageInput({ onSend, onStop, isProcessing, disabled, tokenUsag
         <button
           type="button"
           className="input-button"
-          onClick={handleAttachClick}
+          onClick={() => fileInputRef.current?.click()}
           disabled={disabled}
           title="Attach image"
         >
@@ -169,5 +165,60 @@ export function MessageInput({ onSend, onStop, isProcessing, disabled, tokenUsag
         )}
       </div>
     </div>
+  );
+}
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleImageSelect}
+          accept="image/*"
+          multiple
+          style={{ display: 'none' }}
+        />
+        <button
+          type="button"
+          className="attach-button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={disabled}
+          title="Attach image"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </button>
+        <textarea
+          ref={textareaRef}
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Écris ton message..."
+          rows={1}
+          disabled={disabled}
+        />
+        {isProcessing ? (
+          <button
+            type="button"
+            className="stop-button"
+            onClick={onStop}
+            title="Arrêter la génération"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="6" width="12" height="12" rx="2" />
+            </svg>
+          </button>
+        ) : (
+          <button 
+            type="submit" 
+            disabled={disabled || (!text.trim() && selectedImages.length === 0)}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" />
+            </svg>
+          </button>
+        )}
+      </form>
+    </footer>
   );
 }
