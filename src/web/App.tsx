@@ -78,12 +78,34 @@ function App() {
             ];
           }
 
+          // Parse provider switch details from content if it's a provider switch message
+          let providerSwitch = undefined;
+          if (isProviderSwitch) {
+            // Try to extract from format "Provider changé : X → Y" or similar
+            const match = msg.content.match(/([A-Za-z]+)\s*→\s*([A-Za-z]+)/);
+            if (match) {
+              providerSwitch = {
+                from: match[1].toLowerCase(),
+                to: match[2].toLowerCase(),
+                reason: msg.content.includes('indisponible') ? 'Provider indisponible, bascule automatique' : 'Bascule manuelle'
+              };
+            } else {
+              // Fallback if no arrow pattern found
+              providerSwitch = {
+                from: 'unknown',
+                to: 'unknown',
+                reason: msg.content
+              };
+            }
+          }
+
           return {
             id: crypto.randomUUID(),
             type: isProviderSwitch ? 'provider_switch' as const : (msg.role === 'user' ? 'user' as const : msg.role === 'assistant' ? 'bot' as const : 'system' as const),
             content: msg.content,
             contentParts,
             toolCalls: msg.tool_calls,
+            providerSwitch,
             timestamp: new Date(msg.timestamp)
           };
         });
