@@ -6,8 +6,8 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import { WSMessage } from '../core/types.js';
 
-export type MessageHandler = (message: string, images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>) => Promise<void>;
-export type HistoryProvider = () => Array<{ role: string; content: string; timestamp: string; tool_calls?: Array<{ name: string; input: unknown }>; images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }> }>;
+export type MessageHandler = (message: string) => Promise<void>;
+export type HistoryProvider = () => Array<{ role: string; content: string; timestamp: string; tool_calls?: Array<{ name: string; input: unknown }> }>;
 
 export class WebSocketManager {
   private wss: WebSocketServer;

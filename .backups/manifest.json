@@ -1,5 +1,14 @@
 [
   {
+    "id": "backup_1769786649039",
+    "timestamp": "2026-01-30T15:24:09.069Z",
+    "description": "Modifier types pour supporter les images",
+    "commitHash": "564ceea",
+    "files": [
+      "src/server/websocket.ts"
+    ]
+  },
+  {
     "id": "backup_1769786640227",
     "timestamp": "2026-01-30T15:24:00.272Z",
     "description": "Modifier WebSocket pour recevoir les images",
@@ -78,15 +87,6 @@
     "commitHash": "62aacee",
     "files": [
       "src/web/components/ToolBadge.tsx"
-    ]
-  },
-  {
-    "id": "backup_1769785842921",
-    "timestamp": "2026-01-30T15:10:42.945Z",
-    "description": "Ne pas afficher le content si vide et qu'il y a des tool_calls",
-    "commitHash": "d594df4",
-    "files": [
-      "src/web/components/MessageItem.tsx"
     ]
   }
 ]
