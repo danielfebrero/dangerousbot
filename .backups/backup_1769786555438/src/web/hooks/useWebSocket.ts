@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { WSMessage, ConnectionStatus, ContentPart } from '../types';
+import { WSMessage, ConnectionStatus } from '../types';
 
 interface UseWebSocketOptions {
   onMessage: (message: WSMessage) => void;
@@ -63,15 +63,11 @@ export function useWebSocket(options: UseWebSocketOptions) {
     };
   }, [connect]);
 
-  const sendMessage = useCallback((text: string, images?: ContentPart[]) => {
+  const sendMessage = useCallback((text: string) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      const payload: any = { text };
-      if (images && images.length > 0) {
-        payload.images = images;
-      }
       wsRef.current.send(JSON.stringify({
         type: 'user_message',
-        payload
+        payload: { text }
       }));
       return true;
     }
