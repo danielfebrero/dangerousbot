@@ -184,6 +184,14 @@ function App() {
         const toolName = wsMessage.payload.tool;
         const toolInput = wsMessage.payload.input;
         const executionId = wsMessage.payload.executionId;
+        
+        // Check if this execution already exists using the ref to avoid stale closure
+        const existingExec = activeToolExecutionsRef.current.find(e => e.id === executionId);
+        if (existingExec) {
+          // Already exists, don't create a duplicate
+          break;
+        }
+        
         const execId = addExecution(toolName, toolInput, executionId);
         toolExecutionMapRef.current[executionId] = execId;
 
@@ -202,13 +210,19 @@ function App() {
         setActiveToolExecutions(activeToolExecutionsRef.current);
         
         // Add as a separate message in the chat - use executionId as message ID
-        setMessages(prev => [...prev, {
-          id: executionId,  // Use server executionId for easy lookup
-          type: 'tool_execution',
-          content: '',
-          toolExecution: newExecution,
-          timestamp: new Date()
-        }]);
+        setMessages(prev => {
+          // Check again in the updater function to avoid race conditions
+          if (prev.find(m => m.id === executionId)) {
+            return prev;
+          }
+          return [...prev, {
+            id: executionId,  // Use server executionId for easy lookup
+            type: 'tool_execution',
+            content: '',
+            toolExecution: newExecution,
+            timestamp: new Date()
+          }];
+        });
         break;
 
       case 'tool_result':
