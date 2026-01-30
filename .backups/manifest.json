@@ -1,5 +1,14 @@
 [
   {
+    "id": "backup_1769786525541",
+    "timestamp": "2026-01-30T15:22:05.582Z",
+    "description": "Ajouter support upload d'images dans l'input",
+    "commitHash": "03efade",
+    "files": [
+      "src/web/components/MessageInput.tsx"
+    ]
+  },
+  {
     "id": "backup_1769786484375",
     "timestamp": "2026-01-30T15:21:24.416Z",
     "description": "Ajouter types pour contenu multi-modal (texte + images)",
@@ -74,15 +83,6 @@
   {
     "id": "backup_1769778969050",
     "timestamp": "2026-01-30T13:16:09.073Z",
-    "description": "Test volontaire de rollback - code cassé",
-    "commitHash": "3812e2e",
-    "files": [
-      "src/config.ts"
-    ]
-  },
-  {
-    "id": "backup_1769778962255",
-    "timestamp": "2026-01-30T13:16:02.328Z",
     "description": "Test volontaire de rollback - code cassé",
     "commitHash": "3812e2e",
     "files": [

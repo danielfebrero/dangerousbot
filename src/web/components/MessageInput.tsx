@@ -1,22 +1,67 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { ContentPart } from '../types';
 
 interface MessageInputProps {
-  onSend: (text: string) => void;
+  onSend: (text: string, images?: ContentPart[]) => void;
   disabled?: boolean;
 }
 
 export function MessageInput({ onSend, disabled }: MessageInputProps) {
   const [text, setText] = useState('');
+  const [selectedImages, setSelectedImages] = useState<ContentPart[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const newImages: ContentPart[] = [];
+    
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith('image/')) continue;
+      
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve) => {
+        reader.onloadend = () => {
+          const base64 = reader.result as string;
+          resolve(base64.split(',')[1]); // Remove data:image/xxx;base64, prefix
+        };
+      });
+      reader.readAsDataURL(file);
+      
+      const data = await base64Promise;
+      newImages.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: file.type,
+          data
+        }
+      });
+    }
+
+    setSelectedImages(prev => [...prev, ...newImages]);
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, []);
+
+  const removeImage = useCallback((index: number) => {
+    setSelectedImages(prev => prev.filter((_, i) => i !== index));
+  }, []);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = text.trim();
-    if (trimmed && !disabled) {
-      onSend(trimmed);
+    if ((trimmed || selectedImages.length > 0) && !disabled) {
+      onSend(trimmed, selectedImages.length > 0 ? selectedImages : undefined);
       setText('');
+      setSelectedImages([]);
     }
-  }, [text, disabled, onSend]);
+  }, [text, selectedImages, disabled, onSend]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -35,7 +80,48 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
 
   return (
     <footer className="input-container">
+      {selectedImages.length > 0 && (
+        <div className="image-preview-container">
+          {selectedImages.map((img, idx) => (
+            <div key={idx} className="image-preview">
+              <img 
+                src={`data:${img.source.media_type};base64,${img.source.data}`}
+                alt={`Selected ${idx + 1}`}
+              />
+              <button
+                type="button"
+                className="remove-image"
+                onClick={() => removeImage(idx)}
+                title="Remove image"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       <form className="message-form" onSubmit={handleSubmit}>
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleImageSelect}
+          accept="image/*"
+          multiple
+          style={{ display: 'none' }}
+        />
+        <button
+          type="button"
+          className="attach-button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={disabled}
+          title="Attach image"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </button>
         <textarea
           ref={textareaRef}
           value={text}
@@ -45,7 +131,10 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
           rows={1}
           disabled={disabled}
         />
-        <button type="submit" disabled={disabled || !text.trim()}>
+        <button 
+          type="submit" 
+          disabled={disabled || (!text.trim() && selectedImages.length === 0)}
+        >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" />
           </svg>
