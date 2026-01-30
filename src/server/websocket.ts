@@ -182,18 +182,18 @@ export class WebSocketManager {
   }
 
   // Envoyer une notification d'utilisation d'outil
-  sendToolUse(toolName: string, input: unknown): void {
+  sendToolUse(toolName: string, input: unknown, executionId: string): void {
     this.broadcast({
       type: 'tool_use',
-      payload: { tool: toolName, input }
+      payload: { tool: toolName, input, executionId }
     });
   }
 
   // Envoyer le résultat d'un outil
-  sendToolResult(toolName: string, result: unknown): void {
+  sendToolResult(toolName: string, result: unknown, executionId: string): void {
     this.broadcast({
       type: 'tool_result',
-      payload: { tool: toolName, result }
+      payload: { tool: toolName, result, executionId }
     });
   }
 

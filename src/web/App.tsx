@@ -161,8 +161,9 @@ function App() {
         // Track in tool panel
         const toolName = wsMessage.payload.tool;
         const toolInput = wsMessage.payload.input;
+        const executionId = wsMessage.payload.executionId;
         const execId = addExecution(toolName, toolInput);
-        toolExecutionMapRef.current[toolName] = execId;
+        toolExecutionMapRef.current[executionId] = execId;
 
         // Create a new tool execution message in the chat
         const newExecution: ToolCallExecution = {
@@ -189,8 +190,8 @@ function App() {
 
       case 'tool_result':
         // Update tool panel
-        const resultToolName = wsMessage.payload.tool;
-        const resultExecId = toolExecutionMapRef.current[resultToolName];
+        const resultExecutionId = wsMessage.payload.executionId;
+        const resultExecId = toolExecutionMapRef.current[resultExecutionId];
         if (resultExecId) {
           const result = wsMessage.payload.result;
           const isError = result?.success === false || result?.error;
@@ -235,7 +236,7 @@ function App() {
           });
           setActiveToolExecutions(activeToolExecutionsRef.current);
           
-          delete toolExecutionMapRef.current[resultToolName];
+          delete toolExecutionMapRef.current[resultExecutionId];
         }
         break;
 

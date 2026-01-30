@@ -167,9 +167,11 @@ export class DangerousBotServer {
             // Collecter le tool_call
             allToolCalls.push({ name: block.name, input: block.input });
             
-            // Ne pas renvoyer les tool calls déjà envoyés via streaming
-            // Ils ont déjà été envoyés via le callback onChunk dans thinkStream/continueAfterToolStream
-            // this.wsManager.sendToolUse(block.name, block.input);
+            // Générer un ID unique pour ce tool call
+            const executionId = `exec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            
+            // Envoyer le tool use avec l'ID unique
+            this.wsManager.sendToolUse(block.name, block.input, executionId);
 
             // Exécuter l'outil
             const result = await this.toolExecutor.execute(
@@ -177,7 +179,7 @@ export class DangerousBotServer {
               block.input as ToolInput
             );
 
-            this.wsManager.sendToolResult(block.name, result);
+            this.wsManager.sendToolResult(block.name, result, executionId);
 
             // Vérifier si le résultat contient une image (pour les modèles multimodaux)
             if (result.type === 'image' && result.source) {
@@ -227,7 +229,8 @@ export class DangerousBotServer {
             if (chunk.type === 'text' && chunk.text) {
               this.wsManager.sendStreamChunk(chunk.text);
             } else if (chunk.type === 'tool_use') {
-              this.wsManager.sendToolUse(chunk.name!, chunk.input);
+              const executionId = `exec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+              this.wsManager.sendToolUse(chunk.name!, chunk.input, executionId);
             }
           }
         );
