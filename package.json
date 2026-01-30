@@ -10,7 +10,13 @@
     "build:client": "node esbuild.config.js --client-only",
     "start": "NODE_ENV=production node dist/dangerousbot.js",
     "start:daemon": "./start.sh",
-    "setup": "tsx src/cli/setup.ts"
+    "setup": "tsx src/cli/setup.ts",
+    "searxng": "./searxng.sh",
+    "searxng:start": "./searxng.sh start",
+    "searxng:stop": "./searxng.sh stop",
+    "searxng:restart": "./searxng.sh restart",
+    "searxng:status": "./searxng.sh status",
+    "searxng:logs": "./searxng.sh logs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

@@ -11,7 +11,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { createRoutes } from './routes.js';
 import { WebSocketManager } from './websocket.js';
 import { Brain } from '../core/brain.js';
-import { getToolDefinitions, ToolExecutor } from '../core/tools.js';
+import { getToolDefinitions, getToolDefinitionsForProvider, ToolExecutor } from '../core/tools.js';
 import { getMemory } from '../core/memory.js';
 import { ServerConfig, ToolInput } from '../core/types.js';
 import { Lifecycle } from '../core/lifecycle.js';
@@ -129,7 +129,7 @@ export class DangerousBotServer {
     const allToolCalls: Array<{ name: string; input: unknown }> = [];
 
     try {
-      const tools = getToolDefinitions();
+      const tools = getToolDefinitionsForProvider();
       
       // Utiliser le streaming pour une meilleure UX
       let response = await this.brain.thinkStream(

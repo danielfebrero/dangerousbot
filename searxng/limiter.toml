@@ -1,3 +1,0 @@
-# Désactiver la protection bot detection pour usage local
-[botdetection]
-enabled = false

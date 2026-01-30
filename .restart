@@ -1,1 +1,1 @@
-{"reason":"Test searxng_search with Daniel Febrero Annecy query","timestamp":"2026-01-30T19:35:13.945Z"}
+{"reason":"Fixed searxng_search to include X-Forwarded-For header for local access","timestamp":"2026-01-30T19:38:30.233Z"}

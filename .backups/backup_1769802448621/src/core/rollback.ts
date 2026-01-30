@@ -177,6 +177,50 @@ export class RollbackManager {
   }
 
   /**
+   * Liste les fichiers modifiés depuis le dernier commit
+   */
+  async getModifiedFiles(): Promise<string[]> {
+    const result = await this.execCommand('git diff --name-only HEAD');
+    if (!result.success) {
+      return [];
+    }
+    return result.stdout
+      .split('\n')
+      .filter(f => f.startsWith('src/'))
+      .filter(f => f.endsWith('.ts') || f.endsWith('.tsx'));
+  }
+
+  /**
+   * Liste les fichiers créés (nouveaux, pas encore commités)
+   */
+  async getNewFiles(): Promise<string[]> {
+    const result = await this.execCommand('git status --porcelain');
+    if (!result.success) {
+      return [];
+    }
+    return result.stdout
+      .split('\n')
+      .filter(line => line.startsWith('A ') || line.startsWith('?? '))
+      .map(line => line.substring(3))
+      .filter(f => f.startsWith('src/'))
+      .filter(f => f.endsWith('.ts') || f.endsWith('.tsx'));
+  }
+
+  /**
+   * Liste les fichiers supprimés depuis le dernier commit
+   */
+  async getDeletedFiles(): Promise<string[]> {
+    const result = await this.execCommand('git diff --name-only --diff-filter=D HEAD');
+    if (!result.success) {
+      return [];
+    }
+    return result.stdout
+      .split('\n')
+      .filter(f => f.startsWith('src/'))
+      .filter(f => f.endsWith('.ts') || f.endsWith('.tsx'));
+  }
+
+  /**
    * Supprime un backup
    */
   private deleteBackup(backupId: string): void {
