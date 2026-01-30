@@ -3,6 +3,17 @@ export interface ToolCall {
   input: unknown;
 }
 
+export interface ToolCallExecution {
+  id: string;
+  toolName: string;
+  input: unknown;
+  status: 'running' | 'completed' | 'error';
+  output?: unknown;
+  error?: string;
+  startTime: Date;
+  endTime?: Date;
+}
+
 export interface ImageContent {
   type: 'image';
   source: {
@@ -21,12 +32,13 @@ export type ContentPart = TextContent | ImageContent;
 
 export interface Message {
   id: string;
-  type: 'user' | 'bot' | 'system' | 'tool' | 'provider_switch';
+  type: 'user' | 'bot' | 'system' | 'tool' | 'provider_switch' | 'tool_execution';
   content: string;
   contentParts?: ContentPart[];
   timestamp: Date;
   toolName?: string;
   toolCalls?: ToolCall[];
+  toolExecution?: ToolCallExecution;
   providerSwitch?: {
     from: string;
     to: string;
@@ -51,3 +63,17 @@ export interface TokenUsage {
 }
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
+
+// Tool Panel types
+export type ToolExecutionStatus = 'running' | 'completed' | 'error';
+
+export interface ToolExecution {
+  id: string;
+  toolName: string;
+  input: unknown;
+  output?: unknown;
+  status: ToolExecutionStatus;
+  startTime: Date;
+  endTime?: Date;
+  error?: string;
+}
