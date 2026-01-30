@@ -32,3 +32,6 @@ Thumbs.db
 
 # Backups
 .backups/
+
+# Runtime
+.restart
