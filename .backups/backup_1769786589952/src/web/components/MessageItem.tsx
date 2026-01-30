@@ -1,5 +1,5 @@
 import React from 'react';
-import { Message, ImageContent } from '../types';
+import { Message } from '../types';
 import { Markdown } from './Markdown';
 import { ToolBadge } from './ToolBadge';
 
@@ -8,29 +8,6 @@ interface MessageItemProps {
 }
 
 export function MessageItem({ message }: MessageItemProps) {
-  const renderImages = () => {
-    if (!message.contentParts) return null;
-    
-    const images = message.contentParts.filter((p): p is ImageContent => p.type === 'image');
-    if (images.length === 0) return null;
-    
-    return (
-      <div className="message-images">
-        {images.map((img, idx) => (
-          <div key={idx} className="message-image-wrapper">
-            <img 
-              src={`data:${img.source.media_type};base64,${img.source.data}`}
-              alt={`Image ${idx + 1}`}
-              className="message-image"
-              onClick={() => window.open(`data:${img.source.media_type};base64,${img.source.data}`, '_blank')}
-              title="Click to open full size"
-            />
-          </div>
-        ))}
-      </div>
-    );
-  };
-
   const renderContent = () => {
     // Si le contenu est vide (message avec seulement tool_calls), ne rien afficher
     if (!message.content && message.toolCalls && message.toolCalls.length > 0) {
@@ -53,12 +30,6 @@ export function MessageItem({ message }: MessageItemProps) {
           </div>
         );
       case 'user':
-        return (
-          <>
-            {renderImages()}
-            {message.content && <div className="user-text">{message.content}</div>}
-          </>
-        );
       case 'system':
       default:
         return message.content;
