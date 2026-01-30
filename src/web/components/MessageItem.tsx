@@ -2,6 +2,7 @@ import React from 'react';
 import { Message, ImageContent } from '../types';
 import { Markdown } from './Markdown';
 import { ToolBadge } from './ToolBadge';
+import { ToolCallVisualizer } from './ToolCallVisualizer';
 
 interface MessageItemProps {
   message: Message;
@@ -54,6 +55,12 @@ export function MessageItem({ message }: MessageItemProps) {
           </>
         );
 
+      case 'tool_execution':
+        if (message.toolExecution) {
+          return <ToolCallVisualizer execution={message.toolExecution} />;
+        }
+        return null;
+
       case 'system':
       default:
         return message.content;
@@ -71,6 +78,15 @@ export function MessageItem({ message }: MessageItemProps) {
       </div>
     );
   };
+
+  // Special rendering for tool_execution messages
+  if (message.type === 'tool_execution' && message.toolExecution) {
+    return (
+      <div className={`message ${message.type}`}>
+        <ToolCallVisualizer execution={message.toolExecution} />
+      </div>
+    );
+  }
 
   return (
     <div className={`message ${message.type}`}>

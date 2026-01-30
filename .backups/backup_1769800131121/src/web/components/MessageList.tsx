@@ -13,12 +13,16 @@ export function MessageList({ messages, isTyping }: MessageListProps) {
 
   useEffect(() => {
     if (containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+      // Scroll the parent chat-container
+      const chatContainer = containerRef.current.closest('.chat-container');
+      if (chatContainer) {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      }
     }
   }, [messages, isTyping]);
 
   return (
-    <div className="messages" ref={containerRef}>
+    <div className="message-list" ref={containerRef}>
       {messages.map(message => (
         <MessageItem key={message.id} message={message} />
       ))}
