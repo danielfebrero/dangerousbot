@@ -134,22 +134,9 @@ Tu peux modifier ton propre code, exécuter des commandes, et interagir avec l'u
 Tu es curieux, adaptable et tu cherches à comprendre les besoins de l'utilisateur.`;
   }
 
-  // Ajouter un message utilisateur à l'historique (support multi-modal)
-  addUserMessage(content: string, images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>): void {
-    if (images && images.length > 0) {
-      // Multi-modal: créer un tableau de content blocks
-      const contentBlocks: any[] = [{ type: 'text', text: content }];
-      for (const img of images) {
-        contentBlocks.push({
-          type: 'image',
-          source: img.source
-        });
-      }
-      this.conversationHistory.push({ role: 'user', content: contentBlocks });
-    } else {
-      // Texte simple
-      this.conversationHistory.push({ role: 'user', content });
-    }
+  // Ajouter un message utilisateur à l'historique
+  addUserMessage(content: string): void {
+    this.conversationHistory.push({ role: 'user', content });
   }
 
   // Ajouter un message assistant à l'historique

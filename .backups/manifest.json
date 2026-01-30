@@ -1,5 +1,14 @@
 [
   {
+    "id": "backup_1769786666545",
+    "timestamp": "2026-01-30T15:24:26.565Z",
+    "description": "Modifier addUserMessage pour supporter les images",
+    "commitHash": "0a6a4c6",
+    "files": [
+      "src/core/brain.ts"
+    ]
+  },
+  {
     "id": "backup_1769786653913",
     "timestamp": "2026-01-30T15:24:13.941Z",
     "description": "Modifier processMessage pour accepter les images",
@@ -78,15 +87,6 @@
     "commitHash": "c472504",
     "files": [
       "src/web/types.ts"
-    ]
-  },
-  {
-    "id": "backup_1769786403760",
-    "timestamp": "2026-01-30T15:20:03.803Z",
-    "description": "Ajouter state pour l'upload d'images",
-    "commitHash": "c472504",
-    "files": [
-      "src/web/src/components/ChatInput.tsx"
     ]
   }
 ]
