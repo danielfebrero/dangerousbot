@@ -14,11 +14,20 @@ export class HistoryManager {
    * Ajoute un message utilisateur à l'historique (support multi-modal)
    */
   addUserMessage(
-    content: string, 
+    content: string,
     images?: ImageContent[]
   ): void {
+    // Ignorer les messages vides sans images
+    if (!content?.trim() && (!images || images.length === 0)) {
+      console.warn('[HistoryManager] Ignored empty user message');
+      return;
+    }
+
     if (images && images.length > 0) {
-      const contentBlocks: AIContentBlock[] = [{ type: 'text', text: content }];
+      const contentBlocks: AIContentBlock[] = [];
+      if (content?.trim()) {
+        contentBlocks.push({ type: 'text', text: content });
+      }
       for (const img of images) {
         contentBlocks.push({
           type: 'image',
@@ -36,6 +45,11 @@ export class HistoryManager {
    * Ajoute un message assistant à l'historique
    */
   addAssistantMessage(content: AIContentBlock[]): void {
+    // Ignorer les messages vides
+    if (!content || content.length === 0) {
+      console.warn('[HistoryManager] Ignored empty assistant message');
+      return;
+    }
     this.conversationHistory.push({ role: 'assistant', content });
   }
 
@@ -54,10 +68,21 @@ export class HistoryManager {
   }
 
   /**
-   * Retourne l'historique nettoyé (tool_results compressés)
+   * Retourne l'historique nettoyé (tool_results compressés, messages vides filtrés)
    */
   getCleanedHistory(): AIMessage[] {
-    return cleanOldToolResults(this.conversationHistory as any[]) as AIMessage[];
+    const cleaned = cleanOldToolResults(this.conversationHistory as any[]) as AIMessage[];
+
+    // Filtrer les messages avec contenu vide (cause d'erreur API)
+    return cleaned.filter(msg => {
+      if (typeof msg.content === 'string') {
+        return msg.content.trim().length > 0;
+      }
+      if (Array.isArray(msg.content)) {
+        return msg.content.length > 0;
+      }
+      return true;
+    });
   }
 
   /**
@@ -85,10 +110,18 @@ export class HistoryManager {
 
     for (const msg of messages) {
       if (msg.role === 'user' || msg.role === 'assistant') {
+        // Ignorer les messages vides
+        if (!msg.content?.trim() && (!msg.images || msg.images.length === 0)) {
+          continue;
+        }
+
         let content: string | AIContentBlock[] = msg.content;
 
         if (msg.role === 'user' && msg.images && msg.images.length > 0) {
-          const contentBlocks: AIContentBlock[] = [{ type: 'text', text: msg.content }];
+          const contentBlocks: AIContentBlock[] = [];
+          if (msg.content?.trim()) {
+            contentBlocks.push({ type: 'text', text: msg.content });
+          }
           for (const img of msg.images) {
             contentBlocks.push({
               type: 'image',
