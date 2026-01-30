@@ -9,13 +9,13 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as readline from 'readline';
-import { WebSocket } from 'ws';
+
 
 import { DangerousBotServer } from './server/index.js';
 import { Lifecycle } from './core/lifecycle.js';
 import { getMemory } from './core/memory.js';
 import { initRollbackManager } from './core/rollback.js';
-import { SERVER, PATHS, APIS, initializeApiKeys } from './config.js';
+import { SERVER, PATHS, APIS, initializeApiKeys, reloadProviderConfig } from './config.js';
 
 // Configuration
 const PORT = parseInt(process.env.PORT || String(SERVER.DEFAULT_PORT), 10);
@@ -162,6 +162,10 @@ async function main(): Promise<void> {
   const stats = memory.getStats();
   print(`✓ Mémoire initialisée (${stats.messages} messages, ${stats.knowledge} connaissances)`, 'green');
 
+  // Charger le provider persisté depuis la DB
+  const activeProvider = reloadProviderConfig();
+  print(`✓ Provider chargé: ${activeProvider}`, 'green');
+
   // Initialiser toutes les clés API depuis les fichiers secrets
   initializeApiKeys();
   
@@ -196,33 +200,28 @@ async function main(): Promise<void> {
   await server.start(PORT, HOST);
   print(`✓ Serveur démarré sur http://${HOST}:${PORT}`, 'green');
 
-  // Setup WebSocket message handler
+  // Setup WebSocket handlers
   const wsManager = server.getWSManager();
 
-  // Gérer les messages entrants via un endpoint WebSocket custom
-  const originalWss = (wsManager as any).wss;
-  originalWss.on('connection', (ws: WebSocket) => {
-    // Envoyer l'historique des messages au client qui se connecte
+  // Configurer le handler de messages (une seule fois, pas de doublon)
+  wsManager.setMessageHandler(async (text: string) => {
+    await server.processMessage(text);
+  });
+
+  // Configurer le provider d'historique
+  wsManager.setHistoryProvider(() => {
     const history = memory.getMessages();
-    const formattedHistory = history.map(msg => ({
+    return history.map(msg => ({
       role: msg.role,
       content: msg.content,
-      timestamp: msg.timestamp
+      timestamp: msg.timestamp,
+      tool_calls: msg.tool_calls
     }));
-    wsManager.sendHistory(ws, formattedHistory);
-    console.log(`[Main] Historique envoyé: ${formattedHistory.length} messages`);
+  });
 
-    ws.on('message', async (data: Buffer) => {
-      try {
-        const message = JSON.parse(data.toString());
-
-        if (message.type === 'user_message' && message.payload?.text) {
-          await server.processMessage(message.payload.text);
-        }
-      } catch (error) {
-        console.error('[Main] Erreur de parsing message:', error);
-      }
-    });
+  // Configurer le callback pour la première connexion (message de continuation après redémarrage)
+  wsManager.setOnFirstConnection(() => {
+    server.sendContinuationMessage();
   });
 
   print('\n─────────────────────────────────────────────────────────────', 'dim');

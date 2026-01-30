@@ -7,26 +7,17 @@ import * as path from 'path';
 import * as os from 'os';
 
 // ============================================================================
-// PROVIDER ACTIF (hot-swappable)
-// ============================================================================
-
-export type ProviderType = 'claude' | 'kimi';
-
-export const PROVIDER = {
-  /** Provider actif ('claude' ou 'kimi') - modifiable à chaud */
-  ACTIVE: 'claude' as ProviderType,
-} as const;
-
-// ============================================================================
 // MODÈLES IA
 // ============================================================================
+
+
 
 export const MODELS = {
   /** Modèle principal pour le cerveau (Opus 4.5 = le plus intelligent) */
   BRAIN: 'claude-opus-4-5-20251101',
   
   /** Modèle pour la compression/résumés (Sonnet 4.5 = rapide et efficace) */
-  COMPRESSOR: 'claude-sonnet-4-5-20250929',
+  COMPRESSOR: 'claude-sonnet-4-5-20250514',
   
   /** Modèle pour les embeddings (via OpenRouter) */
   EMBEDDING: 'qwen/qwen3-embedding-8b',
@@ -35,10 +26,6 @@ export const MODELS = {
   MISTRAL_LARGE: 'mistral-large-2411',      // Complexe: architecture, sécurité, review critique
   MISTRAL_MEDIUM: 'mistral-medium-2505',    // Équilibré: brainstorming, validation
   MISTRAL_SMALL: 'mistral-small-2503',      // Rapide: tâches simples, formatting
-  
-  /** Modèles Kimi (Moonshot) */
-  KIMI_DEFAULT: 'kimi-k2.5',                // Kimi 2.5 - modèle par défaut
-  KIMI_LONG: 'kimi-k2.5',                   // Kimi 2.5 (supporte jusqu'à 128k)
 } as const;
 
 // ============================================================================
@@ -129,9 +116,6 @@ export const PATHS = {
   
   /** Fichier de clé API Mistral */
   get MISTRAL_KEY_FILE() { return path.join(this.SECRETS_DIR, 'mistral_api_key'); },
-  
-  /** Fichier de clé API Kimi (Moonshot) */
-  get KIMI_KEY_FILE() { return path.join(this.SECRETS_DIR, 'kimi_api_key'); },
 } as const;
 
 // ============================================================================
@@ -156,9 +140,6 @@ export const APIS = {
   
   /** Clé API OpenRouter (chargée au runtime) */
   OPENROUTER_API_KEY: '' as string,
-  
-  /** Clé API Kimi/Moonshot (chargée au runtime) */
-  KIMI_API_KEY: '' as string,
 };
 
 // ============================================================================
@@ -191,44 +172,6 @@ function loadApiKey(filePath: string): string {
 export function initializeApiKeys(): void {
   APIS.MISTRAL_API_KEY = loadApiKey(PATHS.MISTRAL_KEY_FILE);
   APIS.OPENROUTER_API_KEY = loadApiKey(PATHS.OPENROUTER_KEY_FILE);
-  APIS.KIMI_API_KEY = loadApiKey(PATHS.KIMI_KEY_FILE);
-}
-
-/**
- * Recharge la config du provider actif depuis la DB (pour hot-swap et persistance)
- */
-export function reloadProviderConfig(): ProviderType {
-  try {
-    // Dynamic import to avoid circular dependency
-    const { getMemory } = require('./core/memory');
-    const memory = getMemory();
-    const savedProvider = memory.getConfig('provider');
-    if (savedProvider && (savedProvider === 'claude' || savedProvider === 'kimi')) {
-      (PROVIDER as any).ACTIVE = savedProvider;
-      console.log(`[Config] Provider loaded from DB: ${savedProvider}`);
-      return savedProvider;
-    }
-  } catch (e) {
-    console.warn('[Config] Could not load provider from DB:', e);
-  }
-  return PROVIDER.ACTIVE;
-}
-
-/**
- * Change le provider actif et le persiste en DB
- */
-export function setActiveProvider(provider: ProviderType): void {
-  (PROVIDER as any).ACTIVE = provider;
-  
-  // Persist in DB
-  try {
-    const { getMemory } = require('./core/memory');
-    const memory = getMemory();
-    memory.setConfig('provider', provider);
-    console.log(`[Config] Provider changed and persisted: ${provider}`);
-  } catch (e) {
-    console.warn('[Config] Could not persist provider to DB:', e);
-  }
 }
 
 // ============================================================================
@@ -236,7 +179,6 @@ export function setActiveProvider(provider: ProviderType): void {
 // ============================================================================
 
 export const config = {
-  PROVIDER,
   MODELS,
   TOKENS,
   MEMORY,

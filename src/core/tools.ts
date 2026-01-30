@@ -9,6 +9,7 @@ import { Versioning } from './versioning';
 import { Lifecycle } from './lifecycle';
 import { MistralConsultant, mistralTool } from './mistral';
 import { getRollbackManager } from './rollback';
+import { setActiveProvider, ProviderType } from '../config';
 
 export function getToolDefinitions(): Tool[] {
   return [
@@ -152,7 +153,22 @@ export function getToolDefinitions(): Tool[] {
         required: []
       }
     },
-    mistralTool as Tool
+    mistralTool as Tool,
+    {
+      name: 'switch_provider',
+      description: 'Change le provider AI actif (Claude ou Kimi). Le changement prend effet immédiatement pour le prochain message.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          provider: {
+            type: 'string',
+            description: 'Le provider à utiliser',
+            enum: ['claude', 'kimi']
+          }
+        },
+        required: ['provider']
+      }
+    }
   ];
 }
 
@@ -321,15 +337,26 @@ export class ToolExecutor {
 
       case 'restart_server': {
         const reason = (input.reason as string) || 'Demandé par le bot';
+        const fs = await import('fs');
+        const path = await import('path');
 
-        // Planifier le redémarrage (sera effectué après la réponse)
-        setTimeout(() => {
-          this.lifecycle.restart(reason);
-        }, 1000);
+        // Créer le fichier .restart que start.sh surveille
+        const restartFile = path.join(process.cwd(), '.restart');
+        fs.writeFileSync(restartFile, JSON.stringify({
+          reason,
+          timestamp: new Date().toISOString()
+        }));
+
+        // Stocker le flag pour que le serveur déclenche le restart APRÈS la sauvegarde
+        (global as any).__pendingRestart = { reason };
+
+        // NE PAS faire process.exit() ici !
+        // Le serveur gère le timing après avoir sauvegardé le message
 
         return {
           success: true,
-          message: `Redémarrage planifié: ${reason}`
+          message: `Redémarrage programmé: ${reason}. Le serveur va terminer la réponse puis redémarrer.`,
+          needsRestart: true
         };
       }
 
@@ -361,6 +388,27 @@ export class ToolExecutor {
         } catch (error) {
           return { success: false, error: `Erreur Mistral: ${(error as Error).message}` };
         }
+      }
+
+      case 'switch_provider': {
+        const provider = input.provider as ProviderType;
+        
+        // Valider le provider
+        if (provider !== 'claude' && provider !== 'kimi') {
+          return { success: false, error: `Provider inconnu: ${provider}. Utilise 'claude' ou 'kimi'.` };
+        }
+
+        // Changer le provider dans la config
+        setActiveProvider(provider);
+
+        // Stocker le flag pour que le Brain change de provider
+        (global as any).__pendingProviderSwitch = provider;
+
+        return {
+          success: true,
+          message: `Provider changé vers: ${provider}. Le prochain message utilisera ce provider.`,
+          provider
+        };
       }
 
       default:

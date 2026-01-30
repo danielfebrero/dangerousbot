@@ -10,17 +10,36 @@ function App() {
   const [isTyping, setIsTyping] = useState(false);
   const [tokenUsage, setTokenUsage] = useState<TokenUsage | null>(null);
 
+  // Fonction pour ajouter un message système (utilisé par Header pour la compression)
+  const addSystemMessage = useCallback((content: string) => {
+    setMessages(prev => [...prev, {
+      id: crypto.randomUUID(),
+      type: 'system',
+      content,
+      timestamp: new Date()
+    }]);
+  }, []);
+
   const handleMessage = useCallback((wsMessage: WSMessage) => {
     switch (wsMessage.type) {
       case 'history':
         // Charger l'historique des messages depuis le serveur
         const historyMessages = wsMessage.payload.messages || [];
-        const loadedMessages: Message[] = historyMessages.map((msg: { role: string; content: string; timestamp: string }) => ({
-          id: crypto.randomUUID(),
-          type: msg.role === 'user' ? 'user' : msg.role === 'assistant' ? 'bot' : 'system',
-          content: msg.content,
-          timestamp: new Date(msg.timestamp)
-        }));
+        const loadedMessages: Message[] = historyMessages.map((msg: { role: string; content: string; timestamp: string; tool_calls?: Array<{ name: string; input: unknown }> }) => {
+          // Détecter les messages de changement de provider
+          const isProviderSwitch = msg.role === 'system' && (
+            msg.content.includes('Provider changé') || 
+            (msg.content.includes('Provider') && msg.content.includes('indisponible'))
+          );
+          
+          return {
+            id: crypto.randomUUID(),
+            type: isProviderSwitch ? 'provider_switch' as const : (msg.role === 'user' ? 'user' as const : msg.role === 'assistant' ? 'bot' as const : 'system' as const),
+            content: msg.content,
+            toolCalls: msg.tool_calls,
+            timestamp: new Date(msg.timestamp)
+          };
+        });
         setMessages(loadedMessages);
         break;
 
@@ -68,8 +87,23 @@ function App() {
       case 'usage':
         setTokenUsage({
           input_tokens: wsMessage.payload.input_tokens,
-          output_tokens: wsMessage.payload.output_tokens
+          output_tokens: wsMessage.payload.output_tokens,
+          cost: wsMessage.payload.cost
         });
+        break;
+
+      case 'provider_switch':
+        setMessages(prev => [...prev, {
+          id: crypto.randomUUID(),
+          type: 'provider_switch',
+          content: `🔄 Provider: ${wsMessage.payload.from} → ${wsMessage.payload.to}`,
+          providerSwitch: {
+            from: wsMessage.payload.from,
+            to: wsMessage.payload.to,
+            reason: wsMessage.payload.reason
+          },
+          timestamp: new Date()
+        }]);
         break;
     }
   }, []);
@@ -89,7 +123,7 @@ function App() {
 
   return (
     <div className="app">
-      <Header status={status} tokenUsage={tokenUsage} />
+      <Header status={status} tokenUsage={tokenUsage} onSystemMessage={addSystemMessage} />
       <main className="chat-container">
         <MessageList messages={messages} isTyping={isTyping} />
       </main>

@@ -5,3 +5,4 @@ export { MessageInput } from './MessageInput';
 export { TypingIndicator } from './TypingIndicator';
 export { Markdown } from './Markdown';
 export { TokenCounter } from './TokenCounter';
+export { ToolBadge } from './ToolBadge';

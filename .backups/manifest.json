@@ -1,5 +1,50 @@
 [
   {
+    "id": "backup_1769785816196",
+    "timestamp": "2026-01-30T15:10:16.228Z",
+    "description": "Fix: utiliser String.fromCodePoint pour les emojis au lieu des échappements Unicode bruts",
+    "commitHash": "3812e2e",
+    "files": [
+      "src/web/components/ToolBadge.tsx"
+    ]
+  },
+  {
+    "id": "backup_1769785556416",
+    "timestamp": "2026-01-30T15:05:56.451Z",
+    "description": "Add more emoji mappings for camelCase tool names and additional tools",
+    "commitHash": "3812e2e",
+    "files": [
+      "src/web/src/components/ToolBadge.tsx"
+    ]
+  },
+  {
+    "id": "backup_1769778969050",
+    "timestamp": "2026-01-30T13:16:09.073Z",
+    "description": "Test volontaire de rollback - code cassé",
+    "commitHash": "3812e2e",
+    "files": [
+      "src/config.ts"
+    ]
+  },
+  {
+    "id": "backup_1769778962255",
+    "timestamp": "2026-01-30T13:16:02.328Z",
+    "description": "Test volontaire de rollback - code cassé",
+    "commitHash": "3812e2e",
+    "files": [
+      "src/config.ts"
+    ]
+  },
+  {
+    "id": "backup_1769776860536",
+    "timestamp": "2026-01-30T12:41:00.580Z",
+    "description": "TEST ROLLBACK - Code cassé volontairement",
+    "commitHash": "3812e2e",
+    "files": [
+      "src/config.ts"
+    ]
+  },
+  {
     "id": "backup_1769776536162",
     "timestamp": "2026-01-30T12:35:36.229Z",
     "description": "TEST ROLLBACK v2 - Erreur TypeScript volontaire",

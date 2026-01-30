@@ -52,11 +52,19 @@ export class Memory {
         session_id TEXT NOT NULL,
         role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'system')),
         content TEXT NOT NULL,
+        tool_calls TEXT,
         timestamp TEXT NOT NULL,
         created_at TEXT DEFAULT (datetime('now'))
       );
       CREATE INDEX IF NOT EXISTS idx_conversations_session ON conversations(session_id);
     `);
+    
+    // Migration: ajouter la colonne tool_calls si elle n'existe pas
+    try {
+      this.db.exec(`ALTER TABLE conversations ADD COLUMN tool_calls TEXT`);
+    } catch (e) {
+      // Colonne existe déjà, ignorer
+    }
 
     // Table des embeddings (préparé pour le futur)
     this.db.exec(`
@@ -120,15 +128,29 @@ export class Memory {
 
   // ============ Messages ============
 
-  addMessage(role: 'user' | 'assistant' | 'system', content: string): number {
+  addMessage(role: 'user' | 'assistant' | 'system', content: string, toolCalls?: Array<{ name: string; input: unknown }>): number {
+    // Vérifier si un message identique existe déjà dans les 5 dernières secondes (anti-doublon)
+    const recentDuplicate = this.db.prepare(`
+      SELECT id FROM conversations
+      WHERE session_id = ? AND role = ? AND content = ?
+      AND datetime(timestamp) > datetime('now', '-5 seconds')
+      LIMIT 1
+    `).get(this.currentSessionId, role, content) as { id: number } | undefined;
+    
+    if (recentDuplicate) {
+      console.log(`[Memory] Doublon détecté et ignoré: ${role} - ${content.substring(0, 50)}...`);
+      return recentDuplicate.id;
+    }
+    
     const stmt = this.db.prepare(`
-      INSERT INTO conversations (session_id, role, content, timestamp)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO conversations (session_id, role, content, tool_calls, timestamp)
+      VALUES (?, ?, ?, ?, ?)
     `);
     const result = stmt.run(
       this.currentSessionId,
       role,
       content,
+      toolCalls ? JSON.stringify(toolCalls) : null,
       new Date().toISOString()
     );
     return result.lastInsertRowid as number;
@@ -136,25 +158,35 @@ export class Memory {
 
   getMessages(sessionId?: string, limit: number = 100): Message[] {
     const sid = sessionId || this.currentSessionId;
+    // Prendre les N plus récents (ORDER BY id DESC), puis inverser pour avoir l'ordre chronologique
     const rows = this.db.prepare(`
-      SELECT id, session_id, role, content, timestamp
-      FROM conversations
-      WHERE session_id = ?
-      ORDER BY id ASC
-      LIMIT ?
-    `).all(sid, limit) as Message[];
-    return rows;
-  }
-
-  getRecentMessages(count: number = 20): Message[] {
-    const rows = this.db.prepare(`
-      SELECT id, session_id, role, content, timestamp
+      SELECT id, session_id, role, content, tool_calls, timestamp
       FROM conversations
       WHERE session_id = ?
       ORDER BY id DESC
       LIMIT ?
-    `).all(this.currentSessionId, count) as Message[];
-    return rows.reverse();
+    `).all(sid, limit) as Array<Message & { tool_calls?: string }>;
+    
+    // Inverser pour ordre chronologique + parser les tool_calls JSON
+    return rows.reverse().map(row => ({
+      ...row,
+      tool_calls: row.tool_calls ? JSON.parse(row.tool_calls) : undefined
+    }));
+  }
+
+  getRecentMessages(count: number = 20): Message[] {
+    const rows = this.db.prepare(`
+      SELECT id, session_id, role, content, tool_calls, timestamp
+      FROM conversations
+      WHERE session_id = ?
+      ORDER BY id DESC
+      LIMIT ?
+    `).all(this.currentSessionId, count) as Array<Message & { tool_calls?: string }>;
+    
+    return rows.reverse().map(row => ({
+      ...row,
+      tool_calls: row.tool_calls ? JSON.parse(row.tool_calls) : undefined
+    }));
   }
 
   // ============ Knowledge ============

@@ -9,6 +9,7 @@
     "build:server": "node esbuild.config.js --server-only",
     "build:client": "node esbuild.config.js --client-only",
     "start": "NODE_ENV=production node dist/dangerousbot.js",
+    "start:daemon": "./start.sh",
     "setup": "tsx src/cli/setup.ts"
   },
   "dependencies": {

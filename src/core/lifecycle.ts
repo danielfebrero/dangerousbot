@@ -10,6 +10,7 @@ import * as os from 'os';
 
 const DANGEROUSBOT_DIR = path.join(os.homedir(), '.dangerousbot');
 const LOCKFILE = path.join(DANGEROUSBOT_DIR, 'dangerousbot.lock');
+const RESTART_SIGNAL = path.join(DANGEROUSBOT_DIR, '.restarted');
 
 export class Lifecycle {
   private projectRoot: string;
@@ -120,9 +121,59 @@ export class Lifecycle {
     });
   }
 
+  // Marquer qu'un redémarrage a eu lieu
+  markRestarted(reason: string): void {
+    this.ensureDir();
+    fs.writeFileSync(RESTART_SIGNAL, JSON.stringify({ 
+      timestamp: Date.now(), 
+      reason,
+      version: process.version 
+    }), { mode: 0o600 });
+  }
+
+  // Vérifier si on vient de redémarrer
+  checkRestarted(): { restarted: boolean; reason?: string; timestamp?: number } {
+    if (!fs.existsSync(RESTART_SIGNAL)) {
+      return { restarted: false };
+    }
+
+    try {
+      const content = fs.readFileSync(RESTART_SIGNAL, 'utf-8');
+      const data = JSON.parse(content);
+      
+      // Si le redémarrage date de plus de 30 secondes, on considère que c'est un vieux signal
+      if (Date.now() - data.timestamp > 30000) {
+        fs.unlinkSync(RESTART_SIGNAL);
+        return { restarted: false };
+      }
+      
+      return { 
+        restarted: true, 
+        reason: data.reason,
+        timestamp: data.timestamp 
+      };
+    } catch {
+      return { restarted: false };
+    }
+  }
+
+  // Effacer le signal de redémarrage
+  clearRestarted(): void {
+    try {
+      if (fs.existsSync(RESTART_SIGNAL)) {
+        fs.unlinkSync(RESTART_SIGNAL);
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
   // Redémarrer le serveur
   restart(reason: string = 'Manual restart'): void {
     console.log(`[Lifecycle] Redémarrage: ${reason}`);
+
+    // Marquer le redémarrage
+    this.markRestarted(reason);
 
     // Relâcher le lock
     this.releaseLock();

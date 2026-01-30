@@ -48,45 +48,18 @@ async function askQuestion(rl: readline.Interface, question: string): Promise<st
 // ============ macOS ============
 
 function createMacOSApp(): string {
-  const appPath = path.join(HOME, 'Desktop', 'DangerousBot.app');
-  const contentsPath = path.join(appPath, 'Contents');
-  const macOSPath = path.join(contentsPath, 'MacOS');
-  const resourcesPath = path.join(contentsPath, 'Resources');
-
-  // Créer la structure de l'app
-  fs.mkdirSync(macOSPath, { recursive: true });
-  fs.mkdirSync(resourcesPath, { recursive: true });
-
-  // Info.plist
-  const infoPlist = `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleExecutable</key>
-  <string>launch</string>
-  <key>CFBundleName</key>
-  <string>DangerousBot</string>
-  <key>CFBundleIdentifier</key>
-  <string>com.dangerousbot.app</string>
-  <key>CFBundleVersion</key>
-  <string>1.0</string>
-  <key>CFBundlePackageType</key>
-  <string>APPL</string>
-</dict>
-</plist>`;
-  fs.writeFileSync(path.join(contentsPath, 'Info.plist'), infoPlist);
-
-  // Script de lancement
-  const launchScript = `#!/bin/bash
+  // Créer un fichier .command simple dans le home directory
+  const commandPath = path.join(HOME, 'dangerousbot.command');
+  
+  const commandScript = `#!/bin/bash
 cd "${PROJECT_ROOT}"
-open -a Terminal.app "${PROJECT_ROOT}/dist/dangerousbot.js" 2>/dev/null || \\
-  osascript -e 'tell app "Terminal" to do script "cd \\"${PROJECT_ROOT}\\" && npm start"'
+./start.sh
 `;
-  const launchPath = path.join(macOSPath, 'launch');
-  fs.writeFileSync(launchPath, launchScript);
-  fs.chmodSync(launchPath, '755');
+  
+  fs.writeFileSync(commandPath, commandScript);
+  fs.chmodSync(commandPath, '755');
 
-  return appPath;
+  return commandPath;
 }
 
 function createMacOSLaunchAgent(): string {

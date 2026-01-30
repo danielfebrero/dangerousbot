@@ -14,6 +14,11 @@ import { Brain } from '../core/brain.js';
 import { getToolDefinitions, ToolExecutor } from '../core/tools.js';
 import { getMemory } from '../core/memory.js';
 import { ServerConfig, ToolInput } from '../core/types.js';
+import { Lifecycle } from '../core/lifecycle.js';
+import * as os from 'os';
+
+// Signal pour le message de continuation après redémarrage
+const RESTART_MSG_FILE = path.join(os.homedir(), '.dangerousbot', '.restart_message');
 
 export class DangerousBotServer {
   private app: Application;
@@ -23,6 +28,8 @@ export class DangerousBotServer {
   private toolExecutor: ToolExecutor;
   private projectRoot: string;
   private isProcessing: boolean = false;
+  private lifecycle: Lifecycle;
+  private pendingContinuationMessage: string | null = null;
 
   constructor(config: ServerConfig, projectRoot: string) {
     this.projectRoot = projectRoot;
@@ -30,6 +37,7 @@ export class DangerousBotServer {
     this.server = createServer(this.app);
     this.wsManager = new WebSocketManager(this.server);
     this.toolExecutor = new ToolExecutor(projectRoot);
+    this.lifecycle = new Lifecycle(projectRoot);
 
     this.setupMiddleware();
     this.setupRoutes();
@@ -113,9 +121,25 @@ export class DangerousBotServer {
     this.isProcessing = true;
     this.wsManager.sendBotTyping(true);
 
+    // ✅ SAUVEGARDER LE MESSAGE UTILISATEUR IMMÉDIATEMENT
+    const memory = getMemory();
+    memory.addMessage('user', userMessage);
+
+    // Collecter tous les tool_calls pour cette réponse
+    const allToolCalls: Array<{ name: string; input: unknown }> = [];
+
     try {
       const tools = getToolDefinitions();
       let response = await this.brain.think(userMessage, tools);
+
+      // Vérifier si un fallback de provider a eu lieu
+      const providerSwitched = (global as any).__providerSwitched;
+      if (providerSwitched) {
+        delete (global as any).__providerSwitched;
+        const switchMessage = `⚠️ Provider ${providerSwitched.from} indisponible (${providerSwitched.reason}). Basculé sur ${providerSwitched.to}.`;
+        this.wsManager.sendProviderSwitch(providerSwitched.from, providerSwitched.to, providerSwitched.reason);
+        memory.addMessage('system', switchMessage);
+      }
 
       // Boucle de traitement des outils
       while (response.stopReason === 'tool_use') {
@@ -123,6 +147,9 @@ export class DangerousBotServer {
           if (block.type === 'text') {
             this.wsManager.sendBotMessage(block.text);
           } else if (block.type === 'tool_use') {
+            // Collecter le tool_call
+            allToolCalls.push({ name: block.name, input: block.input });
+            
             this.wsManager.sendToolUse(block.name, block.input);
 
             // Exécuter l'outil
@@ -140,6 +167,17 @@ export class DangerousBotServer {
             if (result.needsRestart) {
               this.wsManager.sendSystem('Redémarrage du serveur en cours...');
             }
+
+            // Vérifier si un changement de provider est demandé
+            const pendingProviderSwitch = (global as any).__pendingProviderSwitch;
+            if (pendingProviderSwitch) {
+              delete (global as any).__pendingProviderSwitch;
+              const previousProvider = this.brain.getCurrentProvider().name;
+              this.brain.switchProvider(pendingProviderSwitch);
+              const switchMessage = `🔄 Provider changé: ${previousProvider} → ${pendingProviderSwitch}`;
+              this.wsManager.sendProviderSwitch(previousProvider, pendingProviderSwitch, 'user_request');
+              memory.addMessage('system', switchMessage);
+            }
           }
         }
 
@@ -148,15 +186,39 @@ export class DangerousBotServer {
       }
 
       // Traiter la réponse finale
+      let finalText = '';
       for (const block of response.content) {
         if (block.type === 'text') {
+          finalText += block.text;
           this.wsManager.sendBotMessage(block.text);
         }
       }
 
-      // Envoyer les stats d'usage des tokens
+      // Sauvegarder le message assistant avec les tool_calls
+      if (finalText || allToolCalls.length > 0) {
+        memory.addMessage('assistant', finalText, allToolCalls.length > 0 ? allToolCalls : undefined);
+      }
+
+      // Envoyer les stats d'usage des tokens et du coût
       if (response.usage) {
-        this.wsManager.sendUsage(response.usage.input_tokens, response.usage.output_tokens);
+        this.wsManager.sendUsage(
+          response.usage.input_tokens, 
+          response.usage.output_tokens,
+          response.cost
+        );
+      }
+
+      // Vérifier si un restart est en attente
+      const pendingRestart = (global as any).__pendingRestart;
+      if (pendingRestart) {
+        delete (global as any).__pendingRestart;
+        console.log(`[Server] Restart programmé: ${pendingRestart.reason}`);
+        this.wsManager.sendSystem(`Redémarrage dans 2 secondes: ${pendingRestart.reason}`);
+        
+        // Attendre un peu pour s'assurer que tout est sauvegardé
+        setTimeout(() => {
+          this.lifecycle.restart(pendingRestart.reason);
+        }, 2000);
       }
     } catch (error) {
       console.error('[Server] Erreur:', error);
@@ -189,12 +251,32 @@ export class DangerousBotServer {
 
   // Démarrer le serveur
   start(port: number, host: string = 'localhost'): Promise<void> {
+    // Vérifier si on vient de redémarrer
+    const restartInfo = this.lifecycle.checkRestarted();
+    if (restartInfo.restarted) {
+      this.pendingContinuationMessage = `🔄 Redémarrage effectué ! Je suis de retour et prêt à continuer.\n\n_(Provider actif: **${this.brain?.getCurrentProvider().name || 'inconnu'}**)_`;
+      console.log('[Server] Message de continuation en attente (redémarrage détecté)');
+    }
+
     return new Promise((resolve) => {
       this.server.listen(port, host, () => {
         console.log(`[Server] DangerousBot écoute sur http://${host}:${port}`);
         resolve();
       });
     });
+  }
+
+  // Envoyer le message de continuation après redémarrage
+  sendContinuationMessage(): void {
+    if (this.pendingContinuationMessage) {
+      // Attendre que le WebSocket soit prêt
+      setTimeout(() => {
+        this.wsManager.sendBotMessage(this.pendingContinuationMessage!);
+        this.pendingContinuationMessage = null;
+        this.lifecycle.clearRestarted();
+        console.log('[Server] Message de continuation envoyé');
+      }, 500);
+    }
   }
 
   // Arrêter le serveur

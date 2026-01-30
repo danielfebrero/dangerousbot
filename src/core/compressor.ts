@@ -13,6 +13,7 @@ import { getMemory, Memory } from './memory';
 import { getEmbeddingService, EmbeddingService } from './embedding';
 import { Message } from './types';
 import { MODELS, TOKENS, MEMORY } from '../config';
+import { logger } from './logger';
 
 export interface CompressedMemory {
   id?: number;
@@ -38,25 +39,50 @@ export class MemoryCompressor {
 
   /**
    * Vérifie si une compression est nécessaire et l'exécute
+   * @param force - Si true, force la compression même si le seuil n'est pas atteint
    */
-  async checkAndCompress(): Promise<boolean> {
-    const messages = this.memory.getMessages(undefined, 1000);
+  async checkAndCompress(force: boolean = false): Promise<boolean> {
+    logger.info('Compressor', `checkAndCompress called, force=${force}`);
     
-    if (messages.length < MEMORY.COMPRESSION_THRESHOLD) {
+    const messages = this.memory.getMessages(undefined, 1000);
+    logger.info('Compressor', `Found ${messages.length} messages, threshold=${MEMORY.COMPRESSION_THRESHOLD}`);
+    
+    if (!force && messages.length < MEMORY.COMPRESSION_THRESHOLD) {
+      logger.info('Compressor', 'Below threshold, skipping');
       return false;
     }
 
     // Messages à compresser (tous sauf les N derniers)
     const toCompress = messages.slice(0, messages.length - MEMORY.KEEP_RECENT_MESSAGES);
+    logger.info('Compressor', `Messages to compress: ${toCompress.length} (keeping ${MEMORY.KEEP_RECENT_MESSAGES} recent)`);
     
-    if (toCompress.length < MEMORY.MIN_MESSAGES_TO_COMPRESS) {
+    if (!force && toCompress.length < MEMORY.MIN_MESSAGES_TO_COMPRESS) {
+      logger.info('Compressor', `Not enough to compress (min=${MEMORY.MIN_MESSAGES_TO_COMPRESS})`);
       return false;  // Pas assez pour justifier une compression
     }
 
-    console.log(`[Compressor] Compressing ${toCompress.length} messages...`);
+    if (toCompress.length === 0) {
+      logger.info('Compressor', 'No messages to compress (0 after keeping recent)');
+      return false;
+    }
+
+    logger.info('Compressor', `Compressing ${toCompress.length} messages...`);
     
-    await this.compressMessages(toCompress);
-    return true;
+    try {
+      await this.compressMessages(toCompress);
+      logger.info('Compressor', 'Compression successful');
+      return true;
+    } catch (error) {
+      logger.error('Compressor', `Compression failed: ${(error as Error).stack || String(error)}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Alias pour checkAndCompress avec support du paramètre force
+   */
+  async compressIfNeeded(force: boolean = false): Promise<boolean> {
+    return this.checkAndCompress(force);
   }
 
   /**
@@ -110,7 +136,7 @@ Format: Un résumé structuré et factuel, sans fluff.`,
     // Supprimer les messages originaux (optionnel - pour l'instant on garde)
     // this.deleteCompressedMessages(compressed.message_ids);
 
-    console.log(`[Compressor] Created summary (${summary.length} chars)`);
+    logger.info('Compressor', `Created summary (${summary.length} chars)`);
 
     return compressed;
   }
@@ -220,18 +246,18 @@ Format: Un résumé structuré et factuel, sans fluff.`,
 // Singleton
 let compressorInstance: MemoryCompressor | null = null;
 
-export function getCompressor(): MemoryCompressor {
-  if (!compressorInstance) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      throw new Error('ANTHROPIC_API_KEY not set');
-    }
-    compressorInstance = new MemoryCompressor(apiKey);
-  }
+export function getCompressor(): MemoryCompressor | null {
+  // Retourne le singleton existant ou null (pas d'erreur)
+  // Le compressor doit être initialisé via initCompressor() depuis le serveur
   return compressorInstance;
 }
 
 export function initCompressor(anthropicApiKey: string): MemoryCompressor {
   compressorInstance = new MemoryCompressor(anthropicApiKey);
+  logger.info('Compressor', 'Initialized');
   return compressorInstance;
+}
+
+export function isCompressorInitialized(): boolean {
+  return compressorInstance !== null;
 }

@@ -6,13 +6,36 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import { WSMessage } from '../core/types.js';
 
+export type MessageHandler = (message: string) => Promise<void>;
+export type HistoryProvider = () => Array<{ role: string; content: string; timestamp: string; tool_calls?: Array<{ name: string; input: unknown }> }>;
+
 export class WebSocketManager {
   private wss: WebSocketServer;
   private clients: Set<WebSocket> = new Set();
+  private messageHandler: MessageHandler | null = null;
+  private historyProvider: HistoryProvider | null = null;
+
+  private onFirstConnection: (() => void) | null = null;
+  private hasConnectedClient: boolean = false;
 
   constructor(server: Server) {
     this.wss = new WebSocketServer({ server });
     this.setupListeners();
+  }
+
+  // Configurer un callback pour la première connexion
+  setOnFirstConnection(callback: () => void): void {
+    this.onFirstConnection = callback;
+  }
+
+  // Configurer le handler de messages (appelé une seule fois depuis main.ts)
+  setMessageHandler(handler: MessageHandler): void {
+    this.messageHandler = handler;
+  }
+
+  // Configurer le provider d'historique
+  setHistoryProvider(provider: HistoryProvider): void {
+    this.historyProvider = provider;
   }
 
   private setupListeners(): void {
@@ -20,10 +43,36 @@ export class WebSocketManager {
       console.log('[WebSocket] Client connecté');
       this.clients.add(ws);
 
+      // Appeler le callback pour la première connexion
+      if (!this.hasConnectedClient && this.onFirstConnection) {
+        this.hasConnectedClient = true;
+        this.onFirstConnection();
+      }
+
       // Envoyer un message de bienvenue
       this.sendTo(ws, {
         type: 'connected',
         payload: { message: 'Connexion établie avec DangerousBot' }
+      });
+
+      // Envoyer l'historique si un provider est configuré
+      if (this.historyProvider) {
+        const history = this.historyProvider();
+        this.sendHistory(ws, history);
+        console.log(`[WebSocket] Historique envoyé: ${history.length} messages`);
+      }
+
+      // Handler de messages entrants
+      ws.on('message', async (data: Buffer) => {
+        try {
+          const message = JSON.parse(data.toString());
+
+          if (message.type === 'user_message' && message.payload?.text && this.messageHandler) {
+            await this.messageHandler(message.payload.text);
+          }
+        } catch (error) {
+          console.error('[WebSocket] Erreur de parsing message:', error);
+        }
       });
 
       ws.on('close', () => {
@@ -110,16 +159,32 @@ export class WebSocketManager {
     });
   }
 
-  // Envoyer les stats d'usage des tokens
-  sendUsage(inputTokens: number, outputTokens: number): void {
+  // Envoyer les stats d'usage des tokens et du coût
+  sendUsage(inputTokens: number, outputTokens: number, cost?: { input_cost: number; output_cost: number; total_cost: number }): void {
     this.broadcast({
       type: 'usage',
-      payload: { input_tokens: inputTokens, output_tokens: outputTokens }
+      payload: { 
+        input_tokens: inputTokens, 
+        output_tokens: outputTokens,
+        cost: cost || {
+          input_cost: 0,
+          output_cost: 0,
+          total_cost: 0
+        }
+      }
+    });
+  }
+
+  // Envoyer une notification de changement de provider
+  sendProviderSwitch(from: string, to: string, reason: string): void {
+    this.broadcast({
+      type: 'provider_switch',
+      payload: { from, to, reason }
     });
   }
 
   // Envoyer l'historique des messages à un client
-  sendHistory(client: WebSocket, messages: Array<{ role: string; content: string; timestamp: string }>): void {
+  sendHistory(client: WebSocket, messages: Array<{ role: string; content: string; timestamp: string; tool_calls?: Array<{ name: string; input: unknown }> }>): void {
     this.sendTo(client, {
       type: 'history',
       payload: { messages }

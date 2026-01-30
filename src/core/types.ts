@@ -6,11 +6,17 @@ import Anthropic from '@anthropic-ai/sdk';
 
 // ============ Messages & Conversation ============
 
+export interface ToolCall {
+  name: string;
+  input: unknown;
+}
+
 export interface Message {
   id?: number;
   session_id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
+  tool_calls?: ToolCall[];
   timestamp: string;
 }
 
