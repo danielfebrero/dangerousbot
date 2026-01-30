@@ -23,8 +23,7 @@ export function useWebSocket(options: UseWebSocketOptions) {
     ws.onopen = () => {
       setStatus('connected');
       attemptsRef.current = 0;
-      // Request to start conversation
-      ws.send(JSON.stringify({ type: 'start_conversation' }));
+      // L'historique est envoyé automatiquement par le serveur à la connexion
     };
 
     ws.onclose = () => {

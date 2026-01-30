@@ -1,5 +1,6 @@
 /**
  * Brain - Interface Claude API (Opus 4.5) pour DangerousBot
+ * Avec injection de contexte automatique depuis la mémoire long-terme
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -7,18 +8,43 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Tool, BrainResponse } from './types';
 import { getMemory } from './memory';
+import { getContextInjector, ContextInjector } from './context-injector';
+import { initEmbeddingService } from './embedding';
+import { initCompressor } from './compressor';
 
 const MODEL = 'claude-opus-4-5-20251101';
 const MAX_TOKENS = 8096;
+const COMPRESS_EVERY_N_MESSAGES = 20;  // Vérifier compression tous les N messages
 
 export class Brain {
   private client: Anthropic;
   private identity: string;
+  private baseIdentity: string;  // Identity sans contexte injecté
   private conversationHistory: Anthropic.MessageParam[] = [];
+  private contextInjector: ContextInjector | null = null;
+  private messageCount: number = 0;
+  private contextEnabled: boolean = false;
 
   constructor(apiKey: string, identityPath?: string) {
     this.client = new Anthropic({ apiKey });
-    this.identity = this.loadIdentity(identityPath);
+    this.baseIdentity = this.loadIdentity(identityPath);
+    this.identity = this.baseIdentity;
+  }
+
+  /**
+   * Initialise le système de contexte (embeddings + compression)
+   */
+  initContextSystem(openRouterApiKey: string, anthropicApiKey: string): void {
+    try {
+      initEmbeddingService(openRouterApiKey);
+      initCompressor(anthropicApiKey);
+      this.contextInjector = getContextInjector();
+      this.contextEnabled = true;
+      console.log('[Brain] Context injection system initialized');
+    } catch (error) {
+      console.error('[Brain] Failed to init context system:', error);
+      this.contextEnabled = false;
+    }
   }
 
   private loadIdentity(customPath?: string): string {
@@ -77,6 +103,15 @@ Tu es curieux, adaptable et tu cherches à comprendre les besoins de l'utilisate
   // Penser avec des outils
   async think(userMessage: string, tools: Tool[]): Promise<BrainResponse> {
     this.addUserMessage(userMessage);
+    this.messageCount++;
+
+    // Injecter le contexte pertinent depuis la mémoire long-terme
+    await this.updateContextualIdentity(userMessage);
+
+    // Vérifier si compression nécessaire (périodiquement)
+    if (this.contextEnabled && this.messageCount % COMPRESS_EVERY_N_MESSAGES === 0) {
+      this.triggerCompressionAsync();
+    }
 
     const response = await this.client.messages.create({
       model: MODEL,
@@ -93,6 +128,44 @@ Tu es curieux, adaptable et tu cherches à comprendre les besoins de l'utilisate
       stopReason: response.stop_reason,
       usage: response.usage
     };
+  }
+
+  /**
+   * Met à jour l'identité avec le contexte pertinent
+   */
+  private async updateContextualIdentity(userMessage: string): Promise<void> {
+    if (!this.contextEnabled || !this.contextInjector) {
+      return;
+    }
+
+    try {
+      const contextBlock = await this.contextInjector.injectContext(userMessage);
+      
+      if (contextBlock) {
+        this.identity = this.baseIdentity + '\n\n' + contextBlock;
+        console.log('[Brain] Context injected into identity');
+      } else {
+        this.identity = this.baseIdentity;
+      }
+    } catch (error) {
+      console.error('[Brain] Context injection failed:', error);
+      this.identity = this.baseIdentity;
+    }
+  }
+
+  /**
+   * Déclenche la compression en arrière-plan (non-bloquant)
+   */
+  private triggerCompressionAsync(): void {
+    if (!this.contextInjector) return;
+
+    this.contextInjector.maybeCompress()
+      .then(compressed => {
+        if (compressed) {
+          console.log('[Brain] Conversation history compressed');
+        }
+      })
+      .catch(err => console.error('[Brain] Compression error:', err));
   }
 
   // Continuer après un résultat d'outil

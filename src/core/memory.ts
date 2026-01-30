@@ -20,7 +20,18 @@ export class Memory {
     this.ensureDataDir();
     this.db = new Database(DB_PATH);
     this.initSchema();
-    this.currentSessionId = this.generateSessionId();
+    // Reprendre la dernière session si elle existe, sinon en créer une nouvelle
+    const lastSession = this.getLastSessionIdInternal();
+    this.currentSessionId = lastSession || this.generateSessionId();
+    console.log(`[Memory] Session: ${this.currentSessionId} (${lastSession ? 'reprise' : 'nouvelle'})`);
+  }
+
+  private getLastSessionIdInternal(): string | null {
+    const row = this.db.prepare(`
+      SELECT session_id FROM conversations
+      ORDER BY created_at DESC LIMIT 1
+    `).get() as { session_id: string } | undefined;
+    return row?.session_id || null;
   }
 
   private ensureDataDir(): void {

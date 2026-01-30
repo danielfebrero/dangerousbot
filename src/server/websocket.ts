@@ -110,6 +110,22 @@ export class WebSocketManager {
     });
   }
 
+  // Envoyer les stats d'usage des tokens
+  sendUsage(inputTokens: number, outputTokens: number): void {
+    this.broadcast({
+      type: 'usage',
+      payload: { input_tokens: inputTokens, output_tokens: outputTokens }
+    });
+  }
+
+  // Envoyer l'historique des messages à un client
+  sendHistory(client: WebSocket, messages: Array<{ role: string; content: string; timestamp: string }>): void {
+    this.sendTo(client, {
+      type: 'history',
+      payload: { messages }
+    });
+  }
+
   // Obtenir le nombre de clients connectés
   getClientCount(): number {
     return this.clients.size;

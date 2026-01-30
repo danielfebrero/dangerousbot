@@ -87,9 +87,15 @@ export class DangerousBotServer {
   }
 
   // Initialiser le brain avec la clé API
-  initBrain(apiKey: string): void {
+  initBrain(apiKey: string, openRouterApiKey?: string): void {
     this.brain = new Brain(apiKey);
     console.log('[Server] Brain initialisé');
+
+    // Initialiser le système de contexte si la clé OpenRouter est fournie
+    if (openRouterApiKey) {
+      this.brain.initContextSystem(openRouterApiKey, apiKey);
+      console.log('[Server] Système de contexte (embeddings) initialisé');
+    }
   }
 
   // Traiter un message utilisateur
@@ -147,6 +153,11 @@ export class DangerousBotServer {
           this.wsManager.sendBotMessage(block.text);
         }
       }
+
+      // Envoyer les stats d'usage des tokens
+      if (response.usage) {
+        this.wsManager.sendUsage(response.usage.input_tokens, response.usage.output_tokens);
+      }
     } catch (error) {
       console.error('[Server] Erreur:', error);
       this.wsManager.sendError(`Erreur: ${(error as Error).message}`);
@@ -156,31 +167,19 @@ export class DangerousBotServer {
     }
   }
 
-  // Démarrer une nouvelle conversation (premier contact)
-  async startConversation(): Promise<void> {
+  // Charger l'historique de la session dans le brain
+  loadSessionHistory(): void {
     if (!this.brain) {
-      this.wsManager.sendError('Brain non initialisé');
       return;
     }
 
     const memory = getMemory();
-    const isNew = this.brain.isNewSession();
+    const messages = memory.getMessages();
 
-    if (!isNew) {
-      // Reprendre la session existante
+    if (messages.length > 0) {
       this.brain.loadHistory();
-      this.wsManager.sendSystem('Session précédente restaurée');
-      return;
+      console.log(`[Server] Historique chargé: ${messages.length} messages`);
     }
-
-    // Première conversation - le bot se présente
-    const introMessage = `C'est notre première rencontre. Je viens de démarrer.
-
-Je suis DangerousBot, un programme IA qui peut évoluer et s'adapter.
-
-Je vais commencer par poser quelques questions pour mieux te connaître et comprendre ce que tu attends de moi.`;
-
-    await this.processMessage(introMessage);
   }
 
   // Obtenir le WebSocket manager

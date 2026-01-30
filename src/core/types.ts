@@ -92,7 +92,7 @@ export interface ExecutionResult {
 // ============ WebSocket ============
 
 export interface WSMessage {
-  type: 'user_message' | 'bot_message' | 'bot_typing' | 'tool_use' | 'tool_result' | 'system' | 'error' | 'connected';
+  type: 'user_message' | 'bot_message' | 'bot_typing' | 'tool_use' | 'tool_result' | 'system' | 'error' | 'connected' | 'history' | 'usage';
   payload: unknown;
   timestamp?: string;
 }

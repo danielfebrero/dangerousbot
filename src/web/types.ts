@@ -7,9 +7,14 @@ export interface Message {
 }
 
 export interface WSMessage {
-  type: 'user_message' | 'bot_message' | 'bot_typing' | 'tool_use' | 'tool_result' | 'system' | 'error' | 'connected';
+  type: 'user_message' | 'bot_message' | 'bot_typing' | 'tool_use' | 'tool_result' | 'system' | 'error' | 'connected' | 'history' | 'usage';
   payload: any;
   timestamp?: string;
+}
+
+export interface TokenUsage {
+  input_tokens: number;
+  output_tokens: number;
 }
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';

@@ -301,10 +301,345 @@ body {
   background: var(--text-muted);
 }
 
+/* ===== MARKDOWN STYLES ===== */
+
+.markdown-content {
+  line-height: 1.7;
+}
+
+.markdown-content > *:first-child {
+  margin-top: 0;
+}
+
+.markdown-content > *:last-child {
+  margin-bottom: 0;
+}
+
+/* Headings */
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  margin: 1.5rem 0 0.75rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+.markdown-content h1 { font-size: 1.75rem; }
+.markdown-content h2 { font-size: 1.5rem; }
+.markdown-content h3 { font-size: 1.25rem; }
+.markdown-content h4 { font-size: 1.1rem; }
+.markdown-content h5 { font-size: 1rem; }
+.markdown-content h6 { font-size: 0.9rem; color: var(--text-secondary); }
+
+/* Paragraphs */
+.markdown-content p {
+  margin: 0.75rem 0;
+}
+
+/* Links */
+.markdown-content a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s;
+}
+
+.markdown-content a:hover {
+  border-bottom-color: var(--accent);
+}
+
+/* Bold, Italic, Strikethrough */
+.markdown-content strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.markdown-content em {
+  font-style: italic;
+}
+
+.markdown-content del {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+/* Inline code */
+.markdown-content .inline-code,
+.markdown-content code:not(.hljs) {
+  background: rgba(6, 182, 212, 0.15);
+  color: var(--accent);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.875em;
+}
+
+/* Code blocks */
+.markdown-content pre {
+  margin: 1rem 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0d1117;
+  border: 1px solid var(--border);
+}
+
+.markdown-content pre code {
+  display: block;
+  padding: 1rem;
+  overflow-x: auto;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  tab-size: 2;
+}
+
+/* Blockquotes */
+.markdown-content blockquote {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  border-left: 4px solid var(--accent);
+  background: var(--bg-secondary);
+  border-radius: 0 8px 8px 0;
+  color: var(--text-secondary);
+}
+
+.markdown-content blockquote p {
+  margin: 0;
+}
+
+/* Lists */
+.markdown-content ul,
+.markdown-content ol {
+  margin: 0.75rem 0;
+  padding-left: 1.5rem;
+}
+
+.markdown-content li {
+  margin: 0.35rem 0;
+}
+
+.markdown-content li > ul,
+.markdown-content li > ol {
+  margin: 0.25rem 0;
+}
+
+/* Task lists */
+.markdown-content ul.contains-task-list {
+  list-style: none;
+  padding-left: 0;
+}
+
+.markdown-content .task-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.markdown-content .task-list-item input[type="checkbox"] {
+  margin-top: 0.35rem;
+  accent-color: var(--accent);
+}
+
+/* Tables */
+.markdown-content table {
+  width: 100%;
+  margin: 1rem 0;
+  border-collapse: collapse;
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 0.9rem;
+}
+
+.markdown-content thead {
+  background: var(--bg-secondary);
+}
+
+.markdown-content th,
+.markdown-content td {
+  padding: 0.6rem 0.8rem;
+  text-align: left;
+  border: 1px solid var(--border);
+}
+
+.markdown-content th {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.markdown-content tbody tr:hover {
+  background: rgba(6, 182, 212, 0.05);
+}
+
+/* Horizontal rule */
+.markdown-content hr {
+  margin: 1.5rem 0;
+  border: none;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--border), transparent);
+}
+
+/* Images */
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 1rem 0;
+}
+
+/* ===== HIGHLIGHT.JS THEME (GitHub Dark inspired) ===== */
+
+.hljs {
+  color: #c9d1d9;
+  background: #0d1117;
+}
+
+.hljs-comment,
+.hljs-punctuation {
+  color: #8b949e;
+}
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-meta,
+.hljs-selector-attr,
+.hljs-selector-class,
+.hljs-selector-id {
+  color: #79c0ff;
+}
+
+.hljs-variable,
+.hljs-literal,
+.hljs-number,
+.hljs-doctag {
+  color: #ffa657;
+}
+
+.hljs-params {
+  color: #c9d1d9;
+}
+
+.hljs-function {
+  color: #d2a8ff;
+}
+
+.hljs-class,
+.hljs-tag,
+.hljs-title,
+.hljs-built_in {
+  color: #7ee787;
+}
+
+.hljs-keyword,
+.hljs-type,
+.hljs-builtin-name,
+.hljs-selector-tag,
+.hljs-meta-keyword {
+  color: #ff7b72;
+}
+
+.hljs-string,
+.hljs-symbol,
+.hljs-meta .hljs-string,
+.hljs-addition {
+  color: #a5d6ff;
+}
+
+.hljs-template-tag,
+.hljs-template-variable {
+  color: #7ee787;
+}
+
+.hljs-deletion {
+  color: #ffa198;
+  background: rgba(248, 81, 73, 0.1);
+}
+
+.hljs-addition {
+  color: #7ee787;
+  background: rgba(63, 185, 80, 0.1);
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: bold;
+}
+
+.hljs-link {
+  color: #79c0ff;
+  text-decoration: underline;
+}
+
+/* ===== TOKEN COUNTER ===== */
+
+.token-counter {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.4rem 0.8rem;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 0.75rem;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.token-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.token-icon {
+  font-size: 0.9rem;
+}
+
+.token-value {
+  font-weight: 600;
+  font-family: 'Monaco', 'Menlo', monospace;
+  color: var(--text-primary);
+}
+
+.token-label {
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+}
+
+.token-item.input .token-value {
+  color: #60a5fa; /* blue */
+}
+
+.token-item.output .token-value {
+  color: #34d399; /* green */
+}
+
+.token-item.cost .token-value {
+  color: #fbbf24; /* amber */
+}
+
+/* Separator between token items */
+.token-item:not(:last-child)::after {
+  content: '';
+  display: block;
+  width: 1px;
+  height: 12px;
+  background: var(--border);
+  margin-left: 0.75rem;
+}
+
 /* Responsive */
 @media (max-width: 640px) {
   .header {
     padding: 0.75rem 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
 
   .logo h1 {
@@ -317,5 +652,13 @@ body {
 
   .input-container {
     padding: 0.75rem 1rem;
+  }
+
+  .token-counter {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    font-size: 0.7rem;
+    padding: 0.3rem 0.5rem;
   }
 }
