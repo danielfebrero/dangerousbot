@@ -1,1 +1,1 @@
-{"reason":"Split tools.ts into modular tools/ directory with auto-registration","timestamp":"2026-01-30T20:34:53.075Z"}
+{"reason":"Refactoring brain.ts en modules séparés (prompt-builder, provider-manager, history-manager)","timestamp":"2026-01-30T20:39:18.921Z"}

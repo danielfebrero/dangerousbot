@@ -1,15 +1,14 @@
 /**
- * Kimi Provider - Moonshot AI (Kimi 2.5)
+ * Mistral Provider - Mistral AI API
  * Implémentation avec BaseProvider
  */
 
 import { BaseProvider } from './base-provider.js';
 import { AIMessage, AIResponse, AIToolDefinition, AIContentBlock, AIProviderConfig } from './types.js';
 
-interface KimiMessage {
+interface MistralMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string | Array<{type: 'text'; text: string} | {type: 'image_url'; image_url: {url: string}}> | null;
-  reasoning_content?: string | null;
+  content: string | Array<{type: 'text'; text: string}>;
   tool_calls?: Array<{
     id: string;
     type: 'function';
@@ -18,12 +17,11 @@ interface KimiMessage {
   tool_call_id?: string;
 }
 
-interface KimiResponse {
+interface MistralResponse {
   choices: Array<{
     message: {
       role: 'assistant';
       content: string | null;
-      reasoning_content?: string | null;
       tool_calls?: Array<{
         id: string;
         type: 'function';
@@ -39,25 +37,32 @@ interface KimiResponse {
   };
 }
 
-export class KimiProvider extends BaseProvider {
-  readonly name = 'kimi';
-  private baseUrl = 'https://api.moonshot.ai/v1';
+export class MistralProvider extends BaseProvider {
+  readonly name = 'mistral';
+  private baseUrl = 'https://api.mistral.ai/v1';
 
+  // Tarifs Mistral (varient selon le modèle)
   protected costConfig = {
-    inputCostPerMillion: 0.60,   // Kimi k2.5: $0.60/M input
-    outputCostPerMillion: 3.00   // Kimi k2.5: $3.00/M output
+    inputCostPerMillion: 2.00,   // Mistral Large: ~$2/M input
+    outputCostPerMillion: 6.00   // Mistral Large: ~$6/M output
   };
 
   constructor(config: AIProviderConfig) {
     super(config);
+    // Ajuster les coûts selon le modèle
+    if (config.model.includes('small')) {
+      this.costConfig = { inputCostPerMillion: 0.20, outputCostPerMillion: 0.60 };
+    } else if (config.model.includes('medium')) {
+      this.costConfig = { inputCostPerMillion: 0.60, outputCostPerMillion: 1.80 };
+    }
   }
 
   supportsTools(): boolean {
     return true;
   }
 
-  protected convertMessages(messages: AIMessage[]): KimiMessage[] {
-    const result: KimiMessage[] = [];
+  protected convertMessages(messages: AIMessage[]): MistralMessage[] {
+    const result: MistralMessage[] = [];
 
     for (const msg of messages) {
       if (typeof msg.content === 'string') {
@@ -65,10 +70,9 @@ export class KimiProvider extends BaseProvider {
         continue;
       }
 
-      // Gestion des content blocks
       if (msg.role === 'assistant') {
         let textContent = '';
-        const toolCalls: KimiMessage['tool_calls'] = [];
+        const toolCalls: MistralMessage['tool_calls'] = [];
 
         for (const block of msg.content) {
           if (block.type === 'text' && block.text) {
@@ -87,29 +91,28 @@ export class KimiProvider extends BaseProvider {
 
         if (!textContent && toolCalls.length === 0) continue;
 
-        const assistantMsg: KimiMessage = {
+        const assistantMsg: MistralMessage = {
           role: 'assistant',
-          content: textContent || null
+          content: textContent || ''
         };
 
         if (toolCalls.length > 0) {
-          assistantMsg.reasoning_content = textContent || 'Processing...';
-          assistantMsg.content = null;
           assistantMsg.tool_calls = toolCalls;
         }
 
         result.push(assistantMsg);
 
       } else if (msg.role === 'user') {
-        const toolResults: KimiMessage[] = [];
-        const contentParts: Array<{type: 'text'; text: string} | {type: 'image_url'; image_url: {url: string}}> = [];
+        const toolResults: MistralMessage[] = [];
+        let textContent = '';
 
         for (const block of msg.content) {
           if (block.type === 'text' && block.text) {
-            contentParts.push({ type: 'text', text: block.text });
-          } else if (block.type === 'image' && block.source) {
-            const dataUrl = `data:${block.source.media_type};base64,${block.source.data}`;
-            contentParts.push({ type: 'image_url', image_url: { url: dataUrl } });
+            textContent += block.text;
+          } else if (block.type === 'image') {
+            // Mistral ne supporte pas les images directement dans l'API chat
+            // On pourrait implémenter la vision via un autre endpoint
+            textContent += '[Image: non supportée dans ce mode]';
           } else if (block.type === 'tool_result') {
             let resultContent = '';
             if (typeof block.content === 'string') {
@@ -130,12 +133,8 @@ export class KimiProvider extends BaseProvider {
 
         result.push(...toolResults);
 
-        if (contentParts.length > 0) {
-          if (contentParts.length === 1 && contentParts[0].type === 'text') {
-            result.push({ role: 'user', content: contentParts[0].text });
-          } else {
-            result.push({ role: 'user', content: contentParts });
-          }
+        if (textContent) {
+          result.push({ role: 'user', content: textContent });
         }
       }
     }
@@ -146,40 +145,36 @@ export class KimiProvider extends BaseProvider {
   protected convertTools(tools?: AIToolDefinition[]): unknown[] | undefined {
     if (!tools || tools.length === 0) return undefined;
 
-    return tools.map(tool => {
-      if (tool.name === 'web_search') {
-        return {
-          type: 'builtin_function',
-          function: { name: '$web_search' }
-        };
+    return tools.map(tool => ({
+      type: 'function',
+      function: {
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.input_schema
       }
-      return {
-        type: 'function',
-        function: {
-          name: tool.name,
-          description: tool.description,
-          parameters: tool.input_schema
-        }
-      };
-    });
+    }));
   }
 
   protected async makeApiCall(
-    messages: KimiMessage[],
+    messages: MistralMessage[],
     tools: unknown[] | undefined,
     system: string | undefined,
     maxTokens: number,
     abortSignal?: AbortSignal
-  ): Promise<KimiResponse> {
+  ): Promise<MistralResponse> {
+    const allMessages: MistralMessage[] = system
+      ? [{ role: 'system', content: system }, ...messages]
+      : messages;
+
     const body: Record<string, unknown> = {
       model: this.model,
-      messages: system ? [{ role: 'system', content: system }, ...messages] : messages,
-      max_tokens: maxTokens,
-      temperature: 1.0
+      messages: allMessages,
+      max_tokens: maxTokens
     };
 
     if (tools) {
       body.tools = tools;
+      body.tool_choice = 'auto';
     }
 
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
@@ -194,20 +189,19 @@ export class KimiProvider extends BaseProvider {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Kimi API error: ${response.status} - ${error}`);
+      throw new Error(`Mistral API error: ${response.status} - ${error}`);
     }
 
-    return await response.json() as KimiResponse;
+    return await response.json() as MistralResponse;
   }
 
-  protected parseResponse(response: KimiResponse): AIResponse {
+  protected parseResponse(response: MistralResponse): AIResponse {
     const choice = response.choices[0];
     const message = choice.message;
     const content: AIContentBlock[] = [];
 
-    const textContent = message.content || message.reasoning_content || '';
-    if (textContent) {
-      content.push({ type: 'text', text: textContent });
+    if (message.content) {
+      content.push({ type: 'text', text: message.content });
     }
 
     if (message.tool_calls) {
@@ -245,23 +239,26 @@ export class KimiProvider extends BaseProvider {
   }
 
   protected async* makeStreamingApiCall(
-    messages: KimiMessage[],
+    messages: MistralMessage[],
     tools: unknown[] | undefined,
     system: string | undefined,
     maxTokens: number,
     abortSignal?: AbortSignal
   ): AsyncGenerator<{ type: 'text'; text: string } | { type: 'tool_use'; id: string; name: string; input: unknown } | { type: 'usage'; inputTokens: number; outputTokens: number } | { type: 'finish'; reason: string | null }, void, unknown> {
+    const allMessages: MistralMessage[] = system
+      ? [{ role: 'system', content: system }, ...messages]
+      : messages;
+
     const body: Record<string, unknown> = {
       model: this.model,
-      messages: system ? [{ role: 'system', content: system }, ...messages] : messages,
+      messages: allMessages,
       max_tokens: maxTokens,
-      temperature: 1.0,
-      stream: true,
-      stream_options: { include_usage: true }
+      stream: true
     };
 
     if (tools) {
       body.tools = tools;
+      body.tool_choice = 'auto';
     }
 
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
@@ -276,7 +273,7 @@ export class KimiProvider extends BaseProvider {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Kimi API error: ${response.status} - ${error}`);
+      throw new Error(`Mistral API error: ${response.status} - ${error}`);
     }
 
     const reader = response.body?.getReader();
@@ -362,7 +359,7 @@ export class KimiProvider extends BaseProvider {
         try {
           parsedInput = JSON.parse(toolCall.arguments || '{}');
         } catch {
-          console.error('[Kimi] Failed to parse tool arguments:', toolCall.arguments);
+          console.error('[Mistral] Failed to parse tool arguments:', toolCall.arguments);
         }
 
         yield {

@@ -1,4 +1,4 @@
-/**
+//**
  * Claude Provider - Anthropic API
  * Implémentation avec BaseProvider
  */
