@@ -67,10 +67,8 @@ export class WebSocketManager {
         try {
           const message = JSON.parse(data.toString());
 
-          if (message.type === 'user_message' && this.messageHandler) {
-            const text = message.payload?.text || '';
-            const images = message.payload?.images;
-            await this.messageHandler(text, images);
+          if (message.type === 'user_message' && message.payload?.text && this.messageHandler) {
+            await this.messageHandler(message.payload.text);
           }
         } catch (error) {
           console.error('[WebSocket] Erreur de parsing message:', error);

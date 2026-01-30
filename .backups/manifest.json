@@ -1,5 +1,14 @@
 [
   {
+    "id": "backup_1769786640227",
+    "timestamp": "2026-01-30T15:24:00.272Z",
+    "description": "Modifier WebSocket pour recevoir les images",
+    "commitHash": "e9ab998",
+    "files": [
+      "src/server/websocket.ts"
+    ]
+  },
+  {
     "id": "backup_1769786617803",
     "timestamp": "2026-01-30T15:23:37.842Z",
     "description": "Ajouter styles CSS pour upload et affichage d'images",
@@ -76,15 +85,6 @@
     "timestamp": "2026-01-30T15:10:42.945Z",
     "description": "Ne pas afficher le content si vide et qu'il y a des tool_calls",
     "commitHash": "d594df4",
-    "files": [
-      "src/web/components/MessageItem.tsx"
-    ]
-  },
-  {
-    "id": "backup_1769785831612",
-    "timestamp": "2026-01-30T15:10:31.635Z",
-    "description": "Supprimer le cas 'tool' obsolète - les tool_calls s'affichent via renderToolCalls",
-    "commitHash": "6fecddd",
     "files": [
       "src/web/components/MessageItem.tsx"
     ]
