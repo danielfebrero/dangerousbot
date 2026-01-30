@@ -3,27 +3,10 @@ export interface ToolCall {
   input: unknown;
 }
 
-export interface ImageContent {
-  type: 'image';
-  source: {
-    type: 'base64';
-    media_type: string;
-    data: string;
-  };
-}
-
-export interface TextContent {
-  type: 'text';
-  text: string;
-}
-
-export type ContentPart = TextContent | ImageContent;
-
 export interface Message {
   id: string;
   type: 'user' | 'bot' | 'system' | 'tool' | 'provider_switch';
   content: string;
-  contentParts?: ContentPart[];
   timestamp: Date;
   toolName?: string;
   toolCalls?: ToolCall[];

@@ -1,1 +1,1 @@
-{"reason":"Activation des fixes emojis avec String.fromCodePoint et correction de l'affichage des tool_calls","timestamp":"2026-01-30T15:10:46.754Z"}
+{"reason":"Apply emoji encoding fix for Firefox","timestamp":"2026-01-30T15:16:07.858Z"}

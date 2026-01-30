@@ -1,5 +1,23 @@
 [
   {
+    "id": "backup_1769786484375",
+    "timestamp": "2026-01-30T15:21:24.416Z",
+    "description": "Ajouter types pour contenu multi-modal (texte + images)",
+    "commitHash": "c472504",
+    "files": [
+      "src/web/types.ts"
+    ]
+  },
+  {
+    "id": "backup_1769786403760",
+    "timestamp": "2026-01-30T15:20:03.803Z",
+    "description": "Ajouter state pour l'upload d'images",
+    "commitHash": "c472504",
+    "files": [
+      "src/web/src/components/ChatInput.tsx"
+    ]
+  },
+  {
     "id": "backup_1769786115715",
     "timestamp": "2026-01-30T15:15:15.755Z",
     "description": "Fix emoji encoding for Firefox - use direct UTF-8 strings instead of String.fromCodePoint()",
@@ -67,24 +85,6 @@
     "timestamp": "2026-01-30T13:16:02.328Z",
     "description": "Test volontaire de rollback - code cassé",
     "commitHash": "3812e2e",
-    "files": [
-      "src/config.ts"
-    ]
-  },
-  {
-    "id": "backup_1769776860536",
-    "timestamp": "2026-01-30T12:41:00.580Z",
-    "description": "TEST ROLLBACK - Code cassé volontairement",
-    "commitHash": "3812e2e",
-    "files": [
-      "src/config.ts"
-    ]
-  },
-  {
-    "id": "backup_1769776536162",
-    "timestamp": "2026-01-30T12:35:36.229Z",
-    "description": "TEST ROLLBACK v2 - Erreur TypeScript volontaire",
-    "commitHash": "2f98ca5",
     "files": [
       "src/config.ts"
     ]
