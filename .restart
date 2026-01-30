@@ -1,1 +1,1 @@
-{"reason":"Correction du nom du tool web_search dans l'execute (était $web_search, maintenant web_search)","timestamp":"2026-01-30T16:39:20.294Z"}
+{"reason":"Activation du streaming de réponses (API -> Server -> Frontend)","timestamp":"2026-01-30T16:56:31.548Z"}
