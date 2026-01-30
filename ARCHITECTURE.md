@@ -22,79 +22,6 @@ DangerousBot est un assistant IA auto-modifiable et évolutif, conçu pour colla
 
 ---
 
-## Structure des Dossiers
-
-```
-dangerousbot/
-├── src/
-│   ├── cli/                    # Setup initial (npm run setup)
-│   │   └── setup.ts
-│   ├── core/                   # 🧠 Cœur du système
-│   │   ├── brain/              # Orchestration AI
-│   │   │   ├── index.ts        # Brain principal
-│   │   │   ├── prompt-builder.ts
-│   │   │   ├── provider-manager.ts
-│   │   │   └── history-manager.ts
-│   │   ├── providers/          # Providers AI (standardisés)
-│   │   │   ├── types.ts        # Types communs
-│   │   │   ├── base-provider.ts # Classe abstraite
-│   │   │   ├── claude.ts       # Anthropic Claude
-│   │   │   ├── kimi.ts         # Moonshot AI
-│   │   │   ├── mistral.ts      # Mistral AI
-│   │   │   └── index.ts        # Factory
-│   │   ├── tools/              # Tools modularisés (18 tools)
-│   │   │   ├── index.ts        # Auto-registration
-│   │   │   ├── types.ts        # Types des tools
-│   │   │   ├── shell.ts
-│   │   │   ├── read-file.ts
-│   │   │   ├── write-file.ts
-│   │   │   ├── edit-file.ts
-│   │   │   ├── list-files.ts
-│   │   │   ├── delete-file.ts
-│   │   │   ├── execute-code.ts
-│   │   │   ├── remember.ts
-│   │   │   ├── recall.ts
-│   │   │   ├── self-update.ts
-│   │   │   ├── restart-server.ts
-│   │   │   ├── switch-provider.ts
-│   │   │   ├── consult-mistral.ts
-│   │   │   ├── searxng-search.ts
-│   │   │   ├── get-kimi-balance.ts
-│   │   │   ├── todo.ts
-│   │   │   └── retrieve-code.ts
-│   │   ├── memory.ts           # SQLite + embeddings
-│   │   ├── embedding.ts        # Service embeddings OpenRouter
-│   │   ├── code-embedding.ts   # Service embeddings Mistral (code)
-│   │   ├── code-indexer.ts     # Indexation codebase
-│   │   ├── types.ts            # Types globaux
-│   │   └── rollback.ts         # Système de rollback
-│   ├── server/                 # Backend HTTP + WebSocket
-│   │   └── index.ts
-│   ├── web/                    # Frontend React
-│   │   ├── src/
-│   │   │   ├── App.tsx
-│   │   │   ├── components/     # Composants React
-│   │   │   └── styles.css
-│   │   ├── index.html
-│   │   └── vite.config.ts
-│   ├── config.ts               # Configuration centralisée
-│   └── main.ts                 # Point d'entrée
-├── data/                       # Données persistantes
-│   ├── dangerousbot.db         # SQLite
-│   └── searxng/                # Config SearxNG
-│       ├── config/
-│       └── data/
-├── scripts/                    # Scripts utilitaires
-│   └── searxng.sh              # Gestion SearxNG
-├── .backups/                   # Backups auto (self_update)
-├── ARCHITECTURE.md             # Ce fichier
-├── package.json
-├── tsconfig.json
-└── README.md
-```
-
----
-
 ## Core Architecture
 
 ### Le Brain (`src/core/brain/`)
@@ -132,11 +59,6 @@ abstract class BaseProvider {
 }
 ```
 
-**Avantages** :
-- Réduction de 40-60% du code dupliqué
-- Ajout d'un nouveau provider : ~150 lignes vs 500+ avant
-- Comportement cohérent (gestion erreurs, coûts, streaming)
-
 ### Architecture des Tools
 
 Pattern **Handler** avec auto-registration :
@@ -163,11 +85,6 @@ for (const handler of handlers) {
   toolRegistry.set(handler.name, handler);
 }
 ```
-
-**Avantages** :
-- 18 tools dans des fichiers séparés (~50 lignes chacun)
-- Ajout d'un tool : créer un fichier + ajouter 2 lignes dans index.ts
-- Pas de switch case monolithique
 
 ---
 
