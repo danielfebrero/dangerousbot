@@ -262,7 +262,7 @@ electron_1.ipcMain.handle('initialize', async () => {
         return { success: false, error: 'Pas de clé API' };
     }
     brain = new core_1.Brain(config.apiKey);
-    executor = new core_1.Executor(WORKSPACE_PATH);
+    executor = new core_1.Executor();
     system = new core_1.System(BASE_PATH);
     // Charger la mémoire si elle existe
     const memoryPath = path.join(DATA_PATH, 'memory.json');

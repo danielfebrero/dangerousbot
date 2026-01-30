@@ -265,7 +265,7 @@ ipcMain.handle('initialize', async () => {
   }
 
   brain = new Brain(config.apiKey);
-  executor = new Executor(WORKSPACE_PATH);
+  executor = new Executor();
   system = new System(BASE_PATH);
 
   // Charger la mémoire si elle existe

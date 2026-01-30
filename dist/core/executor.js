@@ -1,7 +1,7 @@
 "use strict";
 /**
  * executor.ts - Exécution de code pour DangerousBot
- * Permet d'exécuter du code en mémoire ou via fichiers
+ * Accès complet à la machine - pas de restrictions de workspace
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -41,17 +41,24 @@ exports.Executor = void 0;
 const child_process_1 = require("child_process");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
+const os = __importStar(require("os"));
 const vm = __importStar(require("vm"));
 class Executor {
-    workspacePath;
-    constructor(workspacePath) {
-        this.workspacePath = workspacePath;
-        this.ensureWorkspace();
+    homePath;
+    constructor() {
+        this.homePath = os.homedir();
     }
-    ensureWorkspace() {
-        if (!fs.existsSync(this.workspacePath)) {
-            fs.mkdirSync(this.workspacePath, { recursive: true });
+    // Résoudre un chemin (absolu ou relatif au home)
+    resolvePath(inputPath) {
+        if (path.isAbsolute(inputPath)) {
+            return inputPath;
         }
+        // ~ expansion
+        if (inputPath.startsWith('~/')) {
+            return path.join(this.homePath, inputPath.slice(2));
+        }
+        // Chemin relatif -> relatif au home
+        return path.join(this.homePath, inputPath);
     }
     // Exécution JavaScript en mémoire (sandboxé)
     async executeInMemory(code, context = {}) {
@@ -65,12 +72,12 @@ class Executor {
             require,
             process: {
                 env: process.env,
-                cwd: () => this.workspacePath,
+                cwd: () => process.cwd(),
                 platform: process.platform,
                 arch: process.arch
             },
-            __dirname: this.workspacePath,
-            __filename: path.join(this.workspacePath, 'temp_execution.js'),
+            __dirname: process.cwd(),
+            __filename: path.join(process.cwd(), 'temp_execution.js'),
             setTimeout,
             setInterval,
             clearTimeout,
@@ -91,13 +98,18 @@ class Executor {
             return { success: false, error: err.message, stack: err.stack };
         }
     }
-    // Exécution via fichier (plus de permissions)
-    async executeFile(filename, code, interpreter = 'node') {
-        const filePath = path.join(this.workspacePath, filename);
-        fs.writeFileSync(filePath, code);
+    // Exécution via fichier - chemin absolu requis
+    async executeFile(filePath, code, interpreter = 'node') {
+        const resolvedPath = this.resolvePath(filePath);
+        const dir = path.dirname(resolvedPath);
+        // Créer le dossier si nécessaire
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        fs.writeFileSync(resolvedPath, code);
         return new Promise((resolve) => {
-            const child = (0, child_process_1.spawn)(interpreter, [filePath], {
-                cwd: this.workspacePath,
+            const child = (0, child_process_1.spawn)(interpreter, [resolvedPath], {
+                cwd: dir,
                 env: process.env
             });
             let stdout = '';
@@ -108,20 +120,20 @@ class Executor {
             child.stderr.on('data', (data) => {
                 stderr += data.toString();
             });
-            child.on('close', (code) => {
+            child.on('close', (exitCode) => {
                 resolve({
-                    success: code === 0,
-                    exitCode: code ?? -1,
+                    success: exitCode === 0,
+                    exitCode: exitCode ?? -1,
                     stdout,
                     stderr,
-                    filePath
+                    filePath: resolvedPath
                 });
             });
             child.on('error', (error) => {
                 resolve({
                     success: false,
                     error: error.message,
-                    filePath
+                    filePath: resolvedPath
                 });
             });
             // Timeout de 60 secondes
@@ -130,16 +142,17 @@ class Executor {
                 resolve({
                     success: false,
                     error: 'Execution timeout (60s)',
-                    filePath
+                    filePath: resolvedPath
                 });
             }, 60000);
         });
     }
-    // Exécution de commande shell
+    // Exécution de commande shell - cwd optionnel
     async shell(command, options = {}) {
+        const cwd = options.cwd ? this.resolvePath(options.cwd) : process.cwd();
         return new Promise((resolve) => {
             (0, child_process_1.exec)(command, {
-                cwd: options.cwd || this.workspacePath,
+                cwd,
                 env: { ...process.env, ...options.env },
                 timeout: options.timeout || 60000,
                 maxBuffer: 10 * 1024 * 1024
@@ -153,47 +166,96 @@ class Executor {
             });
         });
     }
-    // Écrire un fichier
-    writeFile(relativePath, content) {
-        const fullPath = path.join(this.workspacePath, relativePath);
-        const dir = path.dirname(fullPath);
+    // Écrire un fichier - chemin absolu ou relatif au home
+    writeFile(filePath, content) {
+        const resolvedPath = this.resolvePath(filePath);
+        const dir = path.dirname(resolvedPath);
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
         }
-        fs.writeFileSync(fullPath, content);
-        return fullPath;
+        fs.writeFileSync(resolvedPath, content);
+        return resolvedPath;
     }
-    // Lire un fichier
-    readFile(relativePath) {
-        const fullPath = path.join(this.workspacePath, relativePath);
-        if (fs.existsSync(fullPath)) {
-            return fs.readFileSync(fullPath, 'utf-8');
+    // Lire un fichier - chemin absolu ou relatif au home
+    readFile(filePath) {
+        const resolvedPath = this.resolvePath(filePath);
+        if (fs.existsSync(resolvedPath)) {
+            return fs.readFileSync(resolvedPath, 'utf-8');
         }
         return null;
     }
-    // Lister les fichiers
-    listFiles(relativePath = '') {
-        const fullPath = path.join(this.workspacePath, relativePath);
-        if (fs.existsSync(fullPath)) {
-            return fs.readdirSync(fullPath, { withFileTypes: true }).map(dirent => ({
+    // Lister les fichiers - chemin absolu ou relatif au home
+    listFiles(dirPath = '.') {
+        const resolvedPath = this.resolvePath(dirPath);
+        if (fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isDirectory()) {
+            return fs.readdirSync(resolvedPath, { withFileTypes: true }).map(dirent => ({
                 name: dirent.name,
                 isDirectory: dirent.isDirectory(),
-                path: path.join(relativePath, dirent.name)
+                path: path.join(resolvedPath, dirent.name)
             }));
         }
         return [];
     }
-    // Supprimer un fichier
-    deleteFile(relativePath) {
-        const fullPath = path.join(this.workspacePath, relativePath);
-        if (fs.existsSync(fullPath)) {
-            fs.unlinkSync(fullPath);
+    // Supprimer un fichier - chemin absolu ou relatif au home
+    deleteFile(filePath) {
+        const resolvedPath = this.resolvePath(filePath);
+        if (fs.existsSync(resolvedPath)) {
+            fs.unlinkSync(resolvedPath);
             return true;
         }
         return false;
     }
-    getWorkspacePath() {
-        return this.workspacePath;
+    // Vérifier si un chemin existe
+    exists(filePath) {
+        return fs.existsSync(this.resolvePath(filePath));
+    }
+    // Obtenir des infos sur un fichier/dossier
+    stat(filePath) {
+        const resolvedPath = this.resolvePath(filePath);
+        if (fs.existsSync(resolvedPath)) {
+            return fs.statSync(resolvedPath);
+        }
+        return null;
+    }
+    // Créer un dossier
+    mkdir(dirPath) {
+        const resolvedPath = this.resolvePath(dirPath);
+        if (!fs.existsSync(resolvedPath)) {
+            fs.mkdirSync(resolvedPath, { recursive: true });
+            return true;
+        }
+        return false;
+    }
+    // Copier un fichier
+    copyFile(source, destination) {
+        const srcPath = this.resolvePath(source);
+        const destPath = this.resolvePath(destination);
+        if (fs.existsSync(srcPath)) {
+            const destDir = path.dirname(destPath);
+            if (!fs.existsSync(destDir)) {
+                fs.mkdirSync(destDir, { recursive: true });
+            }
+            fs.copyFileSync(srcPath, destPath);
+            return true;
+        }
+        return false;
+    }
+    // Déplacer/renommer un fichier
+    moveFile(source, destination) {
+        const srcPath = this.resolvePath(source);
+        const destPath = this.resolvePath(destination);
+        if (fs.existsSync(srcPath)) {
+            const destDir = path.dirname(destPath);
+            if (!fs.existsSync(destDir)) {
+                fs.mkdirSync(destDir, { recursive: true });
+            }
+            fs.renameSync(srcPath, destPath);
+            return true;
+        }
+        return false;
+    }
+    getHomePath() {
+        return this.homePath;
     }
 }
 exports.Executor = Executor;

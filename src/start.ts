@@ -347,7 +347,7 @@ async function main(): Promise<void> {
 
   // Initialiser les composants
   const brain = new Brain(config.apiKey);
-  const executor = new Executor(WORKSPACE_PATH);
+  const executor = new Executor();
   const system = new System(BASE_PATH);
 
   // Charger la mémoire si elle existe

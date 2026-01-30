@@ -320,7 +320,7 @@ async function main() {
     }
     // Initialiser les composants
     const brain = new core_1.Brain(config.apiKey);
-    const executor = new core_1.Executor(WORKSPACE_PATH);
+    const executor = new core_1.Executor();
     const system = new core_1.System(BASE_PATH);
     // Charger la mémoire si elle existe
     const memoryPath = path.join(DATA_PATH, 'memory.json');
