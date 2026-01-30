@@ -1,0 +1,128 @@
+/**
+ * Types pour DangerousBot
+ */
+
+import Anthropic from '@anthropic-ai/sdk';
+
+// ============ Messages & Conversation ============
+
+export interface ToolCall {
+  name: string;
+  input: unknown;
+}
+
+export interface Message {
+  id?: number;
+  session_id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  tool_calls?: ToolCall[];
+  timestamp: string;
+}
+
+export interface Conversation {
+  session_id: string;
+  messages: Message[];
+  created_at: string;
+  updated_at: string;
+}
+
+// ============ Memory / Embeddings ============
+
+export interface Embedding {
+  id?: number;
+  conversation_id: number;
+  vector: Buffer;
+  metadata: Record<string, unknown>;
+}
+
+export interface Knowledge {
+  id?: number;
+  type: 'fact' | 'preference' | 'context' | 'skill';
+  content: string;
+  embedding?: Buffer;
+  created_at: string;
+}
+
+// ============ Brain / Claude API ============
+
+export interface BrainResponse {
+  content: Anthropic.ContentBlock[];
+  stopReason: string | null;
+  usage: {
+    input_tokens: number;
+    output_tokens: number;
+  };
+}
+
+// ============ Tools ============
+
+export interface Tool {
+  name: string;
+  description: string;
+  input_schema: {
+    type: 'object';
+    properties: Record<string, {
+      type: string;
+      description: string;
+      enum?: string[];
+    }>;
+    required: string[];
+  };
+}
+
+export interface ToolResult {
+  success: boolean;
+  error?: string;
+  [key: string]: unknown;
+}
+
+export interface ToolInput {
+  [key: string]: unknown;
+}
+
+// ============ Executor ============
+
+export interface ExecutionResult {
+  success: boolean;
+  result?: unknown;
+  logs?: Array<[string, ...unknown[]]>;
+  error?: string;
+  stack?: string;
+  exitCode?: number;
+  stdout?: string;
+  stderr?: string;
+  [key: string]: unknown;
+}
+
+// ============ WebSocket ============
+
+export interface WSMessage {
+  type: 'user_message' | 'bot_message' | 'bot_typing' | 'tool_use' | 'tool_result' | 'system' | 'error' | 'connected' | 'history' | 'usage';
+  payload: unknown;
+  timestamp?: string;
+}
+
+// ============ Lifecycle ============
+
+export interface LifecycleConfig {
+  isDev: boolean;
+  lockfilePath: string;
+  projectRoot: string;
+}
+
+// ============ Versioning ============
+
+export interface VersionInfo {
+  version: string;
+  commit?: string;
+  timestamp: string;
+  description?: string;
+}
+
+// ============ Server ============
+
+export interface ServerConfig {
+  port: number;
+  host: string;
+}

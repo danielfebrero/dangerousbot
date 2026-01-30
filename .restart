@@ -1,1 +1,1 @@
-{"reason":"Correction transmission images WebSocket - server/index.ts doit transmettre les images au MessageHandler","timestamp":"2026-01-30T16:02:30.155Z"}
+{"reason":"Correction du nom du tool web_search dans l'execute (était $web_search, maintenant web_search)","timestamp":"2026-01-30T16:39:20.294Z"}

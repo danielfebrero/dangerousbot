@@ -107,7 +107,7 @@ export class DangerousBotServer {
   }
 
   // Traiter un message utilisateur (avec support multi-modal)
-  async processMessage(userMessage: string, images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>): Promise<void> {
+  async processMessage(userMessage: string, images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>, abortSignal?: AbortSignal): Promise<void> {
     if (!this.brain) {
       this.wsManager.sendError('Brain non initialisé. Clé API manquante.');
       return;
@@ -130,7 +130,7 @@ export class DangerousBotServer {
 
     try {
       const tools = getToolDefinitions();
-      let response = await this.brain.think(userMessage, tools);
+      let response = await this.brain.think(userMessage, tools, images, abortSignal);
 
       // Vérifier si un fallback de provider a eu lieu
       const providerSwitched = (global as any).__providerSwitched;
@@ -195,8 +195,13 @@ export class DangerousBotServer {
           }
         }
 
+        // Vérifier si la requête a été annulée
+        if (abortSignal?.aborted) {
+          throw new Error('Request aborted by user');
+        }
+
         // Continuer la conversation
-        response = await this.brain.continueAfterTool(tools);
+        response = await this.brain.continueAfterTool(tools, abortSignal);
       }
 
       // Traiter la réponse finale
@@ -235,8 +240,13 @@ export class DangerousBotServer {
         }, 2000);
       }
     } catch (error) {
-      console.error('[Server] Erreur:', error);
-      this.wsManager.sendError(`Erreur: ${(error as Error).message}`);
+      if ((error as Error).message === 'Request aborted by user') {
+        console.log('[Server] Requête annulée par l\'utilisateur');
+        this.wsManager.sendSystem('Génération arrêtée.');
+      } else {
+        console.error('[Server] Erreur:', error);
+        this.wsManager.sendError(`Erreur: ${(error as Error).message}`);
+      }
     } finally {
       this.isProcessing = false;
       this.wsManager.sendBotTyping(false);

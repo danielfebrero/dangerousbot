@@ -106,8 +106,8 @@ export class DangerousBotServer {
     }
   }
 
-  // Traiter un message utilisateur
-  async processMessage(userMessage: string): Promise<void> {
+  // Traiter un message utilisateur (avec support multi-modal)
+  async processMessage(userMessage: string, images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>, abortSignal?: AbortSignal): Promise<void> {
     if (!this.brain) {
       this.wsManager.sendError('Brain non initialisé. Clé API manquante.');
       return;
@@ -121,16 +121,16 @@ export class DangerousBotServer {
     this.isProcessing = true;
     this.wsManager.sendBotTyping(true);
 
-    // ✅ SAUVEGARDER LE MESSAGE UTILISATEUR IMMÉDIATEMENT
+    // ✅ SAUVEGARDER LE MESSAGE UTILISATEUR IMMÉDIATEMENT (avec images si présentes)
     const memory = getMemory();
-    memory.addMessage('user', userMessage);
+    memory.addMessage('user', userMessage, undefined, images);
 
     // Collecter tous les tool_calls pour cette réponse
     const allToolCalls: Array<{ name: string; input: unknown }> = [];
 
     try {
       const tools = getToolDefinitions();
-      let response = await this.brain.think(userMessage, tools);
+      let response = await this.brain.think(userMessage, tools, images, abortSignal);
 
       // Vérifier si un fallback de provider a eu lieu
       const providerSwitched = (global as any).__providerSwitched;
@@ -160,8 +160,22 @@ export class DangerousBotServer {
 
             this.wsManager.sendToolResult(block.name, result);
 
-            // Ajouter le résultat à la conversation
-            this.brain.addToolResult(block.id, JSON.stringify(result));
+            // Vérifier si le résultat contient une image (pour les modèles multimodaux)
+            if (result.type === 'image' && result.source) {
+              // Pour les images, ajouter comme message user avec l'image au lieu de tool_result
+              // Cela permet au modèle de "voir" l'image
+              this.brain.addUserMessage(`Image chargée depuis ${block.input.path || 'fichier'}`, [{
+                type: 'image',
+                source: result.source
+              }]);
+            } else if (result._webSearchPassthrough) {
+              // Cas spécial pour $web_search de Kimi: retourner les arguments tels quels
+              // Kimi exécutera la recherche web quand il recevra ce résultat
+              this.brain.addToolResult(block.id, JSON.stringify(result.arguments));
+            } else {
+              // Ajouter le résultat normal à la conversation
+              this.brain.addToolResult(block.id, JSON.stringify(result));
+            }
 
             // Vérifier si un redémarrage est nécessaire
             if (result.needsRestart) {
@@ -181,8 +195,13 @@ export class DangerousBotServer {
           }
         }
 
+        // Vérifier si la requête a été annulée
+        if (abortSignal?.aborted) {
+          throw new Error('Request aborted by user');
+        }
+
         // Continuer la conversation
-        response = await this.brain.continueAfterTool(tools);
+        response = await this.brain.continueAfterTool(tools, abortSignal);
       }
 
       // Traiter la réponse finale
@@ -221,8 +240,13 @@ export class DangerousBotServer {
         }, 2000);
       }
     } catch (error) {
-      console.error('[Server] Erreur:', error);
-      this.wsManager.sendError(`Erreur: ${(error as Error).message}`);
+      if ((error as Error).message === 'Request aborted by user') {
+        console.log('[Server] Requête annulée par l\'utilisateur');
+        this.wsManager.sendSystem('Génération arrêtée.');
+      } else {
+        console.error('[Server] Erreur:', error);
+        this.wsManager.sendError(`Erreur: ${(error as Error).message}`);
+      }
     } finally {
       this.isProcessing = false;
       this.wsManager.sendBotTyping(false);
