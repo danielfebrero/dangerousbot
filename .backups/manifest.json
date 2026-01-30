@@ -1,5 +1,14 @@
 [
   {
+    "id": "backup_1769786653913",
+    "timestamp": "2026-01-30T15:24:13.941Z",
+    "description": "Modifier processMessage pour accepter les images",
+    "commitHash": "e462c14",
+    "files": [
+      "src/server/index.ts"
+    ]
+  },
+  {
     "id": "backup_1769786649039",
     "timestamp": "2026-01-30T15:24:09.069Z",
     "description": "Modifier types pour supporter les images",
@@ -78,15 +87,6 @@
     "commitHash": "c472504",
     "files": [
       "src/web/src/components/ChatInput.tsx"
-    ]
-  },
-  {
-    "id": "backup_1769786115715",
-    "timestamp": "2026-01-30T15:15:15.755Z",
-    "description": "Fix emoji encoding for Firefox - use direct UTF-8 strings instead of String.fromCodePoint()",
-    "commitHash": "62aacee",
-    "files": [
-      "src/web/components/ToolBadge.tsx"
     ]
   }
 ]

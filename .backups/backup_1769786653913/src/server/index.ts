@@ -106,8 +106,8 @@ export class DangerousBotServer {
     }
   }
 
-  // Traiter un message utilisateur (avec support multi-modal)
-  async processMessage(userMessage: string, images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>): Promise<void> {
+  // Traiter un message utilisateur
+  async processMessage(userMessage: string): Promise<void> {
     if (!this.brain) {
       this.wsManager.sendError('Brain non initialisé. Clé API manquante.');
       return;
