@@ -3,7 +3,7 @@
  * Compatible avec le format OpenAI
  */
 
-import { AIProvider, AIMessage, AIResponse, AIToolDefinition, AIContentBlock, AIProviderConfig } from './types.js';
+import { AIProvider, AIMessage, AIResponse, AIToolDefinition, AIContentBlock, AIProviderConfig, StreamCallback } from './types.js';
 
 interface KimiChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -151,7 +151,7 @@ export class KimiProvider implements AIProvider {
       if (msg.role === 'assistant') {
         let textContent = '';
         const toolCalls: Array<{id: string; type: 'function'; function: {name: string; arguments: string}}> = [];
-        
+
         for (const block of msg.content) {
           if (block.type === 'text' && block.text) {
             textContent += block.text;
@@ -166,13 +166,18 @@ export class KimiProvider implements AIProvider {
             });
           }
         }
-        
+
+        // Ne pas ajouter de message assistant vide (ni texte, ni tool_calls)
+        if (!textContent && toolCalls.length === 0) {
+          return result; // Skip empty assistant message
+        }
+
         // Créer le message assistant avec texte et/ou tool_calls
         const assistantMsg: KimiChatMessage = {
           role: 'assistant',
           content: textContent || null
         };
-        
+
         // When tool_calls are present, Kimi requires reasoning_content
         if (toolCalls.length > 0) {
           // Use the text content as reasoning, or provide a placeholder
@@ -180,7 +185,7 @@ export class KimiProvider implements AIProvider {
           assistantMsg.content = null;  // Clear content when we have tool_calls and reasoning
           assistantMsg.tool_calls = toolCalls;
         }
-        
+
         result.push(assistantMsg);
         
       } else if (msg.role === 'user') {
@@ -238,6 +243,222 @@ export class KimiProvider implements AIProvider {
     }
     
     return result;
+  }
+
+  /**
+   * Streaming pour Kimi
+   */
+  async chatStream(
+    messages: AIMessage[],
+    options: {
+      system?: string;
+      tools?: AIToolDefinition[];
+      maxTokens?: number;
+      abortSignal?: AbortSignal;
+      onChunk: StreamCallback;
+    }
+  ): Promise<AIResponse> {
+    const kimiMessages: KimiChatMessage[] = [];
+    
+    if (options.system) {
+      kimiMessages.push({ role: 'system', content: options.system });
+    }
+    
+    for (const msg of messages) {
+      kimiMessages.push(...this.convertMessage(msg));
+    }
+
+    const body: Record<string, unknown> = {
+      model: this.model,
+      messages: kimiMessages,
+      max_tokens: options.maxTokens || this.maxTokens,
+      temperature: 1.0,
+      stream: true,
+      stream_options: { include_usage: true }  // Nécessaire pour recevoir les tokens dans le streaming
+    };
+
+    if (options.tools && options.tools.length > 0) {
+      body.tools = options.tools.map(tool => {
+        if (tool.name === 'web_search') {
+          return {
+            type: 'builtin_function',
+            function: { name: '$web_search' }
+          };
+        }
+        return {
+          type: 'function',
+          function: {
+            name: tool.name,
+            description: tool.description,
+            parameters: tool.input_schema
+          }
+        };
+      });
+    }
+
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.apiKey}`
+      },
+      body: JSON.stringify(body),
+      signal: options.abortSignal
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Kimi API error: ${response.status} - ${error}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('No response body');
+    }
+
+    const content: AIContentBlock[] = [];
+    let currentText = '';
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let finishReason: string | null = null;
+
+    // Track tool calls being built (OpenAI streaming sends them in fragments)
+    const pendingToolCalls: Map<number, { id: string; name: string; arguments: string }> = new Map();
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        if (options.abortSignal?.aborted) {
+          reader.cancel();
+          break;
+        }
+
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+
+            try {
+              const chunk = JSON.parse(data);
+              const delta = chunk.choices?.[0]?.delta;
+
+              if (delta?.content) {
+                currentText += delta.content;
+                options.onChunk({ type: 'text', text: delta.content });
+              }
+
+              // OpenAI-style streaming: tool_calls come in fragments
+              // First chunk has index, id, function.name
+              // Subsequent chunks have index and function.arguments (partial)
+              if (delta?.tool_calls) {
+                for (const toolCallDelta of delta.tool_calls) {
+                  const index = toolCallDelta.index ?? 0;
+
+                  if (!pendingToolCalls.has(index)) {
+                    // First chunk for this tool call - has id and name
+                    pendingToolCalls.set(index, {
+                      id: toolCallDelta.id || `call_${Date.now()}_${index}`,
+                      name: toolCallDelta.function?.name || '',
+                      arguments: toolCallDelta.function?.arguments || ''
+                    });
+                  } else {
+                    // Subsequent chunk - accumulate arguments
+                    const pending = pendingToolCalls.get(index)!;
+                    if (toolCallDelta.function?.arguments) {
+                      pending.arguments += toolCallDelta.function.arguments;
+                    }
+                  }
+                }
+              }
+
+              if (chunk.usage) {
+                inputTokens = chunk.usage.prompt_tokens || inputTokens;
+                outputTokens = chunk.usage.completion_tokens || outputTokens;
+              }
+
+              if (chunk.choices?.[0]?.finish_reason) {
+                finishReason = chunk.choices[0].finish_reason;
+              }
+            } catch (e) {
+              // Ignorer les lignes malformées
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    // Add text content if any
+    if (currentText) {
+      content.push({ type: 'text', text: currentText });
+    }
+
+    // Process completed tool calls and add to content
+    for (const [, toolCall] of pendingToolCalls) {
+      if (toolCall.name) {
+        let parsedInput = {};
+        try {
+          parsedInput = JSON.parse(toolCall.arguments || '{}');
+        } catch (e) {
+          console.error('[Kimi] Failed to parse tool arguments:', toolCall.arguments);
+        }
+
+        const toolUseBlock: AIContentBlock = {
+          type: 'tool_use',
+          id: toolCall.id,
+          name: toolCall.name,
+          input: parsedInput
+        };
+
+        content.push(toolUseBlock);
+
+        // Also notify via callback
+        options.onChunk({
+          type: 'tool_use',
+          id: toolCall.id,
+          name: toolCall.name,
+          input: parsedInput
+        });
+      }
+    }
+
+    // Convertir le finish_reason
+    let stopReason: AIResponse['stopReason'] = null;
+    if (finishReason === 'stop') {
+      stopReason = 'end_turn';
+    } else if (finishReason === 'tool_calls') {
+      stopReason = 'tool_use';
+    } else if (finishReason === 'length') {
+      stopReason = 'max_tokens';
+    }
+
+    // Calculer le coût
+    const inputCost = (inputTokens / 1_000_000) * 0.60;
+    const outputCost = (outputTokens / 1_000_000) * 3.00;
+
+    return {
+      content,
+      stopReason,
+      usage: {
+        input_tokens: inputTokens,
+        output_tokens: outputTokens
+      },
+      cost: {
+        input_cost: inputCost,
+        output_cost: outputCost,
+        total_cost: inputCost + outputCost
+      }
+    };
   }
 
   private convertResponse(response: KimiChatResponse): AIResponse {

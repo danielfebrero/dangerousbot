@@ -130,7 +130,21 @@ export class DangerousBotServer {
 
     try {
       const tools = getToolDefinitions();
-      let response = await this.brain.think(userMessage, tools, images, abortSignal);
+      
+      // Utiliser le streaming pour une meilleure UX
+      let response = await this.brain.thinkStream(
+        userMessage, 
+        tools, 
+        images, 
+        abortSignal,
+        (chunk) => {
+          if (chunk.type === 'text' && chunk.text) {
+            this.wsManager.sendStreamChunk(chunk.text);
+          } else if (chunk.type === 'tool_use') {
+            this.wsManager.sendToolUse(chunk.name!, chunk.input);
+          }
+        }
+      );
 
       // Vérifier si un fallback de provider a eu lieu
       const providerSwitched = (global as any).__providerSwitched;
@@ -145,12 +159,17 @@ export class DangerousBotServer {
       while (response.stopReason === 'tool_use') {
         for (const block of response.content) {
           if (block.type === 'text') {
-            this.wsManager.sendBotMessage(block.text);
+            // Seulement si du texte n'a pas déjà été streamé
+            if (block.text && block.text.trim()) {
+              this.wsManager.sendBotMessage(block.text);
+            }
           } else if (block.type === 'tool_use') {
             // Collecter le tool_call
             allToolCalls.push({ name: block.name, input: block.input });
             
-            this.wsManager.sendToolUse(block.name, block.input);
+            // Ne pas renvoyer les tool calls déjà envoyés via streaming
+            // Ils ont déjà été envoyés via le callback onChunk dans thinkStream/continueAfterToolStream
+            // this.wsManager.sendToolUse(block.name, block.input);
 
             // Exécuter l'outil
             const result = await this.toolExecutor.execute(
@@ -200,16 +219,26 @@ export class DangerousBotServer {
           throw new Error('Request aborted by user');
         }
 
-        // Continuer la conversation
-        response = await this.brain.continueAfterTool(tools, abortSignal);
+        // Continuer la conversation avec streaming
+        response = await this.brain.continueAfterToolStream(
+          tools, 
+          abortSignal,
+          (chunk) => {
+            if (chunk.type === 'text' && chunk.text) {
+              this.wsManager.sendStreamChunk(chunk.text);
+            } else if (chunk.type === 'tool_use') {
+              this.wsManager.sendToolUse(chunk.name!, chunk.input);
+            }
+          }
+        );
       }
 
-      // Traiter la réponse finale
+      // Traiter la réponse finale (les textes ont déjà été streamés)
       let finalText = '';
       for (const block of response.content) {
         if (block.type === 'text') {
           finalText += block.text;
-          this.wsManager.sendBotMessage(block.text);
+          // Plus besoin d'envoyer via sendBotMessage car c'est déjà streamé
         }
       }
 

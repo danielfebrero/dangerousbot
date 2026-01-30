@@ -35,7 +35,7 @@ export interface Message {
 }
 
 export interface WSMessage {
-  type: 'user_message' | 'bot_message' | 'bot_typing' | 'tool_use' | 'tool_result' | 'system' | 'error' | 'connected' | 'history' | 'usage' | 'provider_switch';
+  type: 'user_message' | 'bot_message' | 'bot_typing' | 'tool_use' | 'tool_result' | 'system' | 'error' | 'connected' | 'history' | 'usage' | 'provider_switch' | 'stream_chunk';
   payload: any;
   timestamp?: string;
 }
@@ -51,3 +51,17 @@ export interface TokenUsage {
 }
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
+
+// Tool Panel types
+export type ToolExecutionStatus = 'running' | 'completed' | 'error';
+
+export interface ToolExecution {
+  id: string;
+  toolName: string;
+  input: unknown;
+  output?: unknown;
+  status: ToolExecutionStatus;
+  startTime: Date;
+  endTime?: Date;
+  error?: string;
+}

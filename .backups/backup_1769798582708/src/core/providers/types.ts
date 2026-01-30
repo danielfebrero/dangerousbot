@@ -68,6 +68,17 @@ export interface AIProviderConfig {
 }
 
 /**
+ * Callback pour le streaming de réponses
+ */
+export type StreamCallback = (chunk: {
+  type: 'text' | 'tool_use' | 'thinking';
+  text?: string;
+  id?: string;
+  name?: string;
+  input?: unknown;
+}) => void;
+
+/**
  * Interface abstraite pour les providers AI
  */
 export interface AIProvider {
@@ -87,6 +98,20 @@ export interface AIProvider {
       tools?: AIToolDefinition[];
       maxTokens?: number;
       abortSignal?: AbortSignal;
+    }
+  ): Promise<AIResponse>;
+
+  /**
+   * Envoie un message et reçoit une réponse en streaming
+   */
+  chatStream(
+    messages: AIMessage[],
+    options: {
+      system?: string;
+      tools?: AIToolDefinition[];
+      maxTokens?: number;
+      abortSignal?: AbortSignal;
+      onChunk: StreamCallback;
     }
   ): Promise<AIResponse>;
   

@@ -165,6 +165,14 @@ export class WebSocketManager {
     });
   }
 
+  // Envoyer un chunk de streaming
+  sendStreamChunk(text: string): void {
+    this.broadcast({
+      type: 'stream_chunk',
+      payload: { text }
+    });
+  }
+
   // Indiquer que le bot réfléchit
   sendBotTyping(isTyping: boolean): void {
     this.broadcast({

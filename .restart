@@ -1,1 +1,1 @@
-{"reason":"Renamed get_balances to get_kimi_balance with correct Moonshot API endpoint","timestamp":"2026-01-30T18:26:22.519Z"}
+{"reason":"Fixed duplicate messages in streaming - tool calls now update existing message instead of creating new ones","timestamp":"2026-01-30T18:30:18.648Z"}

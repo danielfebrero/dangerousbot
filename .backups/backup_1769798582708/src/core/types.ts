@@ -53,6 +53,11 @@ export interface BrainResponse {
     input_tokens: number;
     output_tokens: number;
   };
+  cost?: {
+    input_cost: number;
+    output_cost: number;
+    total_cost: number;
+  };
 }
 
 // ============ Tools ============
@@ -98,7 +103,7 @@ export interface ExecutionResult {
 // ============ WebSocket ============
 
 export interface WSMessage {
-  type: 'user_message' | 'bot_message' | 'bot_typing' | 'tool_use' | 'tool_result' | 'system' | 'error' | 'connected' | 'history' | 'usage';
+  type: 'user_message' | 'bot_message' | 'bot_typing' | 'tool_use' | 'tool_result' | 'system' | 'error' | 'connected' | 'history' | 'usage' | 'stream_chunk' | 'provider_switch';
   payload: unknown;
   timestamp?: string;
 }
