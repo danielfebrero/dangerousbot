@@ -6,3 +6,6 @@ export { TypingIndicator } from './TypingIndicator';
 export { Markdown } from './Markdown';
 export { TokenCounter } from './TokenCounter';
 export { ToolBadge } from './ToolBadge';
+export { ToolPanel } from './ToolPanel';
+export { ToolPanelToggle } from './ToolPanelToggle';
+export { ToolExecutionItem } from './ToolExecutionItem';

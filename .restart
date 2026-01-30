@@ -1,1 +1,1 @@
-{"reason":"Fixed duplicate messages in streaming - tool calls now update existing message instead of creating new ones","timestamp":"2026-01-30T18:30:18.648Z"}
+{"reason":"Added todo tool for project/task management","timestamp":"2026-01-30T18:43:03.745Z"}

@@ -159,12 +159,17 @@ export class DangerousBotServer {
       while (response.stopReason === 'tool_use') {
         for (const block of response.content) {
           if (block.type === 'text') {
-            this.wsManager.sendBotMessage(block.text);
+            // Seulement si du texte n'a pas déjà été streamé
+            if (block.text && block.text.trim()) {
+              this.wsManager.sendBotMessage(block.text);
+            }
           } else if (block.type === 'tool_use') {
             // Collecter le tool_call
             allToolCalls.push({ name: block.name, input: block.input });
             
-            this.wsManager.sendToolUse(block.name, block.input);
+            // Ne pas renvoyer les tool calls déjà envoyés via streaming
+            // Ils ont déjà été envoyés via le callback onChunk dans thinkStream/continueAfterToolStream
+            // this.wsManager.sendToolUse(block.name, block.input);
 
             // Exécuter l'outil
             const result = await this.toolExecutor.execute(

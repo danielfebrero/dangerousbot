@@ -189,7 +189,7 @@ export function getToolDefinitions(): Tool[] {
     },
     {
       name: 'todo',
-      description: 'Gère des projets et tâches TODO pour organiser le travail. Permet de créer des projets, y ajouter des tâches ordonnées, et suivre leur complétion. Usage: todo({type: "create_project", name: "nom"}) ou todo({type: "create_task", project_id: 1, title: "tâche"}) etc.',
+      description: 'Gère des projets et tâches TODO pour organiser le travail. IMPORTANT: Lors de la planification d\'une feature complexe, créer D\'ABORD toutes les tâches en batch (anticipation), puis les compléter au fur et à mesure. Usage: todo({type: "create_project", name: "nom"}) ou todo({type: "create_task", project_id: 1, title: "tâche"}) etc. Le système affiche visuellement les changements avec emojis et formatage markdown.',
       input_schema: {
         type: 'object',
         properties: {
@@ -567,32 +567,92 @@ export class ToolExecutor {
 
         const result = todo.execute(action);
 
-        // Format the response for better readability
+        // Format the response with rich visual markdown
         if (result.success) {
+          const formatPriority = (p: string) => {
+            const emojis: Record<string, string> = { high: '🔴', medium: '🟡', low: '🟢' };
+            return `${emojis[p] || '⚪'} ${p.toUpperCase()}`;
+          };
+
           if (action.type === 'list_projects' && result.projects) {
-            const projects = result.projects.map((p: any) => 
-              `[${p.id}] ${p.name} - ${p.completed_tasks}/${p.total_tasks} tasks`
-            ).join('\n');
-            return { success: true, projects: result.projects, message: projects || 'No projects' };
+            if (result.projects.length === 0) {
+              return { success: true, projects: [], message: '📂 Aucun projet' };
+            }
+            const lines = result.projects.map((p: any) => {
+              const progress = p.total_tasks > 0 ? Math.round((p.completed_tasks / p.total_tasks) * 100) : 0;
+              const bar = '█'.repeat(Math.round(progress / 10)) + '░'.repeat(10 - Math.round(progress / 10));
+              return `\n**[${p.id}] ${p.name}**\n   ${bar} ${progress}% (${p.completed_tasks}/${p.total_tasks})\n   ${p.description || '_Pas de description_'}`;
+            });
+            return { success: true, projects: result.projects, message: `## 📊 Projets${lines.join('')}` };
           }
+
           if (action.type === 'list_tasks' && result.tasks) {
-            const tasks = result.tasks.map((t: any) => 
-              `[${t.id}] ${t.status === 'completed' ? '✓' : '○'} ${t.title} (${t.priority})`
-            ).join('\n');
-            return { success: true, tasks: result.tasks, message: tasks || 'No tasks' };
+            if (result.tasks.length === 0) {
+              return { success: true, tasks: [], message: '📝 Aucune tâche' };
+            }
+            const pending = result.tasks.filter((t: any) => t.status !== 'completed');
+            const completed = result.tasks.filter((t: any) => t.status === 'completed');
+            
+            let msg = '## 📋 Tâches\n\n';
+            if (pending.length > 0) {
+              msg += '**⏳ En cours :**\n';
+              msg += pending.map((t: any) => `   ☐ [${t.id}] ${t.title} ${formatPriority(t.priority)}`).join('\n');
+              msg += '\n\n';
+            }
+            if (completed.length > 0) {
+              msg += '**✅ Terminées :**\n';
+              msg += completed.map((t: any) => `   ☑ [${t.id}] ~~${t.title}~~`).join('\n');
+            }
+            return { success: true, tasks: result.tasks, message: msg };
           }
+
           if (action.type === 'create_project' && result.project) {
-            return { success: true, project: result.project, message: `Created project "${result.project.name}" (ID: ${result.project.id})` };
+            return { 
+              success: true, 
+              project: result.project, 
+              message: `## 🆕 Projet créé\n\n**${result.project.name}** (ID: ${result.project.id})\n\n${result.project.description || ''}` 
+            };
           }
+
           if (action.type === 'create_task' && result.task) {
-            return { success: true, task: result.task, message: `Created task "${result.task.title}" (ID: ${result.task.id})` };
+            return { 
+              success: true, 
+              task: result.task, 
+              message: `## ➕ Tâche ajoutée\n\n${formatPriority(result.task.priority)} **[${result.task.id}]** ${result.task.title}` 
+            };
           }
+
           if (action.type === 'complete_task' && result.task) {
-            return { success: true, task: result.task, message: `Completed task "${result.task.title}"` };
+            const project = todo.execute({ type: 'get_project', project_id: result.task.project_id });
+            const progress = project.data?.project ? 
+              `${project.data.project.completed_tasks}/${project.data.project.total_tasks}` : '?';
+            return { 
+              success: true, 
+              task: result.task, 
+              message: `## ✅ Tâche complétée\n\n☑ ~~${result.task.title}~~\n\n*Progression du projet: ${progress}*` 
+            };
           }
+
+          if (action.type === 'delete_task' && result.task) {
+            return { 
+              success: true, 
+              task: result.task, 
+              message: `## 🗑️ Tâche supprimée\n\n~~${result.task.title}~~` 
+            };
+          }
+
+          if (action.type === 'delete_project') {
+            return { success: true, message: `## 🗑️ Projet supprimé` };
+          }
+
           if (result.data?.project) {
             const p = result.data.project;
-            return { success: true, project: p, message: `Project: ${p.name}\nTasks: ${p.completed_tasks}/${p.total_tasks}` };
+            const progress = p.total_tasks > 0 ? Math.round((p.completed_tasks / p.total_tasks) * 100) : 0;
+            return { 
+              success: true, 
+              project: p, 
+              message: `## 📁 ${p.name}\n\n${p.description || '_Pas de description_'}\n\nProgression: ${progress}% (${p.completed_tasks}/${p.total_tasks})` 
+            };
           }
         }
 
