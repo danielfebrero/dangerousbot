@@ -203,19 +203,20 @@ async function main(): Promise<void> {
   // Setup WebSocket handlers
   const wsManager = server.getWSManager();
 
-  // Configurer le handler de messages (une seule fois, pas de doublon)
-  wsManager.setMessageHandler(async (text: string) => {
-    await server.processMessage(text);
+  // Configurer le handler de messages (avec support multi-modal)
+  wsManager.setMessageHandler(async (text: string, images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>) => {
+    await server.processMessage(text, images);
   });
 
-  // Configurer le provider d'historique
+  // Configurer le provider d'historique (avec support images)
   wsManager.setHistoryProvider(() => {
     const history = memory.getMessages();
     return history.map(msg => ({
       role: msg.role,
       content: msg.content,
       timestamp: msg.timestamp,
-      tool_calls: msg.tool_calls
+      tool_calls: msg.tool_calls,
+      images: msg.images
     }));
   });
 

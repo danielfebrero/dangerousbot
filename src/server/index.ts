@@ -121,9 +121,9 @@ export class DangerousBotServer {
     this.isProcessing = true;
     this.wsManager.sendBotTyping(true);
 
-    // ✅ SAUVEGARDER LE MESSAGE UTILISATEUR IMMÉDIATEMENT
+    // ✅ SAUVEGARDER LE MESSAGE UTILISATEUR IMMÉDIATEMENT (avec images si présentes)
     const memory = getMemory();
-    memory.addMessage('user', userMessage);
+    memory.addMessage('user', userMessage, undefined, images);
 
     // Collecter tous les tool_calls pour cette réponse
     const allToolCalls: Array<{ name: string; input: unknown }> = [];

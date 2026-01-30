@@ -1,5 +1,14 @@
 [
   {
+    "id": "backup_1769787338960",
+    "timestamp": "2026-01-30T15:35:39.009Z",
+    "description": "Fix multimodal support - images are now properly saved to DB and loaded from history",
+    "commitHash": "293bb41",
+    "files": [
+      "src/core/memory.ts"
+    ]
+  },
+  {
     "id": "backup_1769787075946",
     "timestamp": "2026-01-30T15:31:15.986Z",
     "description": "Rebuild with multimodal support for Kimi - images can be sent from UI and read from files",
@@ -78,15 +87,6 @@
     "commitHash": "be87d1a",
     "files": [
       "src/web/styles/global.css"
-    ]
-  },
-  {
-    "id": "backup_1769786589952",
-    "timestamp": "2026-01-30T15:23:09.983Z",
-    "description": "Ajouter affichage des images dans les messages",
-    "commitHash": "adc1c50",
-    "files": [
-      "src/web/components/MessageItem.tsx"
     ]
   }
 ]
