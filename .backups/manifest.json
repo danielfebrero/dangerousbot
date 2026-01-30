@@ -1,5 +1,14 @@
 [
   {
+    "id": "backup_1769786672382",
+    "timestamp": "2026-01-30T15:24:32.410Z",
+    "description": "Modifier think pour accepter les images",
+    "commitHash": "a442127",
+    "files": [
+      "src/core/brain.ts"
+    ]
+  },
+  {
     "id": "backup_1769786666545",
     "timestamp": "2026-01-30T15:24:26.565Z",
     "description": "Modifier addUserMessage pour supporter les images",
@@ -78,15 +87,6 @@
     "commitHash": "03efade",
     "files": [
       "src/web/components/MessageInput.tsx"
-    ]
-  },
-  {
-    "id": "backup_1769786484375",
-    "timestamp": "2026-01-30T15:21:24.416Z",
-    "description": "Ajouter types pour contenu multi-modal (texte + images)",
-    "commitHash": "c472504",
-    "files": [
-      "src/web/types.ts"
     ]
   }
 ]

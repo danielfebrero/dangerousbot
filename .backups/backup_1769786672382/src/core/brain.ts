@@ -176,9 +176,9 @@ Tu es curieux, adaptable et tu cherches à comprendre les besoins de l'utilisate
     return cleanOldToolResults(this.conversationHistory as any[]) as AIMessage[];
   }
 
-  // Penser avec des outils (support multi-modal)
-  async think(userMessage: string, tools: Tool[], images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>): Promise<BrainResponse> {
-    this.addUserMessage(userMessage, images);
+  // Penser avec des outils
+  async think(userMessage: string, tools: Tool[]): Promise<BrainResponse> {
+    this.addUserMessage(userMessage);
     this.messageCount++;
 
     // Injecter le contexte pertinent depuis la mémoire long-terme
