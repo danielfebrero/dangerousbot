@@ -8,9 +8,21 @@ import { getMemory } from '../core/memory.js';
 export function createRoutes(): Router {
   const router = Router();
 
-  // Health check
+  // Health check (utilisé par le système de rollback)
   router.get('/health', (_req: Request, res: Response) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    const memory = getMemory();
+    const stats = memory.getStats();
+    
+    res.json({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(),
+      version: stats.version || '0.1.0',
+      uptime: process.uptime(),
+      memory: {
+        heapUsed: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+        heapTotal: Math.round(process.memoryUsage().heapTotal / 1024 / 1024)
+      }
+    });
   });
 
   // Obtenir les stats

@@ -12,11 +12,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { getMemory, Memory } from './memory';
 import { getEmbeddingService, EmbeddingService } from './embedding';
 import { Message } from './types';
-
-// Configuration
-const COMPRESSION_THRESHOLD = 30;  // Nombre de messages avant compression
-const KEEP_RECENT = 10;            // Messages récents à garder intacts
-const COMPRESSION_MODEL = 'claude-sonnet-4-20250514';  // Modèle léger pour résumer
+import { MODELS, TOKENS, MEMORY } from '../config';
 
 export interface CompressedMemory {
   id?: number;
@@ -46,14 +42,14 @@ export class MemoryCompressor {
   async checkAndCompress(): Promise<boolean> {
     const messages = this.memory.getMessages(undefined, 1000);
     
-    if (messages.length < COMPRESSION_THRESHOLD) {
+    if (messages.length < MEMORY.COMPRESSION_THRESHOLD) {
       return false;
     }
 
     // Messages à compresser (tous sauf les N derniers)
-    const toCompress = messages.slice(0, messages.length - KEEP_RECENT);
+    const toCompress = messages.slice(0, messages.length - MEMORY.KEEP_RECENT_MESSAGES);
     
-    if (toCompress.length < 10) {
+    if (toCompress.length < MEMORY.MIN_MESSAGES_TO_COMPRESS) {
       return false;  // Pas assez pour justifier une compression
     }
 
@@ -74,8 +70,8 @@ export class MemoryCompressor {
 
     // Générer le résumé via Claude
     const response = await this.anthropic.messages.create({
-      model: COMPRESSION_MODEL,
-      max_tokens: 1024,
+      model: MODELS.COMPRESSOR,
+      max_tokens: TOKENS.MAX_COMPRESSION_SUMMARY,
       system: `Tu es un assistant qui résume des conversations de manière concise mais complète.
 Extrais les informations clés:
 - Décisions prises
@@ -189,7 +185,7 @@ Format: Un résumé structuré et factuel, sans fluff.`,
   /**
    * Recherche les mémoires pertinentes par similarité sémantique
    */
-  async searchRelevantMemories(query: string, topK: number = 3): Promise<CompressedMemory[]> {
+  async searchRelevantMemories(query: string, topK: number = MEMORY.RELEVANT_MEMORIES_TOP_K): Promise<CompressedMemory[]> {
     const allMemories = this.getCompressedMemories();
     
     if (allMemories.length === 0) {

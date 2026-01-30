@@ -7,6 +7,8 @@ import { Executor } from './executor';
 import { getMemory } from './memory';
 import { Versioning } from './versioning';
 import { Lifecycle } from './lifecycle';
+import { MistralConsultant, mistralTool } from './mistral';
+import { getRollbackManager } from './rollback';
 
 export function getToolDefinitions(): Tool[] {
   return [
@@ -149,7 +151,8 @@ export function getToolDefinitions(): Tool[] {
         },
         required: []
       }
-    }
+    },
+    mistralTool as Tool
   ];
 }
 
@@ -157,12 +160,20 @@ export class ToolExecutor {
   private executor: Executor;
   private versioning: Versioning;
   private lifecycle: Lifecycle;
+  private mistral: MistralConsultant | null = null;
   private askUserCallback?: (question: string) => Promise<string>;
 
   constructor(projectRoot: string) {
     this.executor = new Executor(projectRoot);
     this.versioning = new Versioning(projectRoot);
     this.lifecycle = new Lifecycle(projectRoot);
+    
+    // Initialiser Mistral si la clé est disponible
+    try {
+      this.mistral = new MistralConsultant();
+    } catch (e) {
+      console.warn('[Tools] Mistral not available:', (e as Error).message);
+    }
   }
 
   setAskUserCallback(callback: (question: string) => Promise<string>): void {
@@ -238,32 +249,74 @@ export class ToolExecutor {
         const oldCode = input.old_code as string;
         const newCode = input.new_code as string;
         const description = input.description as string;
+        const filePath = `src/${file}`;
 
-        // 1. Modifier le fichier
-        const editResult = this.executor.editFile(`src/${file}`, oldCode, newCode);
-        if (!editResult.success) {
-          return editResult;
+        // Utiliser le système de rollback si disponible
+        const rollbackManager = getRollbackManager();
+        
+        if (rollbackManager) {
+          // Mode sécurisé avec rollback automatique
+          const result = await rollbackManager.safeUpdate(
+            description,
+            async () => {
+              // Appliquer les modifications
+              const editResult = this.executor.editFile(filePath, oldCode, newCode);
+              if (!editResult.success) {
+                throw new Error(`Échec modification: ${editResult.error}`);
+              }
+            },
+            [filePath]
+          );
+
+          if (!result.success) {
+            return {
+              success: false,
+              error: result.error,
+              message: result.message,
+              rollback: true,
+              backupId: result.backupId
+            };
+          }
+
+          // Versionner après succès
+          const versionResult = await this.versioning.commitChanges(description);
+
+          return {
+            success: true,
+            message: `✅ ${result.message}`,
+            version: versionResult.version,
+            backupId: result.backupId,
+            needsRestart: true
+          };
+        } else {
+          // Mode legacy sans rollback
+          console.warn('[self_update] RollbackManager non disponible, mode legacy');
+
+          // 1. Modifier le fichier
+          const editResult = this.executor.editFile(filePath, oldCode, newCode);
+          if (!editResult.success) {
+            return editResult;
+          }
+
+          // 2. Versionner
+          const versionResult = await this.versioning.commitChanges(description);
+          if (!versionResult.success) {
+            return { success: false, error: `Modification OK mais erreur de versioning: ${versionResult.error}` };
+          }
+
+          // 3. Compiler
+          const buildResult = await this.executor.shell('npm run build');
+          if (!buildResult.success) {
+            return { success: false, error: `Modification OK mais erreur de compilation: ${buildResult.error}` };
+          }
+
+          return {
+            success: true,
+            message: 'Code modifié, versionné et compilé. Redémarrage nécessaire.',
+            version: versionResult.version,
+            needsRestart: true
+          };
         }
-
-        // 2. Versionner
-        const versionResult = await this.versioning.commitChanges(description);
-        if (!versionResult.success) {
-          return { success: false, error: `Modification OK mais erreur de versioning: ${versionResult.error}` };
-        }
-
-        // 3. Compiler
-        const buildResult = await this.executor.shell('npm run build');
-        if (!buildResult.success) {
-          return { success: false, error: `Modification OK mais erreur de compilation: ${buildResult.error}` };
-        }
-
-        // 4. Planifier le redémarrage
-        return {
-          success: true,
-          message: 'Code modifié, versionné et compilé. Redémarrage nécessaire.',
-          version: versionResult.version,
-          needsRestart: true
-        };
       }
 
       case 'restart_server': {
@@ -278,6 +331,36 @@ export class ToolExecutor {
           success: true,
           message: `Redémarrage planifié: ${reason}`
         };
+      }
+
+      case 'consult_mistral': {
+        if (!this.mistral) {
+          return { success: false, error: 'Mistral API non configurée' };
+        }
+
+        const query = input.query as string;
+        const context = input.context as string | undefined;
+        const complexity = input.complexity as 'low' | 'medium' | 'high' | 'auto' | undefined;
+        const forceModel = input.force_model as 'large' | 'medium' | 'small' | undefined;
+
+        try {
+          const result = await this.mistral.consult({
+            query,
+            context,
+            complexity,
+            forceModel
+          });
+
+          return {
+            success: true,
+            response: result.response,
+            model_used: result.model,
+            reasoning: result.reasoning,
+            tokens: result.usage
+          };
+        } catch (error) {
+          return { success: false, error: `Erreur Mistral: ${(error as Error).message}` };
+        }
       }
 
       default:

@@ -14,17 +14,13 @@ import { WebSocket } from 'ws';
 import { DangerousBotServer } from './server/index.js';
 import { Lifecycle } from './core/lifecycle.js';
 import { getMemory } from './core/memory.js';
+import { initRollbackManager } from './core/rollback.js';
+import { SERVER, PATHS, APIS, initializeApiKeys } from './config.js';
 
 // Configuration
-const PORT = parseInt(process.env.PORT || '3000', 10);
-const HOST = process.env.HOST || 'localhost';
+const PORT = parseInt(process.env.PORT || String(SERVER.DEFAULT_PORT), 10);
+const HOST = process.env.HOST || SERVER.DEFAULT_HOST;
 const PROJECT_ROOT = path.resolve(__dirname, '..');
-
-// Chemins pour les clés API
-const DANGEROUSBOT_DIR = path.join(os.homedir(), '.dangerousbot');
-const SECRETS_DIR = path.join(DANGEROUSBOT_DIR, 'secrets');
-const API_KEY_FILE = path.join(SECRETS_DIR, 'anthropic_api_key');
-const OPENROUTER_KEY_FILE = path.join(SECRETS_DIR, 'openrouter_api_key');
 
 // Couleurs terminal
 const colors = {
@@ -45,8 +41,8 @@ function print(text: string, color: keyof typeof colors = 'reset'): void {
 
 // Assurer que les répertoires existent
 function ensureDirectories(): void {
-  if (!fs.existsSync(SECRETS_DIR)) {
-    fs.mkdirSync(SECRETS_DIR, { recursive: true, mode: 0o700 });
+  if (!fs.existsSync(PATHS.SECRETS_DIR)) {
+    fs.mkdirSync(PATHS.SECRETS_DIR, { recursive: true, mode: 0o700 });
   }
 }
 
@@ -59,8 +55,8 @@ async function getApiKey(): Promise<string> {
 
   // 2. Fichier de secrets
   ensureDirectories();
-  if (fs.existsSync(API_KEY_FILE)) {
-    return fs.readFileSync(API_KEY_FILE, 'utf-8').trim();
+  if (fs.existsSync(PATHS.ANTHROPIC_KEY_FILE)) {
+    return fs.readFileSync(PATHS.ANTHROPIC_KEY_FILE, 'utf-8').trim();
   }
 
   // 3. Demander à l'utilisateur
@@ -83,7 +79,7 @@ async function getApiKey(): Promise<string> {
 
       if (apiKey) {
         // Sauvegarder pour les prochains lancements
-        fs.writeFileSync(API_KEY_FILE, apiKey, { mode: 0o600 });
+        fs.writeFileSync(PATHS.ANTHROPIC_KEY_FILE, apiKey, { mode: 0o600 });
         print('\n✓ Clé API sauvegardée\n', 'green');
       }
 
@@ -100,8 +96,8 @@ function getOpenRouterKey(): string | undefined {
   }
 
   // 2. Fichier de secrets
-  if (fs.existsSync(OPENROUTER_KEY_FILE)) {
-    return fs.readFileSync(OPENROUTER_KEY_FILE, 'utf-8').trim();
+  if (fs.existsSync(PATHS.OPENROUTER_KEY_FILE)) {
+    return fs.readFileSync(PATHS.OPENROUTER_KEY_FILE, 'utf-8').trim();
   }
 
   return undefined;
@@ -110,7 +106,7 @@ function getOpenRouterKey(): string | undefined {
 // Sauvegarder une clé OpenRouter
 function saveOpenRouterKey(apiKey: string): void {
   ensureDirectories();
-  fs.writeFileSync(OPENROUTER_KEY_FILE, apiKey, { mode: 0o600 });
+  fs.writeFileSync(PATHS.OPENROUTER_KEY_FILE, apiKey, { mode: 0o600 });
 }
 
 // Afficher la bannière
@@ -166,6 +162,9 @@ async function main(): Promise<void> {
   const stats = memory.getStats();
   print(`✓ Mémoire initialisée (${stats.messages} messages, ${stats.knowledge} connaissances)`, 'green');
 
+  // Initialiser toutes les clés API depuis les fichiers secrets
+  initializeApiKeys();
+  
   // Récupérer la clé OpenRouter pour les embeddings
   let openRouterKey = getOpenRouterKey();
   
@@ -176,6 +175,18 @@ async function main(): Promise<void> {
   } else {
     print('○ Clé OpenRouter non configurée (embeddings désactivés)', 'yellow');
   }
+  
+  // Vérifier la clé Mistral
+  if (APIS.MISTRAL_API_KEY) {
+    print('✓ Clé Mistral configurée (second regard activé)', 'green');
+  } else {
+    print('○ Clé Mistral non configurée (second regard désactivé)', 'yellow');
+  }
+
+  // Initialiser le système de rollback
+  const rollbackManager = initRollbackManager(PROJECT_ROOT);
+  const backups = rollbackManager.listBackups();
+  print(`✓ Système de rollback initialisé (${backups.length} backups disponibles)`, 'green');
 
   // Créer et démarrer le serveur
   const server = new DangerousBotServer({ port: PORT, host: HOST }, PROJECT_ROOT);

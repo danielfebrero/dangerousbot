@@ -11,10 +11,7 @@ import { getMemory } from './memory';
 import { getContextInjector, ContextInjector } from './context-injector';
 import { initEmbeddingService } from './embedding';
 import { initCompressor } from './compressor';
-
-const MODEL = 'claude-opus-4-5-20251101';
-const MAX_TOKENS = 8096;
-const COMPRESS_EVERY_N_MESSAGES = 20;  // Vérifier compression tous les N messages
+import { MODELS, TOKENS, MEMORY } from '../config';
 
 export class Brain {
   private client: Anthropic;
@@ -109,13 +106,13 @@ Tu es curieux, adaptable et tu cherches à comprendre les besoins de l'utilisate
     await this.updateContextualIdentity(userMessage);
 
     // Vérifier si compression nécessaire (périodiquement)
-    if (this.contextEnabled && this.messageCount % COMPRESS_EVERY_N_MESSAGES === 0) {
+    if (this.contextEnabled && this.messageCount % MEMORY.COMPRESSION_CHECK_INTERVAL === 0) {
       this.triggerCompressionAsync();
     }
 
     const response = await this.client.messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
+      model: MODELS.BRAIN,
+      max_tokens: TOKENS.MAX_RESPONSE,
       system: this.identity,
       tools: tools as Anthropic.Tool[],
       messages: this.conversationHistory
@@ -171,8 +168,8 @@ Tu es curieux, adaptable et tu cherches à comprendre les besoins de l'utilisate
   // Continuer après un résultat d'outil
   async continueAfterTool(tools: Tool[]): Promise<BrainResponse> {
     const response = await this.client.messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
+      model: MODELS.BRAIN,
+      max_tokens: TOKENS.MAX_RESPONSE,
       system: this.identity,
       tools: tools as Anthropic.Tool[],
       messages: this.conversationHistory

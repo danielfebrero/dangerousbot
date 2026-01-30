@@ -2,8 +2,7 @@
  * EmbeddingService - Génère des embeddings via OpenRouter (Qwen3-embedding-8b)
  */
 
-const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/embeddings';
-const EMBEDDING_MODEL = 'qwen/qwen3-embedding-8b';
+import { MODELS, APIS } from '../config';
 
 export interface EmbeddingResult {
   vector: number[];
@@ -21,16 +20,16 @@ export class EmbeddingService {
    * Génère un embedding pour un texte donné
    */
   async embed(text: string): Promise<EmbeddingResult> {
-    const response = await fetch(OPENROUTER_API_URL, {
+    const response = await fetch(APIS.OPENROUTER_EMBEDDINGS, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://dangerousbot.local',
-        'X-Title': 'DangerousBot'
+        'HTTP-Referer': APIS.OPENROUTER_REFERER,
+        'X-Title': APIS.OPENROUTER_TITLE
       },
       body: JSON.stringify({
-        model: EMBEDDING_MODEL,
+        model: MODELS.EMBEDDING,
         input: text
       })
     });
@@ -55,16 +54,16 @@ export class EmbeddingService {
    * Génère des embeddings pour plusieurs textes (batch)
    */
   async embedBatch(texts: string[]): Promise<EmbeddingResult[]> {
-    const response = await fetch(OPENROUTER_API_URL, {
+    const response = await fetch(APIS.OPENROUTER_EMBEDDINGS, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://dangerousbot.local',
-        'X-Title': 'DangerousBot'
+        'HTTP-Referer': APIS.OPENROUTER_REFERER,
+        'X-Title': APIS.OPENROUTER_TITLE
       },
       body: JSON.stringify({
-        model: EMBEDDING_MODEL,
+        model: MODELS.EMBEDDING,
         input: texts
       })
     });
