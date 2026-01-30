@@ -13,7 +13,7 @@ import { initEmbeddingService } from './embedding.js';
 import { initCompressor } from './compressor.js';
 import { MODELS, TOKENS, MEMORY, PROVIDER, APIS, setActiveProvider, ProviderType } from '../config.js';
 import { cleanOldToolResults } from './contextCleaner.js';
-import { AIProvider, AIMessage, AIContentBlock, AIResponse, createProvider } from './providers/index.js';
+import { AIProvider, AIMessage, AIContentBlock, AIResponse, createProvider, StreamCallback } from './providers/index.js';
 
 export class Brain {
   private provider: AIProvider;
@@ -176,9 +176,15 @@ Tu es curieux, adaptable et tu cherches à comprendre les besoins de l'utilisate
     return cleanOldToolResults(this.conversationHistory as any[]) as AIMessage[];
   }
 
-  // Penser avec des outils
-  async think(userMessage: string, tools: Tool[]): Promise<BrainResponse> {
-    this.addUserMessage(userMessage);
+  // Penser avec streaming (support multi-modal)
+  async thinkStream(
+    userMessage: string, 
+    tools: Tool[], 
+    images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>, 
+    abortSignal?: AbortSignal,
+    onChunk?: StreamCallback
+  ): Promise<BrainResponse> {
+    this.addUserMessage(userMessage, images);
     this.messageCount++;
 
     // Injecter le contexte pertinent depuis la mémoire long-terme
@@ -200,7 +206,7 @@ Tu es curieux, adaptable et tu cherches à comprendre les besoins de l'utilisate
     }));
 
     // Essayer avec le provider actuel, fallback si erreur
-    const response = await this.chatWithFallback(cleanedHistory, aiTools);
+    const response = await this.chatStreamWithFallback(cleanedHistory, aiTools, abortSignal, onChunk);
 
     this.addAssistantMessage(response.content);
 
@@ -220,7 +226,130 @@ Tu es curieux, adaptable et tu cherches à comprendre les besoins de l'utilisate
         return { type: 'text' as const, text: '' };
       }),
       stopReason: response.stopReason,
-      usage: response.usage
+      usage: response.usage,
+      cost: response.cost
+    };
+  }
+
+  /**
+   * Essaie d'appeler le provider en streaming, avec fallback automatique si erreur
+   */
+  private async chatStreamWithFallback(
+    messages: AIMessage[],
+    tools: { name: string; description: string; input_schema: any }[],
+    abortSignal?: AbortSignal,
+    onChunk?: StreamCallback
+  ): Promise<AIResponse> {
+    const providers: ProviderType[] = ['claude', 'kimi'];
+    const currentProviderName = this.provider.name as ProviderType;
+    
+    const orderedProviders = [
+      currentProviderName,
+      ...providers.filter(p => p !== currentProviderName)
+    ];
+
+    let lastError: Error | null = null;
+
+    for (const providerName of orderedProviders) {
+      try {
+        if (providerName !== this.provider.name) {
+          console.log(`[Brain] Fallback: switching to ${providerName}`);
+          this.switchProvider(providerName);
+          
+          (global as any).__providerSwitched = {
+            from: currentProviderName,
+            to: providerName,
+            reason: lastError?.message || 'Provider unavailable'
+          };
+        }
+
+        const response = await this.provider.chatStream(messages, {
+          system: this.identity,
+          tools,
+          maxTokens: TOKENS.MAX_RESPONSE,
+          abortSignal,
+          onChunk: onChunk || (() => {})
+        });
+
+        return response;
+      } catch (error) {
+        lastError = error as Error;
+        const errorMsg = lastError.message.toLowerCase();
+        
+        const shouldFallback = 
+          errorMsg.includes('insufficient') ||
+          errorMsg.includes('balance') ||
+          errorMsg.includes('quota') ||
+          errorMsg.includes('rate limit') ||
+          errorMsg.includes('timeout') ||
+          errorMsg.includes('401') ||
+          errorMsg.includes('authentication') ||
+          errorMsg.includes('unauthorized') ||
+          errorMsg.includes('invalid') ||
+          errorMsg.includes('503') ||
+          errorMsg.includes('502') ||
+          errorMsg.includes('500') ||
+          errorMsg.includes('overloaded') ||
+          errorMsg.includes('unavailable');
+
+        if (shouldFallback) {
+          console.error(`[Brain] Provider ${providerName} failed: ${lastError.message}`);
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    throw new Error(`All providers failed. Last error: ${lastError?.message}`);
+  }
+
+  // Penser avec des outils (support multi-modal) - VERSION NON-STREAMING (pour compatibilité)
+  async think(userMessage: string, tools: Tool[], images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>, abortSignal?: AbortSignal): Promise<BrainResponse> {
+    this.addUserMessage(userMessage, images);
+    this.messageCount++;
+
+    // Injecter le contexte pertinent depuis la mémoire long-terme
+    await this.updateContextualIdentity(userMessage);
+
+    // Vérifier si compression nécessaire
+    if (this.contextEnabled && this.messageCount % MEMORY.COMPRESSION_CHECK_INTERVAL === 0) {
+      this.triggerCompressionAsync();
+    }
+
+    // Nettoyer les anciens tool_results volumineux
+    const cleanedHistory = this.getCleanedHistory();
+
+    // Convertir les tools au format unifié
+    const aiTools = tools.map(tool => ({
+      name: tool.name,
+      description: tool.description,
+      input_schema: tool.input_schema
+    }));
+
+    // Essayer avec le provider actuel, fallback si erreur
+    const response = await this.chatWithFallback(cleanedHistory, aiTools, abortSignal);
+
+    this.addAssistantMessage(response.content);
+
+    return {
+      content: response.content.map(block => {
+        if (block.type === 'text') {
+          return { type: 'text' as const, text: block.text || '' };
+        }
+        if (block.type === 'tool_use') {
+          return {
+            type: 'tool_use' as const,
+            id: block.id || '',
+            name: block.name || '',
+            input: block.input
+          };
+        }
+        return { type: 'text' as const, text: '' };
+      }),
+      stopReason: response.stopReason,
+      usage: response.usage,
+      cost: response.cost
     };
   }
 
@@ -229,7 +358,8 @@ Tu es curieux, adaptable et tu cherches à comprendre les besoins de l'utilisate
    */
   private async chatWithFallback(
     messages: AIMessage[],
-    tools: { name: string; description: string; input_schema: any }[]
+    tools: { name: string; description: string; input_schema: any }[],
+    abortSignal?: AbortSignal
   ): Promise<AIResponse> {
     const providers: ProviderType[] = ['claude', 'kimi'];
     const currentProviderName = this.provider.name as ProviderType;
@@ -260,7 +390,8 @@ Tu es curieux, adaptable et tu cherches à comprendre les besoins de l'utilisate
         const response = await this.provider.chat(messages, {
           system: this.identity,
           tools,
-          maxTokens: TOKENS.MAX_RESPONSE
+          maxTokens: TOKENS.MAX_RESPONSE,
+          abortSignal
         });
 
         return response;
@@ -337,8 +468,8 @@ Tu es curieux, adaptable et tu cherches à comprendre les besoins de l'utilisate
       .catch(err => console.error('[Brain] Compression error:', err));
   }
 
-  // Continuer après un résultat d'outil
-  async continueAfterTool(tools: Tool[]): Promise<BrainResponse> {
+  // Continuer après un résultat d'outil avec streaming
+  async continueAfterToolStream(tools: Tool[], abortSignal?: AbortSignal, onChunk?: StreamCallback): Promise<BrainResponse> {
     const cleanedHistory = this.getCleanedHistory();
 
     const aiTools = tools.map(tool => ({
@@ -347,8 +478,7 @@ Tu es curieux, adaptable et tu cherches à comprendre les besoins de l'utilisate
       input_schema: tool.input_schema
     }));
 
-    // Utiliser le fallback automatique aussi
-    const response = await this.chatWithFallback(cleanedHistory, aiTools);
+    const response = await this.chatStreamWithFallback(cleanedHistory, aiTools, abortSignal, onChunk);
 
     this.addAssistantMessage(response.content);
 
@@ -368,7 +498,44 @@ Tu es curieux, adaptable et tu cherches à comprendre les besoins de l'utilisate
         return { type: 'text' as const, text: '' };
       }),
       stopReason: response.stopReason,
-      usage: response.usage
+      usage: response.usage,
+      cost: response.cost
+    };
+  }
+
+  // Continuer après un résultat d'outil
+  async continueAfterTool(tools: Tool[], abortSignal?: AbortSignal): Promise<BrainResponse> {
+    const cleanedHistory = this.getCleanedHistory();
+
+    const aiTools = tools.map(tool => ({
+      name: tool.name,
+      description: tool.description,
+      input_schema: tool.input_schema
+    }));
+
+    // Utiliser le fallback automatique aussi
+    const response = await this.chatWithFallback(cleanedHistory, aiTools, abortSignal);
+
+    this.addAssistantMessage(response.content);
+
+    return {
+      content: response.content.map(block => {
+        if (block.type === 'text') {
+          return { type: 'text' as const, text: block.text || '' };
+        }
+        if (block.type === 'tool_use') {
+          return {
+            type: 'tool_use' as const,
+            id: block.id || '',
+            name: block.name || '',
+            input: block.input
+          };
+        }
+        return { type: 'text' as const, text: '' };
+      }),
+      stopReason: response.stopReason,
+      usage: response.usage,
+      cost: response.cost
     };
   }
 
@@ -381,9 +548,24 @@ Tu es curieux, adaptable et tu cherches à comprendre les besoins de l'utilisate
 
     for (const msg of messages) {
       if (msg.role === 'user' || msg.role === 'assistant') {
+        // Reconstruire le content avec les images si présentes
+        let content: string | AIContentBlock[] = msg.content;
+
+        if (msg.role === 'user' && msg.images && msg.images.length > 0) {
+          // Multi-modal: créer un tableau de content blocks
+          const contentBlocks: AIContentBlock[] = [{ type: 'text', text: msg.content }];
+          for (const img of msg.images) {
+            contentBlocks.push({
+              type: 'image',
+              source: img.source
+            } as AIContentBlock);
+          }
+          content = contentBlocks;
+        }
+
         this.conversationHistory.push({
           role: msg.role,
-          content: msg.content
+          content
         });
       }
     }
