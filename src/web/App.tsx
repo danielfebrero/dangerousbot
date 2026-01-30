@@ -184,12 +184,13 @@ function App() {
         const toolName = wsMessage.payload.tool;
         const toolInput = wsMessage.payload.input;
         const executionId = wsMessage.payload.executionId;
-        const execId = addExecution(toolName, toolInput);
+        const execId = addExecution(toolName, toolInput, executionId);
         toolExecutionMapRef.current[executionId] = execId;
 
         // Create a new tool execution message in the chat
+        // Use executionId as the message ID for easy lookup on tool_result
         const newExecution: ToolCallExecution = {
-          id: execId,
+          id: executionId,  // Use server executionId
           toolName: toolName,
           input: toolInput,
           status: 'running',
@@ -200,9 +201,9 @@ function App() {
         activeToolExecutionsRef.current = [...activeToolExecutionsRef.current, newExecution];
         setActiveToolExecutions(activeToolExecutionsRef.current);
         
-        // Add as a separate message in the chat
+        // Add as a separate message in the chat - use executionId as message ID
         setMessages(prev => [...prev, {
-          id: execId,
+          id: executionId,  // Use server executionId for easy lookup
           type: 'tool_execution',
           content: '',
           toolExecution: newExecution,
@@ -224,10 +225,11 @@ function App() {
             completeExecution(resultExecId, result);
           }
           
-          // Update the tool execution message in chat
+          // Update the tool execution message in chat using executionId
           setMessages(prev => {
             return prev.map(msg => {
-              if (msg.type === 'tool_execution' && msg.toolExecution?.id === resultExecId) {
+              // Use message.id (which is executionId) for lookup
+              if (msg.type === 'tool_execution' && msg.id === resultExecutionId) {
                 return {
                   ...msg,
                   toolExecution: {
@@ -243,9 +245,9 @@ function App() {
             });
           });
           
-          // Update active executions ref
+          // Update active executions ref using executionId
           activeToolExecutionsRef.current = activeToolExecutionsRef.current.map(exec => {
-            if (exec.id === resultExecId) {
+            if (exec.id === resultExecutionId) {
               return {
                 ...exec,
                 status: isError ? 'error' : 'completed',

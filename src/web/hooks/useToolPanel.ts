@@ -31,8 +31,8 @@ export function useToolPanel(): UseToolPanelReturn {
     setIsOpen(false);
   }, []);
 
-  const addExecution = useCallback((toolName: string, input: unknown): string => {
-    const id = `tool-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const addExecution = useCallback((toolName: string, input: unknown, executionId?: string): string => {
+    const id = executionId || `tool-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const execution: ToolExecution = {
       id,
       toolName,
