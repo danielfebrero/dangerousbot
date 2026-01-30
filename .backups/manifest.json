@@ -1,5 +1,14 @@
 [
   {
+    "id": "backup_1769785825605",
+    "timestamp": "2026-01-30T15:10:25.635Z",
+    "description": "Fix: tool_use crée un message bot avec toolCalls array pour affichage correct des emojis",
+    "commitHash": "8cee5ec",
+    "files": [
+      "src/web/App.tsx"
+    ]
+  },
+  {
     "id": "backup_1769785816196",
     "timestamp": "2026-01-30T15:10:16.228Z",
     "description": "Fix: utiliser String.fromCodePoint pour les emojis au lieu des échappements Unicode bruts",

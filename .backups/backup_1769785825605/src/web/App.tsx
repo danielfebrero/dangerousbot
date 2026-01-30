@@ -59,9 +59,9 @@ function App() {
       case 'tool_use':
         setMessages(prev => [...prev, {
           id: crypto.randomUUID(),
-          type: 'bot',
-          content: '',
-          toolCalls: [{ name: wsMessage.payload.tool, input: wsMessage.payload.input }],
+          type: 'tool',
+          content: wsMessage.payload.tool,
+          toolName: wsMessage.payload.tool,
           timestamp: new Date()
         }]);
         break;
