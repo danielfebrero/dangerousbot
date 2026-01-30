@@ -1,5 +1,14 @@
 [
   {
+    "id": "backup_1769787453905",
+    "timestamp": "2026-01-30T15:37:33.947Z",
+    "description": "Fix image persistence - images are now properly loaded from history on page refresh",
+    "commitHash": "3c5df53",
+    "files": [
+      "src/web/App.tsx"
+    ]
+  },
+  {
     "id": "backup_1769787338960",
     "timestamp": "2026-01-30T15:35:39.009Z",
     "description": "Fix multimodal support - images are now properly saved to DB and loaded from history",
@@ -78,15 +87,6 @@
     "commitHash": "e9ab998",
     "files": [
       "src/server/websocket.ts"
-    ]
-  },
-  {
-    "id": "backup_1769786617803",
-    "timestamp": "2026-01-30T15:23:37.842Z",
-    "description": "Ajouter styles CSS pour upload et affichage d'images",
-    "commitHash": "be87d1a",
-    "files": [
-      "src/web/styles/global.css"
     ]
   }
 ]
