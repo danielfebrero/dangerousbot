@@ -10,7 +10,7 @@ import Anthropic from '@anthropic-ai/sdk';
 
 import { createRoutes } from './routes.js';
 import { WebSocketManager } from './websocket.js';
-import { Brain } from '../core/brain.js';
+import { Brain } from '../core/brain/index.js';
 import { getToolDefinitions, getToolDefinitionsForProvider, ToolExecutor } from '../core/tools.js';
 import { getMemory } from '../core/memory.js';
 import { ServerConfig, ToolInput } from '../core/types.js';

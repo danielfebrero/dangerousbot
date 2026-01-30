@@ -21,6 +21,11 @@ renderer.codespan = function({ text }: { text: string }) {
   return `<code class="inline-code">${text}</code>`;
 };
 
+// Custom renderer pour les liens - ouvrir dans un nouvel onglet
+renderer.link = function({ href, text }: { href: string; text: string }) {
+  return `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+};
+
 marked.use({ renderer });
 
 interface MarkdownProps {
