@@ -5,13 +5,15 @@ interface UseWebSocketOptions {
   onMessage: (message: WSMessage) => void;
   reconnectAttempts?: number;
   reconnectDelay?: number;
+  onReconnect?: () => void; // Callback quand reconnexion réussie après déconnexion
 }
 
 export function useWebSocket(options: UseWebSocketOptions) {
-  const { onMessage, reconnectAttempts = 5, reconnectDelay = 1000 } = options;
+  const { onMessage, reconnectAttempts = 5, reconnectDelay = 1000, onReconnect } = options;
   const [status, setStatus] = useState<ConnectionStatus>('connecting');
   const wsRef = useRef<WebSocket | null>(null);
   const attemptsRef = useRef(0);
+  const wasDisconnectedRef = useRef(false); // Track si on était déconnecté
 
   const connect = useCallback(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -22,11 +24,22 @@ export function useWebSocket(options: UseWebSocketOptions) {
 
     ws.onopen = () => {
       setStatus('connected');
+      // Si on était déconnecté et qu'on se reconnecte, c'est un redémarrage serveur
+      if (wasDisconnectedRef.current) {
+        console.log('[WebSocket] Reconnexion après déconnexion détectée - rechargement de la page');
+        wasDisconnectedRef.current = false;
+        // Attendre un peu pour que le serveur soit prêt
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+        return;
+      }
       attemptsRef.current = 0;
       // L'historique est envoyé automatiquement par le serveur à la connexion
     };
 
     ws.onclose = () => {
+      wasDisconnectedRef.current = true;
       setStatus('disconnected');
       wsRef.current = null;
 

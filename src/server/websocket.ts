@@ -197,6 +197,14 @@ export class WebSocketManager {
     });
   }
 
+  // Envoyer une notification de redémarrage du serveur
+  sendRestartSignal(reason: string): void {
+    this.broadcast({
+      type: 'restart_signal',
+      payload: { reason, message: 'Le serveur va redémarrer. Rechargement automatique dans quelques secondes...' }
+    });
+  }
+
   // Envoyer un message système
   sendSystem(message: string): void {
     this.broadcast({
