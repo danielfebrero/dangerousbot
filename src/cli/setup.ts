@@ -202,6 +202,7 @@ function createMacOSApp(): string {
   
   const commandScript = `#!/bin/bash
 cd "${PROJECT_ROOT}"
+./searxng.sh start 2>/dev/null || true
 ./start.sh
 `;
   

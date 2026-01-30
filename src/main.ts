@@ -116,6 +116,31 @@ async function isSearxNGRunning(): Promise<boolean> {
   }
 }
 
+// Health check interval pour SearxNG
+let searxngHealthCheckInterval: NodeJS.Timeout | null = null;
+
+// Démarrer le health check régulier de SearxNG (toutes les 60 secondes)
+function startSearxNGHealthCheck(): void {
+  if (searxngHealthCheckInterval) {
+    clearInterval(searxngHealthCheckInterval);
+  }
+  
+  searxngHealthCheckInterval = setInterval(async () => {
+    const running = await isSearxNGRunning();
+    if (!running) {
+      print('🔄 SearxNG détecté comme arrêté, tentative de redémarrage...', 'yellow');
+      const started = await startSearxNG();
+      if (started) {
+        print('✓ SearxNG redémarré automatiquement', 'green');
+      } else {
+        print('⚠ Impossible de redémarrer SearxNG', 'red');
+      }
+    }
+  }, 60000); // Toutes les 60 secondes
+  
+  print('✓ Health check SearxNG activé (toutes les 60s)', 'green');
+}
+
 // Démarrer SearxNG
 async function startSearxNG(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -221,6 +246,9 @@ async function main(): Promise<void> {
       print('⚠ Impossible de démarrer SearxNG (fonctionnalité recherche désactivée)', 'yellow');
     }
   }
+  
+  // Démarrer le health check régulier de SearxNG
+  startSearxNGHealthCheck();
 
   // Initialiser la mémoire
   const memory = getMemory();
