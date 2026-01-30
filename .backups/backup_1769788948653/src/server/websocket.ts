@@ -6,8 +6,15 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import { WSMessage } from '../core/types.js';
 
-export type MessageHandler = (message: string) => Promise<void>;
-export type HistoryProvider = () => Array<{ role: string; content: string; timestamp: string; tool_calls?: Array<{ name: string; input: unknown }> }>;
+export type MessageHandler = (message: string, images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>) => Promise<void>;
+export type HistoryMessage = { 
+  role: string; 
+  content: string; 
+  timestamp: string; 
+  tool_calls?: Array<{ name: string; input: unknown }>; 
+  images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }> 
+};
+export type HistoryProvider = () => HistoryMessage[];
 
 export class WebSocketManager {
   private wss: WebSocketServer;
@@ -31,6 +38,14 @@ export class WebSocketManager {
   // Configurer le handler de messages (appelé une seule fois depuis main.ts)
   setMessageHandler(handler: MessageHandler): void {
     this.messageHandler = handler;
+  }
+
+  // Extraire les images d'un message reçu
+  private extractImages(payload: any): Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }> | undefined {
+    if (!payload || !payload.images || !Array.isArray(payload.images)) {
+      return undefined;
+    }
+    return payload.images as Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>;
   }
 
   // Configurer le provider d'historique
@@ -67,8 +82,10 @@ export class WebSocketManager {
         try {
           const message = JSON.parse(data.toString());
 
-          if (message.type === 'user_message' && message.payload?.text && this.messageHandler) {
-            await this.messageHandler(message.payload.text);
+          if (message.type === 'user_message' && this.messageHandler) {
+            const text = message.payload?.text || '';
+            const images = message.payload?.images;
+            await this.messageHandler(text, images);
           }
         } catch (error) {
           console.error('[WebSocket] Erreur de parsing message:', error);
@@ -184,7 +201,7 @@ export class WebSocketManager {
   }
 
   // Envoyer l'historique des messages à un client
-  sendHistory(client: WebSocket, messages: Array<{ role: string; content: string; timestamp: string; tool_calls?: Array<{ name: string; input: unknown }> }>): void {
+  sendHistory(client: WebSocket, messages: HistoryMessage[]): void {
     this.sendTo(client, {
       type: 'history',
       payload: { messages }
