@@ -29,3 +29,6 @@ Thumbs.db
 # Temp
 *.tmp
 .cache/
+
+# Backups
+.backups/
