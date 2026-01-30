@@ -1,1 +1,1 @@
-{"reason":"Fixed searxng_search to include X-Forwarded-For header for local access","timestamp":"2026-01-30T19:38:30.233Z"}
+{"reason":"Added searxng.sh script and npm commands for SearxNG management","timestamp":"2026-01-30T19:47:29.563Z"}

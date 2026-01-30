@@ -9,7 +9,7 @@ import { Versioning } from './versioning';
 import { Lifecycle } from './lifecycle';
 import { MistralConsultant, mistralTool } from './mistral';
 import { getRollbackManager } from './rollback';
-import { setActiveProvider, ProviderType, APIS, PATHS } from '../config';
+import { setActiveProvider, ProviderType, APIS, PATHS, PROVIDER } from '../config';
 import { getTodoManager } from './todo';
 import { getCodeEmbeddingService, CodeEmbeddingService } from './code-embedding';
 import { getCodeIndexer } from './code-indexer';
@@ -170,14 +170,20 @@ export function getToolDefinitions(): Tool[] {
       }
     },
     {
-      name: 'web_search',
-      description: 'Effectue une recherche web pour obtenir des informations récentes et à jour. Disponible uniquement avec le provider Kimi. Utilise la fonction builtin $web_search de Kimi.',
+      name: 'searxng_search',
+      description: 'Effectue une recherche web privée via une instance SearxNG self-hosted, avec restriction per-query des sources autorisées (engines/categories). Retourne les résultats en JSON.',
       input_schema: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'La requête de recherche (optionnel - Kimi génère les paramètres automatiquement)' }
+          query: { type: 'string', description: 'La requête de recherche (obligatoire).' },
+          engines: { type: 'string', description: 'Liste comma-separated des engines autorisés uniquement (ex: "google,bing,duckduckgo"). Laisse vide pour tous les engines configurés.' },
+          categories: { type: 'string', description: 'Liste comma-separated des catégories autorisées (ex: "general,images,news").' },
+          language: { type: 'string', description: "Code langue ISO (ex: 'fr-FR', 'en-US')." },
+          time_range: { type: 'string', enum: ['day', 'month', 'year', null], description: 'Restriction temporelle pour engines compatibles.' },
+          safesearch: { type: 'integer', enum: [0, 1, 2], description: 'Niveau safe search (0=none, 1=moderate, 2=strict).' },
+          pageno: { type: 'integer', description: 'Numéro de page (default 1).', default: 1 }
         },
-        required: []
+        required: ['query']
       }
     },
     {
@@ -231,6 +237,29 @@ export function getToolDefinitions(): Tool[] {
       }
     }
   ];
+}
+
+/**
+ * Récupère les outils disponibles pour un provider spécifique
+ * Certains outils ne sont pas supportés par tous les providers
+ */
+export function getToolDefinitionsForProvider(provider: string | undefined = undefined): Tool[] {
+  const allTools = getToolDefinitions();
+  const activeProvider = provider || PROVIDER.ACTIVE;
+  
+  // Filtrer les outils selon le provider
+  return allTools.filter(tool => {
+    // web_search est uniquement pour Kimi
+    if (tool.name === 'web_search') {
+      return activeProvider === 'kimi';
+    }
+    // get_kimi_balance est uniquement pour Kimi
+    if (tool.name === 'get_kimi_balance') {
+      return activeProvider === 'kimi';
+    }
+    // Tous les autres outils sont disponibles pour tous les providers
+    return true;
+  });
 }
 
 export class ToolExecutor {
@@ -530,17 +559,79 @@ export class ToolExecutor {
         };
       }
 
-      // web_search est la builtin function de Kimi pour la recherche web
-      // On retourne simplement les arguments tels quels - Kimi exécute la recherche
-      case 'web_search': {
-        // Passthrough: Kimi a généré les arguments, on les retourne tels quels
-        // Kimi exécutera la recherche web quand il recevra ce résultat
-        // Le flag _webSearchPassthrough indique à server/index.ts de ne pas wrapper le résultat
-        return {
-          success: true,
-          _webSearchPassthrough: true,
-          arguments: input
-        };
+      case 'searxng_search': {
+        try {
+          const query = input.query as string;
+          const engines = (input.engines as string) || 'google';
+          const categories = (input.categories as string) || 'general';
+          const language = (input.language as string) || 'fr-FR';
+          const timeRange = input.time_range as string | undefined;
+          const safeSearch = (input.safesearch as number) ?? 0;
+          const pageNo = (input.pageno as number) || 1;
+
+          const searxngUrl = process.env.SEARXNG_URL || 'http://localhost:8080';
+          
+          const params = new URLSearchParams({
+            q: query,
+            format: 'json',
+            language: language,
+            safesearch: safeSearch.toString(),
+            pageno: pageNo.toString()
+          });
+
+          if (engines) {
+            params.append('engines', engines);
+          }
+          if (categories) {
+            params.append('categories', categories);
+          }
+          if (timeRange) {
+            params.append('time_range', timeRange);
+          }
+
+          const response = await fetch(`${searxngUrl}/search?${params.toString()}`, {
+            headers: {
+              'Accept': 'application/json',
+              'X-Forwarded-For': '127.0.0.1'
+            }
+          });
+
+          if (!response.ok) {
+            return {
+              success: false,
+              error: `SearxNG Error: ${response.status} - ${await response.text()}`
+            };
+          }
+
+          const data = await response.json();
+          
+          // Formater les résultats
+          const results = data.results?.map((r: any) => ({
+            title: r.title,
+            url: r.url,
+            content: r.content,
+            engine: r.engine,
+            score: r.score
+          })) || [];
+
+          const formatted = results.slice(0, 10).map((r: any, i: number) => {
+            return `**${i + 1}. ${r.title}**\n${r.url}\n${r.content?.substring(0, 200) || ''}${r.content?.length > 200 ? '...' : ''}`;
+          }).join('\n\n');
+
+          return {
+            success: true,
+            query: query,
+            engines: engines,
+            total_results: data.number_of_results || results.length,
+            results: results.slice(0, 10),
+            message: `## 🔍 Résultats pour: "${query}"\n\n*Moteurs: ${engines}*\n\n${formatted || 'Aucun résultat trouvé.'}`
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Erreur SearxNG: ${(error as Error).message}`
+          };
+        }
       }
 
       case 'get_kimi_balance': {
