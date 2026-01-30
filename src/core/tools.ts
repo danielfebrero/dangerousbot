@@ -11,6 +11,8 @@ import { MistralConsultant, mistralTool } from './mistral';
 import { getRollbackManager } from './rollback';
 import { setActiveProvider, ProviderType, APIS, PATHS } from '../config';
 import { getTodoManager } from './todo';
+import { getCodeEmbeddingService, CodeEmbeddingService } from './code-embedding';
+import { getCodeIndexer } from './code-indexer';
 
 export function getToolDefinitions(): Tool[] {
   return [
@@ -209,6 +211,24 @@ export function getToolDefinitions(): Tool[] {
         },
         required: ['type']
       }
+    },
+    {
+      name: 'retrieve_code',
+      description: 'Recherche sémantique dans la codebase de DangerousBot. Utilise les embeddings pour retrouver les fichiers et snippets de code les plus pertinents par rapport à une requête. Parfait pour trouver où est implémentée une fonctionnalité ou comprendre l\'architecture.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          query: { 
+            type: 'string', 
+            description: 'Description de ce que tu cherches (ex: "fonction qui gère les embeddings", "tool self_update", etc.)' 
+          },
+          top_k: { 
+            type: 'number', 
+            description: 'Nombre de résultats à retourner (défaut: 5)' 
+          }
+        },
+        required: ['query']
+      }
     }
   ];
 }
@@ -357,6 +377,30 @@ export class ToolExecutor {
 
           // Versionner après succès
           const versionResult = await this.versioning.commitChanges(description);
+
+          // Indexer les fichiers modifiés en arrière-plan
+          try {
+            const modifiedFiles = await rollbackManager.getModifiedFiles();
+            const newFiles = await rollbackManager.getNewFiles();
+            const deletedFiles = await rollbackManager.getDeletedFiles();
+            const allChangedFiles = [...modifiedFiles, ...newFiles, ...deletedFiles];
+            
+            if (allChangedFiles.length > 0) {
+              console.log(`[self_update] ${allChangedFiles.length} fichiers à ré-indexer`);
+              const memory = getMemory();
+              const embeddingService = getCodeEmbeddingService();
+              const indexer = getCodeIndexer(process.cwd(), memory, embeddingService);
+              
+              // Lancer l'indexation en arrière-plan
+              indexer.indexModifiedFiles(allChangedFiles).then(indexResult => {
+                console.log(`[self_update] Indexation: ${indexResult.indexed} nouveaux, ${indexResult.updated} mis à jour, ${indexResult.deleted} supprimés`);
+              }).catch(err => {
+                console.warn('[self_update] Erreur indexation:', err);
+              });
+            }
+          } catch (err) {
+            console.warn('[self_update] Impossible d\'indexer les changements:', err);
+          }
 
           // Programmer le redémarrage (créer le fichier .restart)
           const fs = await import('fs');
@@ -657,6 +701,77 @@ export class ToolExecutor {
         }
 
         return result;
+      }
+
+      case 'retrieve_code': {
+        const query = input.query as string;
+        const topK = (input.top_k as number) || 5;
+
+        try {
+          // Obtenir le service d'embedding
+          let embeddingService: CodeEmbeddingService;
+          try {
+            embeddingService = getCodeEmbeddingService();
+          } catch (e) {
+            // Initialiser avec la clé Mistral si pas déjà fait
+            const fs = await import('fs');
+            const mistralKey = APIS.MISTRAL_API_KEY || (fs.existsSync(PATHS.MISTRAL_KEY_FILE) 
+              ? fs.readFileSync(PATHS.MISTRAL_KEY_FILE, 'utf-8').trim()
+              : '');
+            
+            if (!mistralKey) {
+              return {
+                success: false,
+                error: 'Clé API Mistral non configurée (nécessaire pour les embeddings de code)'
+              };
+            }
+            embeddingService = getCodeEmbeddingService();
+          }
+
+          // Générer l'embedding de la requête
+          const queryEmbedding = await embeddingService.embedCode(query);
+
+          // Récupérer tous les embeddings indexés
+          const allEmbeddings = memory.getAllCodeEmbeddings();
+
+          if (allEmbeddings.length === 0) {
+            return {
+              success: true,
+              results: [],
+              message: '📂 Aucun fichier indexé dans la base de données. Utilisez l\'indexation au démarrage.'
+            };
+          }
+
+          // Calculer les similarités
+          const scored = allEmbeddings.map(item => ({
+            file_path: item.file_path,
+            content: item.content,
+            similarity: CodeEmbeddingService.cosineSimilarity(queryEmbedding.vector, item.embedding)
+          }));
+
+          // Trier et prendre les top_k
+          const topResults = scored
+            .sort((a, b) => b.similarity - a.similarity)
+            .slice(0, topK);
+
+          // Formater la réponse
+          const lines = topResults.map((r, i) => {
+            const pct = Math.round(r.similarity * 100);
+            const preview = r.content.substring(0, 200).replace(/\n/g, ' ');
+            return `**${i + 1}. ${r.file_path}** (${pct}% match)\n\`\`\`typescript\n${preview}${r.content.length > 200 ? '...' : ''}\n\`\`\``;
+          });
+
+          return {
+            success: true,
+            results: topResults,
+            message: `## 🔍 Résultats pour: "${query}"\n\n${lines.join('\n\n')}`
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Erreur lors de la recherche: ${(error as Error).message}`
+          };
+        }
       }
 
       default:

@@ -51,3 +51,17 @@ export interface TokenUsage {
 }
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
+
+// Tool Panel types
+export type ToolExecutionStatus = 'running' | 'completed' | 'error';
+
+export interface ToolExecution {
+  id: string;
+  toolName: string;
+  input: unknown;
+  output?: unknown;
+  status: ToolExecutionStatus;
+  startTime: Date;
+  endTime?: Date;
+  error?: string;
+}
