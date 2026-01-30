@@ -1,5 +1,14 @@
 [
   {
+    "id": "backup_1769776536162",
+    "timestamp": "2026-01-30T12:35:36.229Z",
+    "description": "TEST ROLLBACK v2 - Erreur TypeScript volontaire",
+    "commitHash": "2f98ca5",
+    "files": [
+      "src/config.ts"
+    ]
+  },
+  {
     "id": "backup_1769776498885",
     "timestamp": "2026-01-30T12:34:58.950Z",
     "description": "TEST ROLLBACK - Modification volontairement cassée pour tester le système de rollback",

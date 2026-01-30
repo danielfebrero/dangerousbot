@@ -11,8 +11,6 @@ import * as os from 'os';
 // ============================================================================
 
 
-const BROKEN: string = 123; // ERREUR TYPESCRIPT VOLONTAIRE
-
 export const MODELS = {
   /** Modèle principal pour le cerveau (Opus 4.5 = le plus intelligent) */
   BRAIN: 'claude-opus-4-5-20251101',
