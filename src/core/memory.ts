@@ -46,35 +46,45 @@ export class Memory {
   }
 
   private initSchema(): void {
-    // Table des conversations
+    // Table des conversations (schema de base sans les colonnes ajoutées par migration)
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS conversations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         session_id TEXT NOT NULL,
         role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'system')),
         content TEXT NOT NULL,
-        tool_calls TEXT,
-        images TEXT,
-        source TEXT CHECK(source IN ('webapp', 'telegram')),
         timestamp TEXT NOT NULL,
         created_at TEXT DEFAULT (datetime('now'))
       );
       CREATE INDEX IF NOT EXISTS idx_conversations_session ON conversations(session_id);
-      CREATE INDEX IF NOT EXISTS idx_conversations_source ON conversations(source);
     `);
-    
+
     // Migration: ajouter la colonne tool_calls si elle n'existe pas
     try {
       this.db.exec(`ALTER TABLE conversations ADD COLUMN tool_calls TEXT`);
     } catch (e) {
       // Colonne existe déjà, ignorer
     }
-    
+
     // Migration: ajouter la colonne images si elle n'existe pas
     try {
       this.db.exec(`ALTER TABLE conversations ADD COLUMN images TEXT`);
     } catch (e) {
       // Colonne existe déjà, ignorer
+    }
+
+    // Migration: ajouter la colonne source si elle n'existe pas
+    try {
+      this.db.exec(`ALTER TABLE conversations ADD COLUMN source TEXT CHECK(source IN ('webapp', 'telegram'))`);
+    } catch (e) {
+      // Colonne existe déjà, ignorer
+    }
+
+    // Index pour source (après la migration)
+    try {
+      this.db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_source ON conversations(source)`);
+    } catch (e) {
+      // Index existe déjà, ignorer
     }
 
     // Table des embeddings (préparé pour le futur)
@@ -443,6 +453,19 @@ export class Memory {
         username = excluded.username,
         set_at = datetime('now')
     `).run(userId, username);
+  }
+
+  // ============ Webapp Settings ============
+
+  getWebappSettings(): { showAllSources: boolean } {
+    const value = this.getConfig('webapp.showAllSources');
+    return {
+      showAllSources: value === 'true'
+    };
+  }
+
+  setWebappSettings(settings: { showAllSources: boolean }): void {
+    this.setConfig('webapp.showAllSources', settings.showAllSources ? 'true' : 'false');
   }
 
   // ============ Cleanup ============
