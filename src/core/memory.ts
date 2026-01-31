@@ -156,7 +156,7 @@ export class Memory {
   addMessage(
     role: 'user' | 'assistant' | 'system', 
     content: string, 
-    toolCalls?: Array<{ name: string; input: unknown }>,
+    toolCalls?: Array<{ id?: string; name: string; input: unknown }>,
     images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>
   ): number {
     // Vérifier si un message identique existe déjà dans les 5 dernières secondes (anti-doublon)

@@ -165,7 +165,47 @@ export class HistoryManager {
 
         let content: string | AIContentBlock[] = msg.content;
 
-        if (msg.role === 'user' && msg.images && msg.images.length > 0) {
+        // Check if this is a tool result message (persisted with __TOOL_RESULT__ prefix)
+        if (msg.role === 'user' && typeof msg.content === 'string' && msg.content.startsWith('__TOOL_RESULT__')) {
+          const match = msg.content.match(/^__TOOL_RESULT__(.+?)__(.*)$/s);
+          if (match) {
+            const toolUseId = match[1];
+            const resultContent = match[2];
+            content = [{
+              type: 'tool_result',
+              tool_use_id: toolUseId,
+              content: resultContent
+            }];
+            this.conversationHistory.push({
+              role: 'user',
+              content,
+              timestamp: msg.timestamp
+            });
+            continue;
+          }
+        }
+
+        // Reconstruct assistant messages with tool_use blocks from tool_calls column
+        if (msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0) {
+          const contentBlocks: AIContentBlock[] = [];
+
+          // Add text content if present
+          if (msg.content?.trim()) {
+            contentBlocks.push({ type: 'text', text: msg.content });
+          }
+
+          // Add tool_use blocks from tool_calls
+          for (const toolCall of msg.tool_calls) {
+            contentBlocks.push({
+              type: 'tool_use',
+              id: (toolCall as any).id || `tool_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+              name: toolCall.name,
+              input: toolCall.input
+            } as AIContentBlock);
+          }
+
+          content = contentBlocks;
+        } else if (msg.role === 'user' && msg.images && msg.images.length > 0) {
           const contentBlocks: AIContentBlock[] = [];
           if (msg.content?.trim()) {
             contentBlocks.push({ type: 'text', text: msg.content });

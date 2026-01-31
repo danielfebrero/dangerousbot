@@ -126,7 +126,7 @@ export class DangerousBotServer {
     memory.addMessage('user', userMessage, undefined, images);
 
     // Collecter tous les tool_calls pour cette réponse
-    const allToolCalls: Array<{ name: string; input: unknown }> = [];
+    const allToolCalls: Array<{ id?: string; name: string; input: unknown }> = [];
 
     try {
       const tools = getToolDefinitionsForProvider();
@@ -169,8 +169,8 @@ export class DangerousBotServer {
               this.wsManager.sendBotMessage(block.text);
             }
           } else if (block.type === 'tool_use') {
-            // Collecter le tool_call
-            allToolCalls.push({ name: block.name, input: block.input });
+            // Collecter le tool_call (include id for proper reconstruction on load)
+            allToolCalls.push({ id: block.id, name: block.name, input: block.input });
             
             // Générer un ID unique pour ce tool call
             const executionId = `exec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -197,10 +197,16 @@ export class DangerousBotServer {
             } else if (result._webSearchPassthrough) {
               // Cas spécial pour $web_search de Kimi: retourner les arguments tels quels
               // Kimi exécutera la recherche web quand il recevra ce résultat
-              this.brain.addToolResult(block.id, JSON.stringify(result.arguments));
+              const toolResultStr = JSON.stringify(result.arguments);
+              this.brain.addToolResult(block.id, toolResultStr);
+              // Persist tool result to database
+              memory.addMessage('user', `__TOOL_RESULT__${block.id}__${toolResultStr}`);
             } else {
               // Ajouter le résultat normal à la conversation
-              this.brain.addToolResult(block.id, JSON.stringify(result));
+              const toolResultStr = JSON.stringify(result);
+              this.brain.addToolResult(block.id, toolResultStr);
+              // Persist tool result to database
+              memory.addMessage('user', `__TOOL_RESULT__${block.id}__${toolResultStr}`);
             }
 
             // Vérifier si un redémarrage est nécessaire
