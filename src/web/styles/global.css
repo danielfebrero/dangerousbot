@@ -1145,6 +1145,116 @@ html, body {
 }
 
 /* ═══════════════════════════════════════
+   PROVIDER SWITCH MESSAGE - Sexy & Clear
+   ═══════════════════════════════════════ */
+
+.provider-switch-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: var(--space-2) 0;
+}
+
+.provider-switch-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: all var(--duration-fast);
+  animation: provider-switch-enter var(--duration-normal) var(--ease-out);
+}
+
+@keyframes provider-switch-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.provider-switch-badge:hover {
+  background: var(--bg-elevated);
+  border-color: var(--accent);
+}
+
+.provider-switch-badge.fallback {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), var(--bg-surface));
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.provider-switch-badge.fallback:hover {
+  border-color: var(--error);
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.15);
+}
+
+.provider-switch-badge.manual {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), var(--bg-surface));
+  border-color: var(--accent);
+}
+
+.provider-switch-icons {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.provider-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  transition: transform var(--duration-fast);
+}
+
+.provider-switch-badge:hover .provider-icon {
+  transform: scale(1.1);
+}
+
+.provider-arrow {
+  font-size: 0.9rem;
+  color: var(--text-tertiary);
+  transition: transform var(--duration-fast);
+}
+
+.provider-switch-badge:hover .provider-arrow {
+  transform: translateX(2px);
+}
+
+.provider-switch-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+}
+
+.provider-names {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+.provider-reason {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+}
+
+.provider-reason.fallback-reason {
+  color: var(--error);
+  font-weight: 500;
+}
+
+/* ═══════════════════════════════════════
    SCROLLBAR - Subtle
    ═══════════════════════════════════════ */
 

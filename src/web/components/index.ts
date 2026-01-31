@@ -9,3 +9,4 @@ export { ToolBadge } from './ToolBadge';
 export { ToolPanel } from './ToolPanel';
 export { ToolPanelToggle } from './ToolPanelToggle';
 export { ToolExecutionItem } from './ToolExecutionItem';
+export { ProviderSwitchMessage } from './ProviderSwitchMessage';

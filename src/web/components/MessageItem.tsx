@@ -3,6 +3,7 @@ import { Message, ImageContent } from '../types';
 import { Markdown } from './Markdown';
 import { ToolBadge } from './ToolBadge';
 import { ToolCallVisualizer } from './ToolCallVisualizer';
+import { ProviderSwitchMessage } from './ProviderSwitchMessage';
 
 interface MessageItemProps {
   message: Message;
@@ -60,11 +61,7 @@ export function MessageItem({ message }: MessageItemProps) {
         return <Markdown content={message.content} />;
 
       case 'provider_switch':
-        return (
-          <>
-            {message.providerSwitch?.from} → {message.providerSwitch?.to}
-          </>
-        );
+        return <ProviderSwitchMessage message={message} />;
 
       case 'user':
         return (
