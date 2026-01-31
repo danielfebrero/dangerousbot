@@ -23,6 +23,8 @@ export class HistoryManager {
       return;
     }
 
+    const timestamp = new Date().toISOString();
+
     if (images && images.length > 0) {
       const contentBlocks: AIContentBlock[] = [];
       if (content?.trim()) {
@@ -34,9 +36,9 @@ export class HistoryManager {
           source: img.source
         } as AIContentBlock);
       }
-      this.conversationHistory.push({ role: 'user', content: contentBlocks });
+      this.conversationHistory.push({ role: 'user', content: contentBlocks, timestamp });
     } else {
-      this.conversationHistory.push({ role: 'user', content });
+      this.conversationHistory.push({ role: 'user', content, timestamp });
     }
     this.messageCount++;
   }
@@ -50,20 +52,23 @@ export class HistoryManager {
       console.warn('[HistoryManager] Ignored empty assistant message');
       return;
     }
-    this.conversationHistory.push({ role: 'assistant', content });
+    const timestamp = new Date().toISOString();
+    this.conversationHistory.push({ role: 'assistant', content, timestamp });
   }
 
   /**
    * Ajoute un résultat d'outil
    */
   addToolResult(toolUseId: string, result: string): void {
+    const timestamp = new Date().toISOString();
     this.conversationHistory.push({
       role: 'user',
       content: [{
         type: 'tool_result',
         tool_use_id: toolUseId,
         content: result
-      }]
+      }],
+      timestamp
     });
   }
 
@@ -133,7 +138,8 @@ export class HistoryManager {
 
         this.conversationHistory.push({
           role: msg.role,
-          content
+          content,
+          timestamp: msg.timestamp
         });
       }
     }

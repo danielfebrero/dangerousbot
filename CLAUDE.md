@@ -18,6 +18,7 @@ npm run dev:client   # Watch mode for React client
 npm start            # Production mode (runs dist/dangerousbot.js)
 npm run start:daemon # Production daemon via start.sh
 npm run setup        # Configure desktop shortcut or auto-start
+npm run setup:keys   # Configure or reconfigure API keys
 
 # SearxNG web search (requires Docker)
 npm run searxng:start   # Start SearxNG container
@@ -28,49 +29,36 @@ npm run searxng:logs    # View logs
 
 ## Architecture
 
-```
+```text
 src/
 ├── main.ts              # Entry point - server startup, API key management
-├── server/
-│   ├── index.ts         # Express server + WebSocket integration
-│   ├── routes.ts        # REST API endpoints (/api/*)
-│   └── websocket.ts     # Real-time communication with frontend
+├── config.ts            # Central configuration (providers, models, tokens, paths)
+├── server/              # Express server + WebSocket + REST API
 ├── core/
-│   ├── brain.ts         # Claude API interface (Opus 4.5)
+│   ├── brain/           # AI orchestration (prompt-builder, provider-manager, history)
+│   ├── providers/       # AI provider implementations (claude, kimi, mistral)
+│   ├── tools/           # Tool handlers with auto-registration pattern
 │   ├── memory.ts        # SQLite database (conversations, knowledge, embeddings)
-│   ├── executor.ts      # Code execution (VM sandbox, shell, file ops)
-│   ├── tools.ts         # Tool definitions and executor
-│   ├── versioning.ts    # Git auto-commit on self-modification
 │   ├── lifecycle.ts     # Single instance lock, restart, signal handlers
-│   └── types.ts         # TypeScript interfaces
+│   ├── rollback.ts      # Automatic rollback on build failure
+│   └── versioning.ts    # Git auto-commit on self-modification
 ├── web/                 # React TypeScript frontend
-│   ├── index.html       # HTML entry point
-│   ├── index.tsx        # React entry point
-│   ├── App.tsx          # Main React component
-│   ├── types.ts         # Frontend types
-│   ├── hooks/
-│   │   └── useWebSocket.ts  # WebSocket hook
-│   ├── components/
-│   │   ├── Header.tsx
-│   │   ├── MessageList.tsx
-│   │   ├── MessageItem.tsx
-│   │   ├── MessageInput.tsx
-│   │   └── TypingIndicator.tsx
-│   └── styles/
-│       └── global.css
-└── cli/
-    └── setup.ts         # Desktop shortcut / auto-start configuration
+└── cli/                 # Setup scripts (desktop shortcut, API keys)
 ```
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed extension guides (adding tools, providers).
 
 ## Key Concepts
 
 ### Self-Modification Flow
+
 1. Bot uses `self_update` tool to edit source files
 2. Changes are auto-committed via `versioning.ts`
 3. Project is recompiled (`npm run build`) - both server AND client
 4. Server restarts via `lifecycle.ts`
 
 ### Single Instance
+
 - Lockfile at `~/.dangerousbot/dangerousbot.lock`
 - New instance kills existing one before starting
 
@@ -92,7 +80,8 @@ src/
 
 ### Code Embeddings (RAG)
 
-- Uses Mistral embeddings for semantic code search
+- Memory embeddings: OpenRouter (`qwen/qwen3-embedding-8b`)
+- Code embeddings: Mistral (`codestral-embed-2505`)
 - `retrieve_code` tool queries the indexed codebase
 - Automatic re-indexing after self-update
 
@@ -100,11 +89,11 @@ src/
 
 | Provider | Model | Use Case |
 | -------- | ----- | -------- |
-| Claude (default) | Opus 4.5 | Primary brain |
-| Kimi | Moonshot AI | Alternative with native web search |
-| Mistral | Various | Consultation and code embeddings |
+| Kimi (default) | K2.5 | Primary brain with native web search |
+| Claude | Opus 4.5 | Alternative brain (highest capability) |
+| Mistral | Large/Medium/Small | Consultation (`consult_mistral` tool) |
 
-Switch providers at runtime via `switch_provider` tool.
+Switch providers at runtime via `switch_provider` tool. Provider choice persists in SQLite.
 
 ## Development vs Production
 
@@ -134,6 +123,7 @@ Switch providers at runtime via `switch_provider` tool.
 ## WebSocket Protocol
 
 Messages are JSON with `type` and `payload`:
+
 - `user_message` - User sends text
 - `bot_message` - Bot response
 - `bot_typing` - Typing indicator

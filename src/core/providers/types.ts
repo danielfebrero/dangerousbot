@@ -5,6 +5,7 @@
 export interface AIMessage {
   role: 'user' | 'assistant';
   content: string | AIContentBlock[];
+  timestamp?: string; // ISO 8601 format
 }
 
 export interface AIImageContent {
