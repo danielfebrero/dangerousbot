@@ -215,8 +215,8 @@ export function initializeApiKeys(): void {
 export function loadTelegramUserId(): number {
   const userIdStr = loadApiKey(PATHS.TELEGRAM_USER_ID_FILE);
   const userId = parseInt(userIdStr, 10);
-  APIS.TELEGRAM_USER_ID = isNaN(userId) ? 0 : userId;
-  return APIS.TELEGRAM_USER_ID;
+  (APIS as any).TELEGRAM_USER_ID = isNaN(userId) ? 0 : userId;
+  return (APIS as any).TELEGRAM_USER_ID;
 }
 
 /**

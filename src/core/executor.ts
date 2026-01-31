@@ -76,8 +76,10 @@ export class Executor {
   async executeFile(
     code: string,
     filename: string = 'temp.js',
-    interpreter: string = 'node'
+    interpreter: string = 'node',
+    options: { timeout?: number } = {}
   ): Promise<ExecutionResult> {
+    const timeout = options.timeout ?? 60000;
     const tempDir = os.tmpdir();
     const filePath = path.join(tempDir, `dangerousbot_${Date.now()}_${filename}`);
 
@@ -128,15 +130,15 @@ export class Executor {
         });
       });
 
-      // Timeout 60s
+      // Timeout
       setTimeout(() => {
         child.kill();
         cleanup();
         resolve({
           success: false,
-          error: 'Execution timeout (60s)'
+          error: `Execution timeout (${timeout / 1000}s)`
         });
-      }, 60000);
+      }, timeout);
     });
   }
 

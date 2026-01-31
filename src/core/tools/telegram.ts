@@ -6,6 +6,7 @@
  */
 
 import { Tool, ToolContext, ToolHandler } from './types';
+import { ToolInput, ToolResult } from '../types.js';
 import { getMemory } from '../memory';
 
 export interface TelegramInput {
@@ -37,18 +38,18 @@ export const telegramHandler: ToolHandler = {
   name: 'telegram',
   definition: telegramDefinition,
   
-  async execute(input: TelegramInput, context: ToolContext): Promise<any> {
+  async execute(input: ToolInput, context: ToolContext): Promise<ToolResult> {
     const { command, param } = input;
     
     if (command === 'set_master_user') {
-      return await setMasterUser(param, context);
+      return await setMasterUser(param as string, context);
     }
     
     throw new Error(`Action inconnue: ${command}`);
   }
 };
 
-async function setMasterUser(usernameOrId: string, context: ToolContext): Promise<any> {
+async function setMasterUser(usernameOrId: string, context: ToolContext): Promise<ToolResult> {
   const memory = getMemory();
   
   // Détecter si c'est un ID numérique ou un username

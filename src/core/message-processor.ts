@@ -8,7 +8,7 @@ import { getToolDefinitions } from './tools/index.js';
 import { ToolExecutor } from './tools.js';
 import { getContextInjector } from './context-injector.js';
 import { getMemory } from './memory.js';
-import { ToolCall, AIContentBlock } from './types.js';
+import { ToolCall } from './types.js';
 import {
   ChatSource,
   ChatImage,
@@ -122,24 +122,22 @@ export class MessageProcessor {
           responseText += block.text;
         } else if (block.type === 'tool_use') {
           toolCalls.push({
-            id: block.id,
             name: block.name,
-            arguments: block.input as Record<string, unknown>,
+            input: block.input as Record<string, unknown>,
           });
         }
       }
 
       // Résultats des tools
-      const toolResults: Array<{ name: string; success: boolean; result?: unknown; id: string }> = [];
+      const toolResults: Array<{ name: string; success: boolean; result?: unknown }> = [];
 
       // Exécuter les tool calls si présents
       if (toolCalls.length > 0) {
         // D'abord exécuter TOUS les tools
         for (const tc of toolCalls) {
           try {
-            const result = await this.toolExecutor.execute(tc.name, tc.arguments);
+            const result = await this.toolExecutor.execute(tc.name, tc.input);
             toolResults.push({
-              id: tc.id,
               name: tc.name,
               success: result.success !== false,
               result,
@@ -147,7 +145,6 @@ export class MessageProcessor {
           } catch (e) {
             const error = e as Error;
             toolResults.push({
-              id: tc.id,
               name: tc.name,
               success: false,
               result: { success: false, error: error.message },
@@ -167,7 +164,7 @@ export class MessageProcessor {
             role: 'user',
             content: [{
               type: 'tool_result',
-              tool_use_id: tr.id,
+              tool_use_id: tr.name,
               content: JSON.stringify(tr.result),
             }],
           });

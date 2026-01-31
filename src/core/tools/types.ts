@@ -2,11 +2,13 @@
  * Types partagés pour les tools
  */
 
-import { Tool, ToolResult, ToolInput } from '../types';
+import { Tool as ToolType, ToolResult, ToolInput } from '../types';
+
+export { ToolType as Tool };
 
 export interface ToolHandler {
   name: string;
-  definition: Tool;
+  definition: ToolType;
   execute(input: ToolInput, context: ToolContext): Promise<ToolResult>;
 }
 

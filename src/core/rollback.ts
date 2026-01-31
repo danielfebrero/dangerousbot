@@ -275,7 +275,29 @@ export class RollbackManager {
   }
 
   /**
-   * Pipeline CI complet: TypeScript check + Build
+   * Exécute les tests unitaires (CI step 3)
+   */
+  async runUnitTests(): Promise<RollbackResult> {
+    console.log('[Rollback] 🧪 Tests unitaires...');
+    
+    const result = await this.execCommand('npm run test:unit');
+    
+    if (result.success) {
+      return {
+        success: true,
+        message: '✅ Tests passed'
+      };
+    } else {
+      return {
+        success: false,
+        message: '❌ Tests failed',
+        error: result.stderr || result.stdout
+      };
+    }
+  }
+
+  /**
+   * Pipeline CI complet: TypeScript check + Build + Tests
    */
   async runCI(): Promise<RollbackResult> {
     console.log('[Rollback] 🚀 Running CI pipeline...');
@@ -291,10 +313,16 @@ export class RollbackManager {
     if (!buildResult.success) {
       return buildResult;
     }
+
+    // Step 3: Unit tests
+    const testResult = await this.runUnitTests();
+    if (!testResult.success) {
+      return testResult;
+    }
     
     return {
       success: true,
-      message: '🎉 CI passed (TypeScript + Build)'
+      message: '🎉 CI passed (TypeScript + Build + Tests)'
     };
   }
 

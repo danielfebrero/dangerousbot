@@ -76,6 +76,8 @@ export interface ToolProperty {
   description: string;
   enum?: string[];
   items?: ToolProperty;
+  minimum?: number;
+  maximum?: number;
 }
 
 export interface Tool {

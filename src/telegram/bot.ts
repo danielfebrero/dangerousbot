@@ -130,7 +130,7 @@ export class TelegramBotService extends EventEmitter {
   private setupHandlers(): void {
     if (!this.bot) return;
 
-    this.bot.on('message', async (msg) => {
+    this.bot.on('message', async (msg: any) => {
       const userId = msg.from?.id;
       const username = msg.from?.username;
 
@@ -145,14 +145,14 @@ export class TelegramBotService extends EventEmitter {
     });
 
     // Commandes
-    this.bot.onText(/\/start/, (msg) => this.handleCommand(msg, '/start'));
-    this.bot.onText(/\/status/, (msg) => this.handleCommand(msg, '/status'));
-    this.bot.onText(/\/web/, (msg) => this.handleCommand(msg, '/web'));
-    this.bot.onText(/\/provider/, (msg) => this.handleCommand(msg, '/provider'));
-    this.bot.onText(/\/help/, (msg) => this.handleCommand(msg, '/help'));
+    this.bot.onText(/\/start/, (msg: any) => this.handleCommand(msg, '/start'));
+    this.bot.onText(/\/status/, (msg: any) => this.handleCommand(msg, '/status'));
+    this.bot.onText(/\/web/, (msg: any) => this.handleCommand(msg, '/web'));
+    this.bot.onText(/\/provider/, (msg: any) => this.handleCommand(msg, '/provider'));
+    this.bot.onText(/\/help/, (msg: any) => this.handleCommand(msg, '/help'));
   }
 
-  private async handleMessage(msg: TelegramBot.Message): Promise<void> {
+  private async handleMessage(msg: any): Promise<void> {
     if (!this.bot || !this.messageProcessor) return;
 
     const chatId = msg.chat.id;
@@ -203,7 +203,7 @@ export class TelegramBotService extends EventEmitter {
   }
 
   private async extractMessageContent(
-    msg: TelegramBot.Message
+    msg: any
   ): Promise<{ text: string; images: ChatImage[] }> {
     let text = msg.text || msg.caption || '';
     const images: ChatImage[] = [];
@@ -232,7 +232,7 @@ export class TelegramBotService extends EventEmitter {
     return { text, images };
   }
 
-  private async handleCommand(msg: TelegramBot.Message, command: TelegramCommand): Promise<void> {
+  private async handleCommand(msg: any, command: TelegramCommand): Promise<void> {
     if (!this.bot) return;
 
     const chatId = msg.chat.id;
