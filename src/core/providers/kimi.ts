@@ -70,6 +70,21 @@ export class KimiProvider extends BaseProvider {
     const pendingToolCalls = new Set<string>();
 
     for (const msg of messages) {
+      // Handle null/undefined content
+      if (msg.content === null || msg.content === undefined) {
+        if (msg.role === 'assistant' && (msg as any).tool_calls) {
+          // Assistant message with tool_calls but no content
+          result.push({
+            role: 'assistant',
+            content: null,
+            tool_calls: (msg as any).tool_calls
+          });
+        } else {
+          result.push({ role: msg.role, content: '' });
+        }
+        continue;
+      }
+
       if (typeof msg.content === 'string') {
         result.push({ role: msg.role, content: msg.content });
         continue;

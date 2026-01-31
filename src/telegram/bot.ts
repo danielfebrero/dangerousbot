@@ -469,14 +469,15 @@ L'utilisateur écrit depuis un appareil mobile (Telegram). Sauf indication contr
         );
         break;
 
-      case '/clear':
-        const session = this.sessions.get(userId);
-        if (session) {
-          await getMemory().clearConversation(session);
-          this.sessions.delete(userId);
-        }
-        await this.bot.sendMessage(chatId, '🧹 Conversation effacée.');
-        break;
+      // Dani: je ne veux pas que l'on puisse supprimer la conversation
+      // case '/clear':
+      //   const session = this.sessions.get(userId);
+      //   if (session) {
+      //     await getMemory().clearConversation(session);
+      //     this.sessions.delete(userId);
+      //   }
+      //   await this.bot.sendMessage(chatId, '🧹 Conversation effacée.');
+      //   break;
 
       case '/provider':
         const current = PROVIDER.ACTIVE;
@@ -496,7 +497,6 @@ L'utilisateur écrit depuis un appareil mobile (Telegram). Sauf indication contr
           '/start - Démarrer\n' +
           '/status - Voir le statut\n' +
           '/web - Lien vers l\'interface web\n' +
-          '/clear - Effacer la conversation\n' +
           '/provider - Voir le provider actif\n' +
           '/help - Cette aide',
           { parse_mode: 'Markdown' }
