@@ -12,7 +12,28 @@ const DATA_DIR = path.join(os.homedir(), '.dangerousbot', 'data');
 const DB_PATH = path.join(DATA_DIR, 'dangerousbot.db');
 
 function getDb(): Database.Database {
-  return new Database(DB_PATH);
+  const db = new Database(DB_PATH);
+  // S'assurer que la table files existe
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS files (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      url TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      original_name TEXT,
+      mime_type TEXT,
+      size_bytes INTEGER NOT NULL DEFAULT 0,
+      source TEXT NOT NULL DEFAULT 'webapp',
+      telegram_chat_id TEXT,
+      downloaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      accessed_at DATETIME,
+      deleted_at DATETIME,
+      is_deleted INTEGER DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_files_downloaded_at ON files(downloaded_at);
+    CREATE INDEX IF NOT EXISTS idx_files_is_deleted ON files(is_deleted);
+    CREATE INDEX IF NOT EXISTS idx_files_source ON files(source);
+  `);
+  return db;
 }
 
 export interface FileRecord {
