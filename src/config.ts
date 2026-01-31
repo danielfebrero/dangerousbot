@@ -135,6 +135,9 @@ export const PATHS = {
   
   /** Fichier pour l'ID utilisateur Telegram */
   get TELEGRAM_USER_ID_FILE() { return path.join(this.CONFIG_DIR, 'telegram.user'); },
+  
+  /** Fichier pour le token API Telegram Bot */
+  get TELEGRAM_BOT_TOKEN_FILE() { return path.join(this.SECRETS_DIR, 'telegram_bot_token'); },
 } as const;
 
 // ============================================================================
@@ -186,7 +189,7 @@ import * as fs from 'fs';
 /**
  * Charge une clé API depuis un fichier
  */
-function loadApiKey(filePath: string): string {
+export function loadApiKey(filePath: string): string {
   try {
     if (fs.existsSync(filePath)) {
       return fs.readFileSync(filePath, 'utf-8').trim();

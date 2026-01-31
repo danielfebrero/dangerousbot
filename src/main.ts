@@ -16,7 +16,7 @@ import { Lifecycle } from './core/lifecycle.js';
 import { getMemory } from './core/memory.js';
 import { initRollbackManager } from './core/rollback.js';
 import { logger, enableConsoleCapture } from './core/logger.js';
-import { SERVER, PATHS, APIS, initializeApiKeys, reloadProviderConfig } from './config.js';
+import { SERVER, PATHS, APIS, initializeApiKeys, reloadProviderConfig, loadApiKey } from './config.js';
 
 // Activer la capture des console.* dès le démarrage
 enableConsoleCapture();
@@ -327,7 +327,7 @@ async function main(): Promise<void> {
   print(`✓ Serveur démarré sur http://${HOST}:${PORT}`, 'green');
 
   // Démarrer le bot Telegram si un token est configuré
-  const telegramToken = loadApiKey(PATHS.TELEGRAM_TOKEN_FILE);
+  const telegramToken = loadApiKey(PATHS.TELEGRAM_BOT_TOKEN_FILE);
   if (telegramToken) {
     APIS.TELEGRAM_BOT_TOKEN = telegramToken;
     try {

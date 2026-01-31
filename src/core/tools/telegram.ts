@@ -9,41 +9,42 @@ import { Tool, ToolContext, ToolHandler } from './types';
 import { getMemory } from '../memory';
 
 export interface TelegramInput {
-  action: 'set_master_user';
-  username: string;
+  command: 'set_master_user';
+  param: string;
 }
 
 export const telegramDefinition: Tool = {
   name: 'telegram',
   description: 'Gère l\'utilisateur maître Telegram. Un seul maître autorisé à interagir avec le bot.\nUsage: telegram(set_master_user, "username") ou telegram(set_master_user, "123456789") pour un ID numérique.',
-  parameters: {
+  input_schema: {
     type: 'object',
     properties: {
-      action: {
+      command: {
         type: 'string',
         enum: ['set_master_user'],
-        description: 'Action à effectuer'
+        description: 'Commande à effectuer'
       },
-      username: {
+      param: {
         type: 'string',
         description: 'Username Telegram (sans @) ou ID numérique de l\'utilisateur maître'
       }
     },
-    required: ['action', 'username']
+    required: ['command', 'param']
   }
 };
 
 export const telegramHandler: ToolHandler = {
   name: 'telegram',
+  definition: telegramDefinition,
   
   async execute(input: TelegramInput, context: ToolContext): Promise<any> {
-    const { action, username } = input;
+    const { command, param } = input;
     
-    if (action === 'set_master_user') {
-      return await setMasterUser(username, context);
+    if (command === 'set_master_user') {
+      return await setMasterUser(param, context);
     }
     
-    throw new Error(`Action inconnue: ${action}`);
+    throw new Error(`Action inconnue: ${command}`);
   }
 };
 
