@@ -217,32 +217,7 @@ export class KimiProvider extends BaseProvider {
       return true;
     });
 
-    // Log to file for debugging
-    this.logToFile('kimi-messages', {
-      timestamp: new Date().toISOString(),
-      inputMessagesCount: messages.length,
-      outputMessagesCount: filteredResult.length,
-      unresolvedToolCalls: Array.from(pendingToolCalls),
-      resolvedToolCallIds: Array.from(resolvedToolCallIds),
-      finalToolCallIds: Array.from(finalToolCallIds),
-      messages: filteredResult
-    });
-
     return filteredResult;
-  }
-
-  private logToFile(prefix: string, data: unknown): void {
-    try {
-      const logsDir = path.join(os.homedir(), 'dev', 'dangerousbot', 'logs');
-      if (!fs.existsSync(logsDir)) {
-        fs.mkdirSync(logsDir, { recursive: true });
-      }
-      const filename = `${prefix}-${Date.now()}.json`;
-      fs.writeFileSync(path.join(logsDir, filename), JSON.stringify(data, null, 2));
-      console.log(`[Kimi] Logged to ${filename}`);
-    } catch (err) {
-      console.error('[Kimi] Failed to write log:', err);
-    }
   }
 
   protected convertTools(tools?: AIToolDefinition[]): unknown[] | undefined {

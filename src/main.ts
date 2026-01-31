@@ -16,7 +16,7 @@ import { Lifecycle } from './core/lifecycle.js';
 import { getMemory } from './core/memory.js';
 import { initRollbackManager } from './core/rollback.js';
 import { logger, enableConsoleCapture } from './core/logger.js';
-import { SERVER, PATHS, APIS, initializeApiKeys, reloadProviderConfig } from './config.js';
+import { SERVER, PATHS, APIS, initializeApiKeys, reloadProviderConfig, loadTelegramUserId } from './config.js';
 
 // Activer la capture des console.* dès le démarrage
 enableConsoleCapture();
@@ -325,6 +325,25 @@ async function main(): Promise<void> {
 
   await server.start(PORT, HOST);
   print(`✓ Serveur démarré sur http://${HOST}:${PORT}`, 'green');
+
+  // Démarrer le bot Telegram
+  const telegramUserId = loadTelegramUserId();
+  if (telegramUserId > 0) {
+    try {
+      const { initTelegramBot } = await import('./telegram/bot.js');
+      const telegramBot = initTelegramBot({
+        token: APIS.TELEGRAM_BOT_TOKEN,
+        allowedUserId: telegramUserId,
+        usePolling: true,
+      });
+      await telegramBot.start();
+      print(`✓ Bot Telegram démarré (@cdxx_dangerousbot, user: ${telegramUserId})`, 'green');
+    } catch (err) {
+      print(`⚠️ Échec du démarrage Telegram: ${err}`, 'yellow');
+    }
+  } else {
+    print('⚠️ ID utilisateur Telegram non configuré, bot désactivé', 'yellow');
+  }
 
   // Setup WebSocket handlers
   const wsManager = server.getWSManager();

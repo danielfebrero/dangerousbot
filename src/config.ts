@@ -132,6 +132,9 @@ export const PATHS = {
   
   /** Fichier de clé API Kimi (Moonshot) */
   get KIMI_KEY_FILE() { return path.join(this.SECRETS_DIR, 'kimi_api_key'); },
+  
+  /** Fichier pour l'ID utilisateur Telegram */
+  get TELEGRAM_USER_ID_FILE() { return path.join(this.CONFIG_DIR, 'telegram.user'); },
 } as const;
 
 // ============================================================================
@@ -159,6 +162,12 @@ export const APIS = {
   
   /** Clé API Kimi/Moonshot (chargée au runtime) */
   KIMI_API_KEY: '' as string,
+  
+  /** Token API Telegram Bot */
+  TELEGRAM_BOT_TOKEN: '***REMOVED***' as string,
+  
+  /** ID utilisateur Telegram autorisé */
+  TELEGRAM_USER_ID: 0 as number,
 };
 
 // ============================================================================
@@ -192,6 +201,16 @@ export function initializeApiKeys(): void {
   APIS.MISTRAL_API_KEY = loadApiKey(PATHS.MISTRAL_KEY_FILE);
   APIS.OPENROUTER_API_KEY = loadApiKey(PATHS.OPENROUTER_KEY_FILE);
   APIS.KIMI_API_KEY = loadApiKey(PATHS.KIMI_KEY_FILE);
+}
+
+/**
+ * Charge l'ID utilisateur Telegram autorisé
+ */
+export function loadTelegramUserId(): number {
+  const userIdStr = loadApiKey(PATHS.TELEGRAM_USER_ID_FILE);
+  const userId = parseInt(userIdStr, 10);
+  APIS.TELEGRAM_USER_ID = isNaN(userId) ? 0 : userId;
+  return APIS.TELEGRAM_USER_ID;
 }
 
 /**

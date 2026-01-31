@@ -26,6 +26,7 @@
     "express": "^4.18.2",
     "highlight.js": "^11.11.1",
     "marked": "^17.0.1",
+    "node-telegram-bot-api": "^0.67.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "ws": "^8.14.2"
