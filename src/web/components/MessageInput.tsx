@@ -6,13 +6,24 @@ interface MessageInputProps {
   onStop?: () => void;
   isProcessing?: boolean;
   disabled?: boolean;
+  droppedImages?: ContentPart[];
+  onDroppedImagesClear?: () => void;
 }
 
-export function MessageInput({ onSend, onStop, isProcessing, disabled }: MessageInputProps) {
+export function MessageInput({ 
+  onSend, 
+  onStop, 
+  isProcessing, 
+  disabled,
+  droppedImages,
+  onDroppedImagesClear 
+}: MessageInputProps) {
   const [text, setText] = useState('');
   const [selectedImages, setSelectedImages] = useState<ContentPart[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dropZoneRef = useRef<HTMLDivElement>(null);
 
   const handleImageSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -79,12 +90,83 @@ export function MessageInput({ onSend, onStop, isProcessing, disabled }: Message
     }
   }, [text]);
 
+  // Handle dropped images from drag overlay
+  useEffect(() => {
+    if (droppedImages && droppedImages.length > 0) {
+      setSelectedImages(prev => [...prev, ...droppedImages]);
+      onDroppedImagesClear?.();
+    }
+  }, [droppedImages, onDroppedImagesClear]);
+
   const handleAttachClick = useCallback(() => {
     fileInputRef.current?.click();
   }, []);
 
+  // Drag & Drop handlers
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.currentTarget === dropZoneRef.current) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    const imageFiles = files.filter(file => file.type.startsWith('image/'));
+
+    if (imageFiles.length === 0) return;
+
+    const newImages: ContentPart[] = [];
+
+    for (const file of imageFiles) {
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve) => {
+        reader.onloadend = () => {
+          const base64 = reader.result as string;
+          resolve(base64.split(',')[1]);
+        };
+      });
+      reader.readAsDataURL(file);
+
+      const data = await base64Promise;
+      newImages.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: file.type,
+          data
+        }
+      });
+    }
+
+    setSelectedImages(prev => [...prev, ...newImages]);
+  }, []);
+
   return (
-    <div className="message-input-container">
+    <div 
+      className={`message-input-container ${isDragging ? 'dragging' : ''}`}
+      ref={dropZoneRef}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       {selectedImages.length > 0 && (
         <div className="image-preview">
           {selectedImages.map((img, idx) => (

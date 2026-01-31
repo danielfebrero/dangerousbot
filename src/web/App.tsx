@@ -6,6 +6,7 @@ import { MessageList } from './components/MessageList';
 import { MessageInput } from './components/MessageInput';
 import { ToolPanel } from './components/ToolPanel';
 import { ToolPanelToggle } from './components/ToolPanelToggle';
+import { DragOverlay } from './components/DragOverlay';
 import { Message, WSMessage, TokenUsage, ContentPart, ToolCallExecution } from './types';
 import './styles/global.css';
 
@@ -15,6 +16,7 @@ function App() {
   const [tokenUsage, setTokenUsage] = useState<TokenUsage | null>(null);
   const [headerVisible, setHeaderVisible] = useState(true);
   const lastScrollY = useRef(0);
+  const [droppedImages, setDroppedImages] = useState<ContentPart[]>([]);
 
   // Tool panel state
   const {
@@ -323,6 +325,40 @@ function App() {
 
   const { status, sendMessage, sendStop } = useWebSocket({ onMessage: handleMessage });
 
+  // Handle dropped files from drag overlay
+  const handleFilesDrop = useCallback((files: File[]) => {
+    // Convert files to ContentPart and send immediately
+    const processFiles = async () => {
+      const newImages: ContentPart[] = [];
+
+      for (const file of files) {
+        const reader = new FileReader();
+        const base64Promise = new Promise<string>((resolve) => {
+          reader.onloadend = () => {
+            const base64 = reader.result as string;
+            resolve(base64.split(',')[1]);
+          };
+        });
+        reader.readAsDataURL(file);
+
+        const data = await base64Promise;
+        newImages.push({
+          type: 'image',
+          source: {
+            type: 'base64',
+            media_type: file.type,
+            data
+          }
+        });
+      }
+
+      // Store dropped images temporarily
+      setDroppedImages(newImages);
+    };
+
+    processFiles();
+  }, []);
+
   const handleSend = useCallback((text: string, images?: ContentPart[]) => {
     // Reset streaming message ID when user sends a new message
     streamingMessageIdRef.current = null;
@@ -368,6 +404,13 @@ function App() {
         onSend={handleSend}
         onStop={sendStop}
         isProcessing={isTyping}
+        disabled={status !== 'connected'}
+        droppedImages={droppedImages}
+        onDroppedImagesClear={() => setDroppedImages([])}
+      />
+
+      <DragOverlay
+        onFilesDrop={handleFilesDrop}
         disabled={status !== 'connected'}
       />
 
