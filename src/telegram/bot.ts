@@ -11,10 +11,10 @@
 
 import TelegramBot from 'node-telegram-bot-api';
 import { EventEmitter } from 'events';
-import { TelegramConfig, TelegramMessage, TelegramCommand } from './types';
-import { Message as CoreMessage, ToolCall, ImageContent } from '../core/types';
-import { getMemory } from '../core/memory';
-import { getContextInjector } from '../core/context-injector';
+import { TelegramConfig, TelegramMessage, TelegramCommand } from './types.js';
+import { Message as CoreMessage, ToolCall, ImageContent } from '../core/types.js';
+import { getMemory } from '../core/memory.js';
+import { getContextInjector } from '../core/context-injector.js';
 import { PROVIDER, MODELS } from '../config';
 import { ProviderManager } from '../core/brain/provider-manager.js';
 import { ToolExecutor } from '../core/executor';
@@ -171,18 +171,11 @@ export class TelegramBotService extends EventEmitter {
       const memory = getMemory();
       const conversationId = this.getOrCreateSession(userId, chatId);
 
-      const userMessage: CoreMessage = {
-        id: `tg-${Date.now()}`,
-        role: 'user',
-        content,
-        timestamp: new Date(),
-        conversationId,
-      };
+      // Sauvegarder dans la session courante
+      memory.addMessage('user', content);
 
-      await memory.saveMessage(userMessage);
-
-      // Récupérer l'historique
-      const history = await memory.getRecentMessages(conversationId, 20);
+      // Récupérer l'historique (20 derniers messages)
+      const history = memory.getMessages(conversationId, 20);
 
       // Injecter le contexte
       const injector = getContextInjector();
@@ -321,7 +314,7 @@ export class TelegramBotService extends EventEmitter {
       case '/status':
         const provider = PROVIDER.ACTIVE;
         const memory = getMemory();
-        const history = await memory.getRecentMessages();
+        const history = memory.getMessages();
         const messagesCount = history.length;
         
         await this.bot.sendMessage(
