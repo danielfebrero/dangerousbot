@@ -228,6 +228,73 @@ export class HistoryManager {
     }
 
     console.log(`[HistoryManager] Loaded ${this.conversationHistory.length} messages from database`);
+
+    // Validate and fix incomplete tool chains (critical for Kimi API)
+    this.validateToolChains();
+  }
+
+  /**
+   * Validates tool chains and removes incomplete ones.
+   * Kimi API requires that every tool_use has a corresponding tool_result.
+   */
+  private validateToolChains(): void {
+    // Collect all tool_use IDs and tool_result IDs
+    const toolUseIds = new Set<string>();
+    const toolResultIds = new Set<string>();
+
+    for (const msg of this.conversationHistory) {
+      if (Array.isArray(msg.content)) {
+        for (const block of msg.content) {
+          if (block.type === 'tool_use' && block.id) {
+            toolUseIds.add(block.id);
+          } else if (block.type === 'tool_result' && block.tool_use_id) {
+            toolResultIds.add(block.tool_use_id);
+          }
+        }
+      }
+    }
+
+    // Find unresolved tool_use IDs (tool calls without results)
+    const unresolvedIds = new Set<string>();
+    for (const id of toolUseIds) {
+      if (!toolResultIds.has(id)) {
+        unresolvedIds.add(id);
+      }
+    }
+
+    if (unresolvedIds.size === 0) {
+      return; // All tool chains are complete
+    }
+
+    console.warn(`[HistoryManager] Found ${unresolvedIds.size} incomplete tool chains, removing them...`);
+
+    // Remove messages with incomplete tool chains
+    // Strategy: Remove assistant messages that have unresolved tool_use blocks
+    // and any orphaned tool_result messages
+    this.conversationHistory = this.conversationHistory.filter(msg => {
+      if (!Array.isArray(msg.content)) {
+        return true; // Keep simple string messages
+      }
+
+      // Check if this message has any unresolved tool_use
+      const hasUnresolvedToolUse = msg.content.some(
+        block => block.type === 'tool_use' && block.id && unresolvedIds.has(block.id)
+      );
+
+      if (hasUnresolvedToolUse) {
+        // If the message has ONLY tool_use blocks (no text), remove it entirely
+        const hasText = msg.content.some(block => block.type === 'text' && block.text?.trim());
+        if (!hasText) {
+          return false; // Remove message entirely
+        }
+        // Otherwise, strip the tool_use blocks but keep text
+        msg.content = msg.content.filter(block => block.type !== 'tool_use');
+      }
+
+      return true;
+    });
+
+    console.log(`[HistoryManager] After cleanup: ${this.conversationHistory.length} messages`);
   }
 
   /**
