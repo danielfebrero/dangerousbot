@@ -11,6 +11,12 @@ export interface TelegramConfig {
   usePolling: boolean;
   /** URL webhook (si usePolling = false) */
   webhookUrl?: string;
+  /** Clé API Anthropic */
+  anthropicApiKey?: string;
+  /** Clé API Kimi */
+  kimiApiKey?: string;
+  /** Clé API OpenRouter */
+  openRouterApiKey?: string;
 }
 
 export interface TelegramMessage {

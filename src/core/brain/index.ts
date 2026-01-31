@@ -93,7 +93,8 @@ export class Brain {
     tools: Tool[],
     images?: ImageContent[],
     abortSignal?: AbortSignal,
-    onChunk?: StreamCallback
+    onChunk?: StreamCallback,
+    source?: 'webapp' | 'telegram'
   ): Promise<BrainResponse> {
     // Ajouter le message à l'historique
     this.historyManager.addUserMessage(userMessage, images);
@@ -113,7 +114,7 @@ export class Brain {
 
     // Appeler le provider
     const response = await this.providerManager.chatStreamWithFallback(apiHistory, {
-      system: this.promptBuilder.getSystemPrompt(),
+      system: this.promptBuilder.getSystemPrompt(source),
       tools: aiTools,
       abortSignal,
       onChunk
@@ -132,7 +133,8 @@ export class Brain {
     userMessage: string,
     tools: Tool[],
     images?: ImageContent[],
-    abortSignal?: AbortSignal
+    abortSignal?: AbortSignal,
+    source?: 'webapp' | 'telegram'
   ): Promise<BrainResponse> {
     this.historyManager.addUserMessage(userMessage, images);
 
@@ -147,7 +149,7 @@ export class Brain {
     const aiTools = this.formatTools(tools);
 
     const response = await this.providerManager.chatWithFallback(apiHistory, {
-      system: this.promptBuilder.getSystemPrompt(),
+      system: this.promptBuilder.getSystemPrompt(source),
       tools: aiTools,
       abortSignal
     });

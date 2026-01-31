@@ -109,6 +109,16 @@ export function getToolDefinitionsForProvider(provider: string | undefined = und
   });
 }
 
+// Récupérer un handler par son nom
+export function getToolHandler(toolName: string): ToolHandler | undefined {
+  // Initialiser le registry si nécessaire
+  if (toolRegistry.size === 0) {
+    registerAllTools();
+  }
+
+  return toolRegistry.get(toolName);
+}
+
 // Exécuter un tool par son nom
 export async function executeTool(
   toolName: string,

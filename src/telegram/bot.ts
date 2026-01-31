@@ -15,19 +15,24 @@ import { TelegramConfig, TelegramMessage, TelegramCommand } from './types.js';
 import { Message as CoreMessage, ToolCall, ImageContent } from '../core/types.js';
 import { getMemory } from '../core/memory.js';
 import { getContextInjector } from '../core/context-injector.js';
-import { PROVIDER, MODELS } from '../config';
+import { PROVIDER, MODELS, APIS } from '../config';
 import { ProviderManager } from '../core/brain/provider-manager.js';
-import { getToolDefinitions, Tool } from '../core/tools';
+import { getToolDefinitions, Tool, ToolExecutor } from '../core/tools';
+import * as path from 'path';
 
 export class TelegramBotService extends EventEmitter {
   private bot: TelegramBot | null = null;
   private config: TelegramConfig;
   private sessions: Map<number, string> = new Map(); // userId -> conversationId
   private userChatMap: Map<number, number> = new Map(); // userId -> chatId
+  private toolExecutor: ToolExecutor;
 
   constructor(config: TelegramConfig) {
     super();
     this.config = config;
+    // Initialiser le ToolExecutor
+    const projectRoot = path.resolve(process.cwd());
+    this.toolExecutor = new ToolExecutor(projectRoot);
   }
 
   /**
@@ -180,9 +185,25 @@ export class TelegramBotService extends EventEmitter {
       const injector = getContextInjector();
       const contextBlock = await injector.injectContext(content);
 
+      // Instructions spécifiques Telegram
+      const telegramInstructions = `
+## Source du message
+L'utilisateur écrit depuis: telegram
+
+## Instructions Telegram
+L'utilisateur écrit depuis un appareil mobile (Telegram). Sauf indication contraire:
+- Réponds de manière brève et concise
+- Évite les longues listes et explications détaillées
+- Va droit au but
+- Utilise un formatage simple (pas de tableaux complexes)
+- Si une réponse longue est nécessaire, propose de la détailler sur demande`;
+
+      const basePrompt = contextBlock || 'Tu es DangerousBot, un assistant IA autonome.';
+      const systemPrompt = basePrompt + telegramInstructions;
+
       // Construire les messages pour le provider
       const messages = [
-        { role: 'system' as const, content: contextBlock || 'Tu es DangerousBot, un assistant IA autonome.' },
+        { role: 'system' as const, content: systemPrompt },
         ...history.map(m => ({
           role: m.role as 'user' | 'assistant',
           content: m.content
@@ -200,12 +221,9 @@ export class TelegramBotService extends EventEmitter {
       // Préparer les tools
       const tools = getToolDefinitions();
 
-      // Envoyer une réponse "typing" en attendant
-      await this.bot.sendMessage(chatId, '💬 Je réfléchis...');
-
       // Appeler le provider
       const response = await providerManager.chatWithFallback(messages, {
-        system: contextBlock || 'Tu es DangerousBot, un assistant IA autonome.',
+        system: systemPrompt,
         tools: tools.map(t => ({
           name: t.name,
           description: t.description,
@@ -234,25 +252,19 @@ export class TelegramBotService extends EventEmitter {
         const toolResults = [];
         
         for (const tc of toolCalls) {
-          // Import dynamique des handlers
-          const { getToolHandler } = await import('../core/tools/index.js');
-          const handler = getToolHandler(tc.name);
-          
-          if (handler) {
-            try {
-              const result = await handler.execute(tc.arguments, {});
-              toolResults.push({
-                id: tc.id,
-                name: tc.name,
-                result
-              });
-            } catch (e) {
-              toolResults.push({
-                id: tc.id,
-                name: tc.name,
-                result: { success: false, error: (e as Error).message }
-              });
-            }
+          try {
+            const result = await this.toolExecutor.execute(tc.name, tc.arguments);
+            toolResults.push({
+              id: tc.id,
+              name: tc.name,
+              result
+            });
+          } catch (e) {
+            toolResults.push({
+              id: tc.id,
+              name: tc.name,
+              result: { success: false, error: (e as Error).message }
+            });
           }
         }
 
@@ -270,7 +282,7 @@ export class TelegramBotService extends EventEmitter {
         }
 
         const continuation = await providerManager.chatWithFallback(messages, {
-          system: contextBlock || 'Tu es DangerousBot, un assistant IA autonome.',
+          system: systemPrompt,
           tools: []
         });
 
@@ -291,6 +303,30 @@ export class TelegramBotService extends EventEmitter {
     } catch (error) {
       console.error('[Telegram] Error handling message:', error);
       await this.bot.sendMessage(chatId, '❌ Une erreur s\'est produite. Veuillez réessayer.');
+    }
+  }
+
+  /**
+   * Envoie un message avec fallback vers texte brut si Markdown échoue
+   */
+  private async sendMessageSafe(chatId: number, text: string): Promise<void> {
+    if (!this.bot) return;
+
+    try {
+      await this.bot.sendMessage(chatId, text, {
+        parse_mode: 'Markdown',
+        disable_web_page_preview: true,
+      });
+    } catch (error: any) {
+      // Si erreur de parsing Markdown, renvoyer en texte brut
+      if (error?.response?.body?.description?.includes("can't parse entities")) {
+        console.log('[Telegram] Markdown parsing failed, sending as plain text');
+        await this.bot.sendMessage(chatId, text, {
+          disable_web_page_preview: true,
+        });
+      } else {
+        throw error;
+      }
     }
   }
 
@@ -319,19 +355,14 @@ export class TelegramBotService extends EventEmitter {
         }
       }
 
-      await this.bot.sendMessage(chatId, text, {
-        parse_mode: 'Markdown',
-        disable_web_page_preview: true,
-      });
+      await this.sendMessageSafe(chatId, text);
     }
 
     // Si les tool calls sont trop longs, les envoyer séparément
     if (toolCalls && toolCalls.length > 0) {
       const toolText = this.formatToolCalls(toolCalls);
       if (toolText.length > 1000) {
-        await this.bot.sendMessage(chatId, toolText, {
-          parse_mode: 'Markdown',
-        });
+        await this.sendMessageSafe(chatId, toolText);
       }
     }
   }

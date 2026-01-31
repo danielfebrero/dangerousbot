@@ -121,10 +121,25 @@ Exemple: retrieve_code({query: "fonction qui gère les embeddings"})`;
   }
 
   /**
-   * Retourne le system prompt actuel
+   * Retourne le system prompt actuel avec instructions selon la source
    */
-  getSystemPrompt(): string {
-    return this.identity;
+  getSystemPrompt(source?: 'webapp' | 'telegram'): string {
+    let prompt = this.identity;
+
+    if (source) {
+      prompt += `\n\n## Source du message\nL'utilisateur écrit depuis: ${source}`;
+
+      if (source === 'telegram') {
+        prompt += `\n\n## Instructions Telegram\nL'utilisateur écrit depuis un appareil mobile (Telegram). Sauf indication contraire:
+- Réponds de manière brève et concise
+- Évite les longues listes et explications détaillées
+- Va droit au but
+- Utilise un formatage simple (pas de tableaux complexes)
+- Si une réponse longue est nécessaire, propose de la détailler sur demande`;
+      }
+    }
+
+    return prompt;
   }
 
   /**
