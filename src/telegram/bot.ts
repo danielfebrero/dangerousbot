@@ -202,13 +202,26 @@ L'utilisateur écrit depuis un appareil mobile (Telegram). Sauf indication contr
       const systemPrompt = basePrompt + telegramInstructions;
 
       // Construire les messages pour le provider
+      // Inclure les images si présentes
+      const userContent: any[] = [{ type: 'text', text: content }];
+      for (const img of images) {
+        userContent.push({
+          type: 'image',
+          source: {
+            type: 'base64',
+            media_type: img.mimeType,
+            data: img.url.replace(/^data:image\/\w+;base64,/, '')
+          }
+        });
+      }
+
       const messages = [
         { role: 'system' as const, content: systemPrompt },
         ...history.map(m => ({
           role: m.role as 'user' | 'assistant',
           content: m.content
         })),
-        { role: 'user' as const, content }
+        { role: 'user' as const, content: userContent }
       ];
 
       // Appeler le ProviderManager pour traiter le message
@@ -250,7 +263,7 @@ L'utilisateur écrit depuis un appareil mobile (Telegram). Sauf indication contr
       // Exécuter les tool calls si présents
       if (toolCalls.length > 0) {
         const toolResults = [];
-        
+
         for (const tc of toolCalls) {
           try {
             const result = await this.toolExecutor.execute(tc.name, tc.arguments);
@@ -268,26 +281,21 @@ L'utilisateur écrit depuis un appareil mobile (Telegram). Sauf indication contr
           }
         }
 
-        // Renvoyer les résultats au provider pour continuation
-        // Format pour OpenAI/Kimi: tool role avec tool_call_id
-        messages.push({
+        // Ajouter la réponse assistant avec les tool_use blocks (format Claude)
+        (messages as any[]).push({
           role: 'assistant',
-          content: null,
-          tool_calls: toolCalls.map(tc => ({
-            id: tc.id,
-            type: 'function',
-            function: {
-              name: tc.name,
-              arguments: JSON.stringify(tc.arguments)
-            }
-          }))
+          content: response.content
         });
 
+        // Ajouter les résultats en format Claude (tool_result blocks dans un message user)
         for (const tr of toolResults) {
-          messages.push({
-            role: 'tool',
-            tool_call_id: tr.id,
-            content: JSON.stringify(tr.result)
+          (messages as any[]).push({
+            role: 'user',
+            content: [{
+              type: 'tool_result',
+              tool_use_id: tr.id,
+              content: JSON.stringify(tr.result)
+            }]
           });
         }
 
