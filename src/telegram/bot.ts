@@ -269,15 +269,25 @@ L'utilisateur écrit depuis un appareil mobile (Telegram). Sauf indication contr
         }
 
         // Renvoyer les résultats au provider pour continuation
+        // Format pour OpenAI/Kimi: tool role avec tool_call_id
         messages.push({
           role: 'assistant',
-          content: response.content
+          content: null,
+          tool_calls: toolCalls.map(tc => ({
+            id: tc.id,
+            type: 'function',
+            function: {
+              name: tc.name,
+              arguments: JSON.stringify(tc.arguments)
+            }
+          }))
         });
 
         for (const tr of toolResults) {
           messages.push({
-            role: 'user',
-            content: JSON.stringify({ tool_result: tr })
+            role: 'tool',
+            tool_call_id: tr.id,
+            content: JSON.stringify(tr.result)
           });
         }
 
