@@ -148,5 +148,31 @@ export function createRoutes(): Router {
     }
   });
 
+  // Webapp Settings
+  router.get('/webapp/settings', (_req: Request, res: Response) => {
+    const memory = getMemory();
+    const settings = memory.getWebappSettings();
+    res.json(settings);
+  });
+
+  router.post('/webapp/settings', (req: Request, res: Response) => {
+    const memory = getMemory();
+    const { showAllSources } = req.body;
+    
+    if (typeof showAllSources !== 'boolean') {
+      res.status(400).json({ 
+        success: false, 
+        error: 'showAllSources must be a boolean' 
+      });
+      return;
+    }
+    
+    memory.setWebappSettings({ showAllSources });
+    res.json({ 
+      success: true, 
+      settings: { showAllSources } 
+    });
+  });
+
   return router;
 }

@@ -14,7 +14,31 @@ function App() {
   const [headerVisible, setHeaderVisible] = useState(true);
   const [droppedImages, setDroppedImages] = useState<ContentPart[]>([]);
   const [showAllSources, setShowAllSources] = useState(true);
+  const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
   const lastScrollY = useRef(0);
+
+  // Load settings from backend on mount
+  useEffect(() => {
+    fetch('/api/webapp/settings')
+      .then(res => res.json())
+      .then(data => {
+        if (typeof data.showAllSources === 'boolean') {
+          setShowAllSources(data.showAllSources);
+        }
+      })
+      .catch(err => console.error('Failed to load settings:', err))
+      .finally(() => setIsSettingsLoaded(true));
+  }, []);
+
+  // Save settings when changed
+  const handleToggleSources = useCallback((showAll: boolean) => {
+    setShowAllSources(showAll);
+    fetch('/api/webapp/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ showAllSources: showAll })
+    }).catch(err => console.error('Failed to save settings:', err));
+  }, []);
 
   // Track tool execution IDs for matching results
   const toolExecutionMapRef = useRef<Record<string, string>>({});
@@ -379,7 +403,7 @@ function App() {
         visible={headerVisible}
         tokenUsage={tokenUsage}
         showAllSources={showAllSources}
-        onToggleSources={setShowAllSources}
+        onToggleSources={handleToggleSources}
       />
 
       <main className="main-content">
