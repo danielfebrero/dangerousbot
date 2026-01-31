@@ -360,10 +360,14 @@ export class DangerousBotServer {
     if (this.pendingContinuationMessage) {
       // Attendre que le WebSocket soit prêt
       setTimeout(() => {
+        // Sauvegarder le message de continuation dans la DB
+        const memory = getMemory();
+        memory.addMessage('assistant', this.pendingContinuationMessage!);
+        
         this.wsManager.sendBotMessage(this.pendingContinuationMessage!);
         this.pendingContinuationMessage = null;
         this.lifecycle.clearRestarted();
-        console.log('[Server] Message de continuation envoyé');
+        console.log('[Server] Message de continuation envoyé et sauvegardé');
       }, 500);
     }
   }
