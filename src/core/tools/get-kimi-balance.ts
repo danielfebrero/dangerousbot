@@ -47,7 +47,16 @@ export const getKimiBalanceHandler: ToolHandler = {
         };
       }
 
-      const data = await response.json();
+      const data = await response.json() as {
+        code: number;
+        status: boolean;
+        scode?: number;
+        data?: {
+          available_balance: number;
+          voucher_balance: number;
+          cash_balance: number;
+        }
+      };
       
       if (data.code !== 0 || !data.status) {
         return {
@@ -58,11 +67,11 @@ export const getKimiBalanceHandler: ToolHandler = {
 
       return {
         success: true,
-        available_balance: data.data.available_balance,
-        voucher_balance: data.data.voucher_balance,
-        cash_balance: data.data.cash_balance,
+        available_balance: data.data!.available_balance,
+        voucher_balance: data.data!.voucher_balance,
+        cash_balance: data.data!.cash_balance,
         currency: 'USD',
-        message: `Solde disponible: ${data.data.available_balance.toFixed(2)} (Vouchers: ${data.data.voucher_balance.toFixed(2)}, Cash: ${data.data.cash_balance.toFixed(2)})`
+        message: `Solde disponible: ${data.data!.available_balance.toFixed(2)} (Vouchers: ${data.data!.voucher_balance.toFixed(2)}, Cash: ${data.data!.cash_balance.toFixed(2)})`
       };
     } catch (error) {
       return {

@@ -201,7 +201,8 @@ export class DangerousBotServer {
             if (result.type === 'image' && result.source) {
               // Pour les images, ajouter comme message user avec l'image au lieu de tool_result
               // Cela permet au modèle de "voir" l'image
-              this.brain.addUserMessage(`Image chargée depuis ${block.input.path || 'fichier'}`, [{
+              const toolInput = block.input as { path?: string };
+              this.brain.addUserMessage(`Image chargée depuis ${toolInput?.path || 'fichier'}`, [{
                 type: 'image',
                 source: result.source
               }]);

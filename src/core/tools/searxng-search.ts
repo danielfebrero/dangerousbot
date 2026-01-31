@@ -15,9 +15,9 @@ export const searxngSearchDefinition: Tool = {
       engines: { type: 'string', description: 'Liste comma-separated des engines autorisés uniquement (ex: "google,bing,duckduckgo"). Laisse vide pour tous les engines configurés.' },
       categories: { type: 'string', description: 'Liste comma-separated des catégories autorisées (ex: "general,images,news").' },
       language: { type: 'string', description: "Code langue ISO (ex: 'fr-FR', 'en-US')." },
-      time_range: { type: 'string', enum: ['day', 'month', 'year', null], description: 'Restriction temporelle pour engines compatibles.' },
-      safesearch: { type: 'integer', enum: [0, 1, 2], description: 'Niveau safe search (0=none, 1=moderate, 2=strict).' },
-      pageno: { type: 'integer', description: 'Numéro de page (default 1).', default: 1 }
+      time_range: { type: 'string', enum: ['day', 'month', 'year'], description: 'Restriction temporelle pour engines compatibles (day, month, year).' },
+      safesearch: { type: 'integer', description: 'Niveau safe search (0=none, 1=moderate, 2=strict).' },
+      pageno: { type: 'integer', description: 'Numéro de page (default 1).' }
     },
     required: ['query']
   }
@@ -33,8 +33,8 @@ export const searxngSearchHandler: ToolHandler = {
       const categories = (input.categories as string) || 'general';
       const language = (input.language as string) || 'fr-FR';
       const timeRange = input.time_range as string | undefined;
-      const safeSearch = (input.safesearch as number) ?? 0;
-      const pageNo = (input.pageno as number) || 1;
+      const safeSearch = input.safesearch != null ? String(input.safesearch) : '0';
+      const pageNo = input.pageno != null ? String(input.pageno) : '1';
 
       const searxngUrl = process.env.SEARXNG_URL || 'http://localhost:8080';
       
@@ -42,8 +42,8 @@ export const searxngSearchHandler: ToolHandler = {
         q: query,
         format: 'json',
         language: language,
-        safesearch: safeSearch.toString(),
-        pageno: pageNo.toString()
+        safesearch: safeSearch,
+        pageno: pageNo
       });
 
       if (engines) {
@@ -70,9 +70,12 @@ export const searxngSearchHandler: ToolHandler = {
         };
       }
 
-      const data = await response.json();
+      const data = await response.json() as {
+        results?: Array<{ title: string; url: string; content?: string; engine?: string; score?: number }>;
+        number_of_results?: number;
+      };
       
-      const results = data.results?.map((r: any) => ({
+      const results = data.results?.map((r) => ({
         title: r.title,
         url: r.url,
         content: r.content,
@@ -80,8 +83,8 @@ export const searxngSearchHandler: ToolHandler = {
         score: r.score
       })) || [];
 
-      const formatted = results.slice(0, 10).map((r: any, i: number) => {
-        return `**${i + 1}. ${r.title}**\n${r.url}\n${r.content?.substring(0, 200) || ''}${r.content?.length > 200 ? '...' : ''}`;
+      const formatted = results.slice(0, 10).map((r, i) => {
+        return `**${i + 1}. ${r.title}**\n${r.url}\n${r.content?.substring(0, 200) || ''}${r.content && r.content.length > 200 ? '...' : ''}`;
       }).join('\n\n');
 
       return {

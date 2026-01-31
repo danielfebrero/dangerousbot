@@ -7,7 +7,7 @@ import Database from 'better-sqlite3';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
-import { Message, Knowledge } from './types';
+import { Message, Knowledge, Stats } from './types';
 import { logger } from './logger';
 
 const DATA_DIR = path.join(os.homedir(), '.dangerousbot', 'data');
@@ -280,7 +280,7 @@ export class Memory {
 
   // ============ Stats ============
 
-  getStats(): { sessions: number; messages: number; knowledge: number } {
+  getStats(): Stats {
     const sessions = this.db.prepare(`
       SELECT COUNT(DISTINCT session_id) as count FROM conversations
     `).get() as { count: number };

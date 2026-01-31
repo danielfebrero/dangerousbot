@@ -44,6 +44,15 @@ export interface Knowledge {
   created_at: string;
 }
 
+// ============ Stats ============
+
+export interface Stats {
+  sessions: number;
+  messages: number;
+  knowledge: number;
+  version?: string;
+}
+
 // ============ Brain / Claude API ============
 
 export interface BrainResponse {
@@ -62,16 +71,19 @@ export interface BrainResponse {
 
 // ============ Tools ============
 
+export interface ToolProperty {
+  type: string;
+  description: string;
+  enum?: string[];
+  items?: ToolProperty;
+}
+
 export interface Tool {
   name: string;
   description: string;
   input_schema: {
     type: 'object';
-    properties: Record<string, {
-      type: string;
-      description: string;
-      enum?: string[];
-    }>;
+    properties: Record<string, ToolProperty>;
     required: string[];
   };
 }
@@ -103,7 +115,7 @@ export interface ExecutionResult {
 // ============ WebSocket ============
 
 export interface WSMessage {
-  type: 'user_message' | 'bot_message' | 'bot_typing' | 'tool_use' | 'tool_result' | 'system' | 'error' | 'connected' | 'history' | 'usage' | 'stream_chunk' | 'provider_switch';
+  type: 'user_message' | 'bot_message' | 'bot_typing' | 'tool_use' | 'tool_result' | 'system' | 'error' | 'connected' | 'history' | 'usage' | 'stream_chunk' | 'provider_switch' | 'restart_signal';
   payload: unknown;
   timestamp?: string;
 }

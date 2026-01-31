@@ -24,7 +24,7 @@ export const todoDefinition: Tool = {
       title: { type: 'string', description: 'Titre de la tâche (pour create_task)' },
       priority: { type: 'string', enum: ['low', 'medium', 'high'], description: 'Priorité de la tâche (default: medium)' },
       status: { type: 'string', enum: ['all', 'pending', 'completed'], description: 'Filtre de statut (pour list_tasks)' },
-      task_ids: { type: 'array', items: { type: 'number' }, description: 'Ordre des IDs de tâches (pour reorder_tasks)' }
+      task_ids: { type: 'array', items: { type: 'number', description: 'ID de tâche' }, description: 'Ordre des IDs de tâches (pour reorder_tasks)' }
     },
     required: ['type']
   }
@@ -55,24 +55,24 @@ export const todoHandler: ToolHandler = {
         return `${emojis[p] || '⚪'} ${p.toUpperCase()}`;
       };
 
-      if (action.type === 'list_projects' && result.projects) {
-        if (result.projects.length === 0) {
+      if (action.type === 'list_projects' && result.data?.projects) {
+        if (result.data.projects.length === 0) {
           return { success: true, projects: [], message: '📂 Aucun projet' };
         }
-        const lines = result.projects.map((p: any) => {
+        const lines = result.data.projects.map((p: any) => {
           const progress = p.total_tasks > 0 ? Math.round((p.completed_tasks / p.total_tasks) * 100) : 0;
           const bar = '█'.repeat(Math.round(progress / 10)) + '░'.repeat(10 - Math.round(progress / 10));
           return `\n**[${p.id}] ${p.name}**\n   ${bar} ${progress}% (${p.completed_tasks}/${p.total_tasks})\n   ${p.description || '_Pas de description_'}`;
         });
-        return { success: true, projects: result.projects, message: `## 📊 Projets${lines.join('')}` };
+        return { success: true, projects: result.data.projects, message: `## 📊 Projets${lines.join('')}` };
       }
 
-      if (action.type === 'list_tasks' && result.tasks) {
-        if (result.tasks.length === 0) {
+      if (action.type === 'list_tasks' && result.data?.tasks) {
+        if (result.data.tasks.length === 0) {
           return { success: true, tasks: [], message: '📝 Aucune tâche' };
         }
-        const pending = result.tasks.filter((t: any) => t.status !== 'completed');
-        const completed = result.tasks.filter((t: any) => t.status === 'completed');
+        const pending = result.data.tasks.filter((t: any) => t.status !== 'completed');
+        const completed = result.data.tasks.filter((t: any) => t.status === 'completed');
         
         let msg = '## 📋 Tâches\n\n';
         if (pending.length > 0) {
@@ -84,41 +84,41 @@ export const todoHandler: ToolHandler = {
           msg += '**✅ Terminées :**\n';
           msg += completed.map((t: any) => `   ☑ [${t.id}] ~~${t.title}~~`).join('\n');
         }
-        return { success: true, tasks: result.tasks, message: msg };
+        return { success: true, tasks: result.data.tasks, message: msg };
       }
 
-      if (action.type === 'create_project' && result.project) {
+      if (action.type === 'create_project' && result.data?.project) {
         return { 
           success: true, 
-          project: result.project, 
-          message: `## 🆕 Projet créé\n\n**${result.project.name}** (ID: ${result.project.id})\n\n${result.project.description || ''}` 
+          project: result.data.project, 
+          message: `## 🆕 Projet créé\n\n**${result.data.project.name}** (ID: ${result.data.project.id})\n\n${result.data.project.description || ''}` 
         };
       }
 
-      if (action.type === 'create_task' && result.task) {
+      if (action.type === 'create_task' && result.data?.task) {
         return { 
           success: true, 
-          task: result.task, 
-          message: `## ➕ Tâche ajoutée\n\n${formatPriority(result.task.priority)} **[${result.task.id}]** ${result.task.title}` 
+          task: result.data.task, 
+          message: `## ➕ Tâche ajoutée\n\n${formatPriority(result.data.task.priority)} **[${result.data.task.id}]** ${result.data.task.title}` 
         };
       }
 
-      if (action.type === 'complete_task' && result.task) {
-        const project = todo.execute({ type: 'get_project', project_id: result.task.project_id });
+      if (action.type === 'complete_task' && result.data?.task) {
+        const project = todo.execute({ type: 'get_project', project_id: result.data.task.project_id });
         const progress = project.data?.project ? 
           `${project.data.project.completed_tasks}/${project.data.project.total_tasks}` : '?';
         return { 
           success: true, 
-          task: result.task, 
-          message: `## ✅ Tâche complétée\n\n☑ ~~${result.task.title}~~\n\n*Progression du projet: ${progress}*` 
+          task: result.data.task, 
+          message: `## ✅ Tâche complétée\n\n☑ ~~${result.data.task.title}~~\n\n*Progression du projet: ${progress}*` 
         };
       }
 
-      if (action.type === 'delete_task' && result.task) {
+      if (action.type === 'delete_task' && result.data?.task) {
         return { 
           success: true, 
-          task: result.task, 
-          message: `## 🗑️ Tâche supprimée\n\n~~${result.task.title}~~` 
+          task: result.data.task, 
+          message: `## 🗑️ Tâche supprimée\n\n~~${result.data.task.title}~~` 
         };
       }
 

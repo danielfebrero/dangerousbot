@@ -22,7 +22,7 @@ export interface InjectedContext {
 
 export class ContextInjector {
   private memory: Memory;
-  private compressor: MemoryCompressor;
+  private compressor: MemoryCompressor | null;
   private embedding: EmbeddingService;
 
   constructor() {
@@ -42,8 +42,10 @@ export class ContextInjector {
 
     // 1. Récupérer les mémoires compressées pertinentes
     try {
-      const relevantMemories = await this.compressor.searchRelevantMemories(userMessage, 3);
-      context.memories = relevantMemories.map(m => m.summary);
+      if (this.compressor) {
+        const relevantMemories = await this.compressor.searchRelevantMemories(userMessage, 3);
+        context.memories = relevantMemories.map(m => m.summary);
+      }
     } catch (error) {
       console.error('[ContextInjector] Error fetching memories:', error);
     }
@@ -63,11 +65,13 @@ export class ContextInjector {
 
     // 3. Vérifier si on a des résumés de session
     try {
-      const sessionMemories = this.compressor.getCompressedMemories();
-      if (sessionMemories.length > 0) {
-        // Prendre le résumé le plus récent de la session
-        const latest = sessionMemories[sessionMemories.length - 1];
-        context.recentSummary = latest.summary;
+      if (this.compressor) {
+        const sessionMemories = this.compressor.getCompressedMemories();
+        if (sessionMemories.length > 0) {
+          // Prendre le résumé le plus récent de la session
+          const latest = sessionMemories[sessionMemories.length - 1];
+          context.recentSummary = latest.summary;
+        }
       }
     } catch (error) {
       console.error('[ContextInjector] Error fetching session summary:', error);
@@ -141,6 +145,7 @@ ${sections.join('\n\n')}
    * Déclenche une compression si nécessaire (à appeler périodiquement)
    */
   async maybeCompress(): Promise<boolean> {
+    if (!this.compressor) return false;
     return this.compressor.checkAndCompress();
   }
 }

@@ -262,7 +262,7 @@ export class RollbackManager {
       try {
         const response = await fetch(`http://localhost:${port}/api/health`);
         if (response.ok) {
-          const data = await response.json();
+          const data = await response.json() as { version?: string };
           return {
             success: true,
             message: `Serveur OK (version: ${data.version || 'unknown'})`
