@@ -166,7 +166,7 @@ export class Executor {
   }
 
   // Lecture de fichier
-  readFile(filePath: string): { success: boolean; content?: string; error?: string } {
+  readFile(filePath: string, offset?: number, limit?: number): { success: boolean; content?: string; total_lines?: number; start_line?: number; end_line?: number; error?: string } {
     const resolved = this.resolvePath(filePath);
     try {
       if (!fs.existsSync(resolved)) {
@@ -177,6 +177,28 @@ export class Executor {
         return { success: false, error: 'Le chemin pointe vers un répertoire' };
       }
       const content = fs.readFileSync(resolved, 'utf-8');
+      
+      // Si offset ou limit spécifié, traiter le contenu ligne par ligne
+      if (offset !== undefined || limit !== undefined) {
+        const lines = content.split('\n');
+        const totalLines = lines.length;
+        const startLine = Math.max(0, (offset ?? 1) - 1); // Convertir 1-indexed à 0-indexed
+        const endLine = limit !== undefined 
+          ? Math.min(startLine + limit, totalLines)
+          : totalLines;
+        
+        const selectedLines = lines.slice(startLine, endLine);
+        const result = selectedLines.join('\n');
+        
+        return { 
+          success: true, 
+          content: result,
+          total_lines: totalLines,
+          start_line: startLine + 1,
+          end_line: endLine
+        };
+      }
+      
       return { success: true, content };
     } catch (error) {
       return { success: false, error: (error as Error).message };
