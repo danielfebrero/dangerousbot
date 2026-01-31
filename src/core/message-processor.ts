@@ -38,6 +38,12 @@ export interface ProcessOptions {
 
   /** Callbacks pour les événements */
   callbacks?: ProcessingCallbacks;
+
+  /** Contexte spécifique à la plateforme (Telegram, etc.) */
+  platformContext?: {
+    telegramChatId?: string;
+    bot?: any;
+  };
 }
 
 /**
@@ -61,7 +67,7 @@ export class MessageProcessor {
     message: IncomingMessage,
     options: ProcessOptions
   ): Promise<ProcessingResult> {
-    const { source, conversationId, historyLimit = 20, callbacks } = options;
+    const { source, conversationId, historyLimit = 20, callbacks, platformContext } = options;
 
     try {
       // Notifier le début du traitement
@@ -133,10 +139,14 @@ export class MessageProcessor {
 
       // Exécuter les tool calls si présents
       if (toolCalls.length > 0) {
-        // D'abord exécuter TOUS les tools
+        // D'abord exécuter TOUS les tools avec le contexte de la plateforme
         for (const tc of toolCalls) {
           try {
-            const result = await this.toolExecutor.execute(tc.name, tc.input);
+            const result = await this.toolExecutor.execute(
+              tc.name, 
+              tc.input,
+              platformContext
+            );
             toolResults.push({
               name: tc.name,
               success: result.success !== false,

@@ -20,6 +20,14 @@ export interface IncomingMessage {
   images?: ChatImage[];
 }
 
+/** Contexte spécifique à la plateforme */
+export interface PlatformContext {
+  /** Chat ID Telegram (si applicable) */
+  telegramChatId?: string;
+  /** Instance du bot Telegram (si applicable) */
+  bot?: any;
+}
+
 /** Callbacks pour les événements de traitement */
 export interface ProcessingCallbacks {
   /** Appelé quand des tools sont exécutés */

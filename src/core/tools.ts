@@ -46,7 +46,11 @@ export class ToolExecutor {
     registerAllTools();
   }
 
-  async execute(toolName: string, input: any): Promise<any> {
+  async execute(
+    toolName: string, 
+    input: any, 
+    platformContext?: { telegramChatId?: string; bot?: any }
+  ): Promise<any> {
     const memory = getMemory();
     const rollbackManager = getRollbackManager();
     
@@ -57,7 +61,9 @@ export class ToolExecutor {
       versioning: this.versioning,
       lifecycle: this.lifecycle,
       mistral: this.mistral,
-      rollbackManager
+      rollbackManager,
+      telegramChatId: platformContext?.telegramChatId,
+      bot: platformContext?.bot
     };
     
     return await executeTool(toolName, input, context);

@@ -186,6 +186,10 @@ export class TelegramBotService extends EventEmitter {
               await adapter.sendToolNotification(tools);
             },
           },
+          platformContext: {
+            telegramChatId: String(chatId),
+            bot: this.bot,
+          },
         }
       );
 
