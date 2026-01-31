@@ -140,9 +140,11 @@ export class TelegramBotService extends EventEmitter {
       let content = '';
       let images: Array<{ url: string; mimeType: string }> = [];
 
-      // Texte
+      // Texte (inclut la légende des images si présente)
       if (msg.text) {
         content = msg.text;
+      } else if (msg.caption) {
+        content = msg.caption;
       }
 
       // Photo (prend la plus grande résolution)
@@ -154,7 +156,9 @@ export class TelegramBotService extends EventEmitter {
         try {
           const base64Data = await this.downloadImageAsBase64(fileUrl);
           images.push({ url: base64Data, mimeType: 'image/jpeg' });
-          content = content || '[Image]'; // Placeholder si pas de texte
+          if (!content) {
+            content = '[Image]'; // Placeholder si pas de texte
+          }
         } catch (e) {
           console.error('[Telegram] Failed to download image:', e);
         }
