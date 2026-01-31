@@ -24,6 +24,7 @@ export class TelegramBotService extends EventEmitter {
   private bot: TelegramBot | null = null;
   private config: TelegramConfig;
   private sessions: Map<number, string> = new Map(); // userId -> conversationId
+  private userChatMap: Map<number, number> = new Map(); // userId -> chatId
 
   constructor(config: TelegramConfig) {
     super();
@@ -123,6 +124,9 @@ export class TelegramBotService extends EventEmitter {
 
     const chatId = msg.chat.id;
     const userId = msg.from!.id;
+
+    // Stocker le mapping userId -> chatId pour pouvoir envoyer des messages plus tard
+    this.userChatMap.set(userId, chatId);
 
     // Message de typing
     this.bot.sendChatAction(chatId, 'typing');
@@ -404,6 +408,56 @@ export class TelegramBotService extends EventEmitter {
    */
   getTelegramConversationId(userId: number): string | undefined {
     return this.sessions.get(userId);
+  }
+
+  /**
+   * Envoie un message au master user
+   * Retourne true si envoyé, false sinon
+   */
+  async sendMessageToMaster(message: string): Promise<boolean> {
+    if (!this.bot) return false;
+
+    const memory = getMemory();
+    const master = memory.getTelegramMaster();
+    
+    if (!master) {
+      console.log('[Telegram] Pas de master user défini');
+      return false;
+    }
+
+    try {
+      // Si on a un user_id, on essaie de trouver le chat_id correspondant
+      if (master.user_id) {
+        const chatId = this.findChatIdForUser(master.user_id);
+        if (chatId) {
+          await this.bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+          console.log(`[Telegram] Message envoyé à ${master.user_id}`);
+          return true;
+        }
+      }
+
+      // Si on n'a pas trouvé de chat_id, on ne peut pas envoyer le message
+      // L'utilisateur doit d'abord interagir avec le bot
+      console.log('[Telegram] Impossible d\'envoyer le message - aucune session active');
+      return false;
+    } catch (err) {
+      console.error('[Telegram] Erreur lors de l\'envoi:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Trouve le chat_id pour un user_id donné (si une session existe)
+   */
+  private findChatIdForUser(userId: number): number | undefined {
+    return this.userChatMap.get(userId);
+  }
+
+  /**
+   * Récupère le chatId d'un user
+   */
+  getChatIdForUser(userId: number): number | undefined {
+    return this.userChatMap.get(userId);
   }
 }
 
