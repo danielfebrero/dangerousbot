@@ -174,6 +174,7 @@ export class TelegramBotService extends EventEmitter {
       const { text, images } = await this.extractMessageContent(msg);
 
       if (!text) {
+        clearInterval(typingInterval); // Arrêter le typing avant d'envoyer
         await adapter.sendMessage(MESSAGES.UNKNOWN_MESSAGE_TYPE);
         return;
       }
