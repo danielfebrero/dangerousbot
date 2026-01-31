@@ -267,17 +267,10 @@ L'utilisateur écrit depuis un appareil mobile (Telegram). Sauf indication contr
       // Exécuter les tool calls si présents
       if (toolCalls.length > 0) {
         const toolResults = [];
-
-        // Envoyer un résumé des tools à exécuter
-        await this.sendMessageSafe(chatId, `🔧 *Actions en cours* (${toolCalls.length} tool${toolCalls.length > 1 ? 's' : ''})...`);
+        const toolBadges: string[] = [];
 
         for (const tc of toolCalls) {
-          // Informer l'utilisateur du tool call en cours
           const toolEmoji = this.getToolEmoji(tc.name);
-          const argsPreview = JSON.stringify(tc.arguments).length > 100
-            ? JSON.stringify(tc.arguments).slice(0, 100) + '...'
-            : JSON.stringify(tc.arguments);
-          await this.sendMessageSafe(chatId, `${toolEmoji} *\`${tc.name}\`*\n\`\`\`json\n${argsPreview}\n\`\`\``);
 
           try {
             const result = await this.toolExecutor.execute(tc.name, tc.arguments);
@@ -286,13 +279,7 @@ L'utilisateur écrit depuis un appareil mobile (Telegram). Sauf indication contr
               name: tc.name,
               result
             });
-
-            // Envoyer le résultat
-            const resultStr = JSON.stringify(result);
-            const resultPreview = result.success
-              ? `✅ *Succès*\n\`\`\`json\n${resultStr.length > 200 ? resultStr.slice(0, 200) + '...' : resultStr}\n\`\`\``
-              : `❌ *Erreur*\n${result.error || 'Unknown error'}`;
-            await this.sendMessageSafe(chatId, resultPreview);
+            toolBadges.push(`${toolEmoji} ${tc.name} ✓`);
           } catch (e) {
             const errorResult = { success: false, error: (e as Error).message };
             toolResults.push({
@@ -300,9 +287,12 @@ L'utilisateur écrit depuis un appareil mobile (Telegram). Sauf indication contr
               name: tc.name,
               result: errorResult
             });
-            await this.sendMessageSafe(chatId, `❌ *Erreur*\n${errorResult.error}`);
+            toolBadges.push(`${toolEmoji} ${tc.name} ✗`);
           }
         }
+
+        // Envoyer un seul message avec tous les badges
+        await this.sendMessageSafe(chatId, `🔧 ${toolBadges.join(' | ')}`);
 
         // Ajouter la réponse assistant avec les tool_use blocks (format Claude)
         (messages as any[]).push({
@@ -321,8 +311,6 @@ L'utilisateur écrit depuis un appareil mobile (Telegram). Sauf indication contr
             }]
           });
         }
-
-        await this.sendMessageSafe(chatId, '🤔 *Analyse des résultats...*');
 
         const continuation = await providerManager.chatWithFallback(messages, {
           system: systemPrompt,
@@ -618,25 +606,6 @@ L'utilisateur écrit depuis un appareil mobile (Telegram). Sauf indication contr
    */
   getChatIdForUser(userId: number): number | undefined {
     return this.userChatMap.get(userId);
-  }
-
-  /**
-   * Envoie un message en gérant les erreurs Markdown
-   */
-  private async sendMessageSafe(chatId: number, text: string): Promise<void> {
-    if (!this.bot) return;
-    
-    try {
-      // Essayer d'abord avec Markdown
-      await this.bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
-    } catch (err) {
-      // Si ça échoue, essayer sans formatage
-      try {
-        await this.bot.sendMessage(chatId, text);
-      } catch (err2) {
-        console.error('[Telegram] Failed to send message:', err2);
-      }
-    }
   }
 
   /**
