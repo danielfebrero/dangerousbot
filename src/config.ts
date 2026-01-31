@@ -166,8 +166,11 @@ export const APIS = {
   /** Token API Telegram Bot */
   TELEGRAM_BOT_TOKEN: '***REMOVED***' as string,
   
-  /** ID utilisateur Telegram autorisé */
-  TELEGRAM_USER_ID: 0 as number,
+  /** IDs utilisateurs Telegram autorisés (numériques) */
+  TELEGRAM_USER_IDS: [] as number[],
+  
+  /** Usernames Telegram autorisés (sans le @) */
+  TELEGRAM_USERNAMES: ['***REMOVED***'] as string[],
 };
 
 // ============================================================================

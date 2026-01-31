@@ -327,22 +327,26 @@ async function main(): Promise<void> {
   print(`✓ Serveur démarré sur http://${HOST}:${PORT}`, 'green');
 
   // Démarrer le bot Telegram
-  const telegramUserId = loadTelegramUserId();
-  if (telegramUserId > 0) {
+  if (APIS.TELEGRAM_USER_IDS.length > 0 || APIS.TELEGRAM_USERNAMES.length > 0) {
     try {
       const { initTelegramBot } = await import('./telegram/bot.js');
       const telegramBot = initTelegramBot({
         token: APIS.TELEGRAM_BOT_TOKEN,
-        allowedUserId: telegramUserId,
+        allowedUserIds: APIS.TELEGRAM_USER_IDS,
+        allowedUsernames: APIS.TELEGRAM_USERNAMES,
         usePolling: true,
       });
       await telegramBot.start();
-      print(`✓ Bot Telegram démarré (@cdxx_dangerousbot, user: ${telegramUserId})`, 'green');
+      const usersList = [
+        ...APIS.TELEGRAM_USER_IDS.map(id => `ID:${id}`),
+        ...APIS.TELEGRAM_USERNAMES.map(u => `@${u}`)
+      ].join(', ');
+      print(`✓ Bot Telegram démarré (@cdxx_dangerousbot, autorisés: ${usersList})`, 'green');
     } catch (err) {
       print(`⚠️ Échec du démarrage Telegram: ${err}`, 'yellow');
     }
   } else {
-    print('⚠️ ID utilisateur Telegram non configuré, bot désactivé', 'yellow');
+    print('⚠️ Aucun utilisateur Telegram configuré, bot désactivé', 'yellow');
   }
 
   // Setup WebSocket handlers

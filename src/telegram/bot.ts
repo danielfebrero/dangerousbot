@@ -58,10 +58,21 @@ export class TelegramBotService extends EventEmitter {
   }
 
   /**
-   * Vérifie si l'utilisateur est autorisé
+   * Vérifie si l'utilisateur est autorisé (par ID ou username)
    */
-  private isAuthorized(userId: number): boolean {
-    return userId === this.config.allowedUserId;
+  private isAuthorized(userId: number, username?: string): boolean {
+    // Vérifier par ID numérique
+    if (this.config.allowedUserIds.includes(userId)) {
+      return true;
+    }
+    // Vérifier par username (sans le @)
+    if (username) {
+      const cleanUsername = username.toLowerCase().replace(/^@/, '');
+      if (this.config.allowedUsernames.map(u => u.toLowerCase()).includes(cleanUsername)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -73,7 +84,8 @@ export class TelegramBotService extends EventEmitter {
     // Message texte
     this.bot.on('message', async (msg) => {
       const userId = msg.from?.id;
-      if (!userId || !this.isAuthorized(userId)) {
+      const username = msg.from?.username;
+      if (!userId || !this.isAuthorized(userId, username)) {
         if (userId) {
           this.bot?.sendMessage(msg.chat.id, '⛔ Vous n\'êtes pas autorisé à utiliser ce bot.');
         }
@@ -270,8 +282,9 @@ export class TelegramBotService extends EventEmitter {
 
     const chatId = msg.chat.id;
     const userId = msg.from?.id;
+    const username = msg.from?.username;
 
-    if (!userId || !this.isAuthorized(userId)) {
+    if (!userId || !this.isAuthorized(userId, username)) {
       await this.bot.sendMessage(chatId, '⛔ Non autorisé.');
       return;
     }
