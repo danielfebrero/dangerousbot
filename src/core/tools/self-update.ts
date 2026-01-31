@@ -34,11 +34,8 @@ export const selfUpdateHandler: ToolHandler = {
       const result = await rollbackManager.safeUpdate(
         description,
         async () => {
-          // Juste compiler - les modifications ont déjà été faites via edit_file/write_file
-          const buildResult = await context.executor.shell('npm run build');
-          if (!buildResult.success) {
-            throw new Error(`Échec compilation: ${buildResult.error}`);
-          }
+          // Les modifications ont déjà été faites via edit_file/write_file
+          // La validation CI (TypeScript + Build) est faite par safeUpdate
         },
         [] // Pas de fichiers spécifiques à sauvegarder (déjà versionnés via edit_file)
       );

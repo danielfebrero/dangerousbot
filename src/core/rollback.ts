@@ -231,25 +231,71 @@ export class RollbackManager {
   }
 
   /**
-   * Vérifie que le build compile correctement
+   * Vérifie les types TypeScript (CI step 1)
+   */
+  async validateTypes(): Promise<RollbackResult> {
+    console.log('[Rollback] 🔍 Validation TypeScript...');
+    
+    const result = await this.execCommand('npx tsc --noEmit');
+    
+    if (result.success) {
+      return {
+        success: true,
+        message: '✅ TypeScript validation passed'
+      };
+    } else {
+      return {
+        success: false,
+        message: '❌ TypeScript validation failed',
+        error: result.stderr || result.stdout
+      };
+    }
+  }
+
+  /**
+   * Vérifie que le build compile correctement (CI step 2)
    */
   async validateBuild(): Promise<RollbackResult> {
-    console.log('[Rollback] Validation du build...');
+    console.log('[Rollback] 🔨 Compilation...');
     
     const result = await this.execCommand('npm run build');
     
     if (result.success) {
       return {
         success: true,
-        message: 'Build validé avec succès'
+        message: '✅ Build passed'
       };
     } else {
       return {
         success: false,
-        message: 'Échec du build',
+        message: '❌ Build failed',
         error: result.stderr || result.stdout
       };
     }
+  }
+
+  /**
+   * Pipeline CI complet: TypeScript check + Build
+   */
+  async runCI(): Promise<RollbackResult> {
+    console.log('[Rollback] 🚀 Running CI pipeline...');
+    
+    // Step 1: TypeScript validation
+    const tsResult = await this.validateTypes();
+    if (!tsResult.success) {
+      return tsResult;
+    }
+    
+    // Step 2: Build
+    const buildResult = await this.validateBuild();
+    if (!buildResult.success) {
+      return buildResult;
+    }
+    
+    return {
+      success: true,
+      message: '🎉 CI passed (TypeScript + Build)'
+    };
   }
 
   /**
@@ -375,11 +421,11 @@ export class RollbackManager {
       console.log('[Rollback] Application des modifications...');
       await applyChanges();
 
-      // 3. Valider le build
-      const buildResult = await this.validateBuild();
+      // 3. Valider le build (avec CI: TypeScript + Build)
+      const buildResult = await this.runCI();
       
       if (!buildResult.success) {
-        console.log('[Rollback] Build échoué, rollback automatique...');
+        console.log('[Rollback] ❌ CI failed, rollback automatique...');
         
         // Rollback automatique
         const restoreResult = await this.restoreBackup(backupResult.backupId);
@@ -389,7 +435,7 @@ export class RollbackManager {
         
         return {
           success: false,
-          message: `Modifications annulées (build échoué): ${buildResult.error}`,
+          message: `Modifications annulées (CI failed): ${buildResult.error}`,
           error: buildResult.error,
           backupId: backupResult.backupId
         };
