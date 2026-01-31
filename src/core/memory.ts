@@ -123,6 +123,16 @@ export class Memory {
         updated_at TEXT DEFAULT (datetime('now'))
       );
     `);
+
+    // Table du master user Telegram
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS telegram_master (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        user_id INTEGER,
+        username TEXT,
+        set_at TEXT DEFAULT (datetime('now'))
+      );
+    `);
   }
 
   // ============ Session Management ============
@@ -380,6 +390,26 @@ export class Memory {
     `).get() as { total_files: number; total_tokens: number; last_indexed: string | null };
     
     return result;
+  }
+
+  // ============ Telegram Master ============
+
+  getTelegramMaster(): { user_id: number | null; username: string | null } | null {
+    const row = this.db.prepare(`
+      SELECT user_id, username FROM telegram_master WHERE id = 1
+    `).get() as { user_id: number | null; username: string | null } | undefined;
+    return row || null;
+  }
+
+  setTelegramMaster(userId: number | null, username: string | null): void {
+    this.db.prepare(`
+      INSERT INTO telegram_master (id, user_id, username, set_at)
+      VALUES (1, ?, ?, datetime('now'))
+      ON CONFLICT(id) DO UPDATE SET
+        user_id = excluded.user_id,
+        username = excluded.username,
+        set_at = datetime('now')
+    `).run(userId, username);
   }
 
   // ============ Cleanup ============

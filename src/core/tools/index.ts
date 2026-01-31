@@ -24,6 +24,7 @@ import { getKimiBalanceHandler, getKimiBalanceDefinition } from './get-kimi-bala
 import { todoHandler, todoDefinition } from './todo';
 import { retrieveCodeHandler, retrieveCodeDefinition } from './retrieve-code';
 import { logHandler, logDefinition, setLogLevelHandler, setLogLevelDefinition, clearLogsHandler, clearLogsDefinition } from './log';
+import { telegramHandler, telegramDefinition } from './telegram';
 
 import { PROVIDER } from '../../config';
 
@@ -54,7 +55,8 @@ export function registerAllTools(): void {
     retrieveCodeHandler,
     logHandler,
     setLogLevelHandler,
-    clearLogsHandler
+    clearLogsHandler,
+    telegramHandler
   ];
   
   for (const handler of handlers) {
@@ -84,7 +86,8 @@ export function getToolDefinitions(): Tool[] {
     retrieveCodeDefinition,
     logDefinition,
     setLogLevelDefinition,
-    clearLogsDefinition
+    clearLogsDefinition,
+    telegramDefinition
   ];
 }
 

@@ -7,10 +7,6 @@ import { Message } from '../core/types';
 export interface TelegramConfig {
   /** Token API du bot */
   token: string;
-  /** IDs des utilisateurs autorisés (numériques) */
-  allowedUserIds: number[];
-  /** Usernames autorisés (sans le @) */
-  allowedUsernames: string[];
   /** Activer le polling (dev) ou webhook (prod) */
   usePolling: boolean;
   /** URL webhook (si usePolling = false) */

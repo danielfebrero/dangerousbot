@@ -16,7 +16,7 @@ import { Lifecycle } from './core/lifecycle.js';
 import { getMemory } from './core/memory.js';
 import { initRollbackManager } from './core/rollback.js';
 import { logger, enableConsoleCapture } from './core/logger.js';
-import { SERVER, PATHS, APIS, initializeApiKeys, reloadProviderConfig, loadTelegramUserId } from './config.js';
+import { SERVER, PATHS, APIS, initializeApiKeys, reloadProviderConfig } from './config.js';
 
 // Activer la capture des console.* dès le démarrage
 enableConsoleCapture();
@@ -326,27 +326,32 @@ async function main(): Promise<void> {
   await server.start(PORT, HOST);
   print(`✓ Serveur démarré sur http://${HOST}:${PORT}`, 'green');
 
-  // Démarrer le bot Telegram
-  if (APIS.TELEGRAM_USER_IDS.length > 0 || APIS.TELEGRAM_USERNAMES.length > 0) {
+  // Démarrer le bot Telegram si un token est configuré
+  const telegramToken = loadApiKey(PATHS.TELEGRAM_TOKEN_FILE);
+  if (telegramToken) {
+    APIS.TELEGRAM_BOT_TOKEN = telegramToken;
     try {
       const { initTelegramBot } = await import('./telegram/bot.js');
       const telegramBot = initTelegramBot({
         token: APIS.TELEGRAM_BOT_TOKEN,
-        allowedUserIds: APIS.TELEGRAM_USER_IDS,
-        allowedUsernames: APIS.TELEGRAM_USERNAMES,
         usePolling: true,
       });
       await telegramBot.start();
-      const usersList = [
-        ...APIS.TELEGRAM_USER_IDS.map(id => `ID:${id}`),
-        ...APIS.TELEGRAM_USERNAMES.map(u => `@${u}`)
-      ].join(', ');
-      print(`✓ Bot Telegram démarré (@cdxx_dangerousbot, autorisés: ${usersList})`, 'green');
+      
+      // Vérifier si un master est défini
+      const master = memory.getTelegramMaster();
+      if (master?.username) {
+        print(`✓ Bot Telegram démarré (master: @${master.username})`, 'green');
+      } else if (master?.user_id) {
+        print(`✓ Bot Telegram démarré (master ID: ${master.user_id})`, 'green');
+      } else {
+        print('✓ Bot Telegram démarré (⚠️ aucun master défini - utilisez telegram(set_master_user, "username"))', 'yellow');
+      }
     } catch (err) {
       print(`⚠️ Échec du démarrage Telegram: ${err}`, 'yellow');
     }
   } else {
-    print('⚠️ Aucun utilisateur Telegram configuré, bot désactivé', 'yellow');
+    print('○ Token Telegram non configuré, bot désactivé', 'dim');
   }
 
   // Setup WebSocket handlers

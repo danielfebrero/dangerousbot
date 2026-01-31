@@ -58,20 +58,31 @@ export class TelegramBotService extends EventEmitter {
   }
 
   /**
-   * Vérifie si l'utilisateur est autorisé (par ID ou username)
+   * Vérifie si l'utilisateur est autorisé (lit depuis la DB)
+   * Un seul master user possible
    */
   private isAuthorized(userId: number, username?: string): boolean {
+    const memory = getMemory();
+    const master = memory.getTelegramMaster();
+    
+    if (!master) {
+      return false; // Pas de master défini = personne n'est autorisé
+    }
+    
     // Vérifier par ID numérique
-    if (this.config.allowedUserIds.includes(userId)) {
+    if (master.user_id !== null && userId === master.user_id) {
       return true;
     }
+    
     // Vérifier par username (sans le @)
-    if (username) {
-      const cleanUsername = username.toLowerCase().replace(/^@/, '');
-      if (this.config.allowedUsernames.map(u => u.toLowerCase()).includes(cleanUsername)) {
+    if (master.username && username) {
+      const cleanMasterUsername = master.username.toLowerCase().replace(/^@/, '');
+      const cleanUserUsername = username.toLowerCase().replace(/^@/, '');
+      if (cleanUserUsername === cleanMasterUsername) {
         return true;
       }
     }
+    
     return false;
   }
 
