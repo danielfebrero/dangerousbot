@@ -25,6 +25,9 @@ import { todoHandler, todoDefinition } from './todo';
 import { retrieveCodeHandler, retrieveCodeDefinition } from './retrieve-code';
 import { logHandler, logDefinition, setLogLevelHandler, setLogLevelDefinition, clearLogsHandler, clearLogsDefinition } from './log';
 import { telegramHandler, telegramDefinition } from './telegram';
+import { configHandler, configDefinition } from './config';
+import { downloadFileHandler, downloadFileDefinition } from './download-file';
+import { sendFileHandler, sendFileDefinition } from './send-file';
 
 import { PROVIDER } from '../../config';
 
@@ -56,7 +59,10 @@ export function registerAllTools(): void {
     logHandler,
     setLogLevelHandler,
     clearLogsHandler,
-    telegramHandler
+    telegramHandler,
+    configHandler,
+    downloadFileHandler,
+    sendFileHandler
   ];
   
   for (const handler of handlers) {
@@ -87,7 +93,10 @@ export function getToolDefinitions(): Tool[] {
     logDefinition,
     setLogLevelDefinition,
     clearLogsDefinition,
-    telegramDefinition
+    telegramDefinition,
+    configDefinition,
+    downloadFileDefinition,
+    sendFileDefinition
   ];
 }
 
@@ -143,6 +152,9 @@ export * from './types';
 export {
   executeCodeHandler,
   shellHandler,
+  configHandler,
+  downloadFileHandler,
+  sendFileHandler,
   readFileHandler,
   writeFileHandler,
   editFileHandler,

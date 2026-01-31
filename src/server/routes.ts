@@ -5,6 +5,9 @@
 import { Router, Request, Response } from 'express';
 import { getMemory } from '../core/memory.js';
 import { logger } from '../core/logger.js';
+import { downloadService } from '../core/services/download.js';
+import * as path from 'path';
+import * as fs from 'fs';
 
 export function createRoutes(): Router {
   const router = Router();
@@ -174,5 +177,127 @@ export function createRoutes(): Router {
     });
   });
 
+  // ============ FILE DOWNLOAD ENDPOINTS ============
+
+  // Servir un fichier téléchargé par son ID
+  router.get('/files/:id', async (req: Request, res: Response) => {
+    const fileId = parseInt(req.params.id, 10);
+
+    if (isNaN(fileId)) {
+      res.status(400).json({ success: false, error: 'ID de fichier invalide' });
+      return;
+    }
+
+    try {
+      const file = await downloadService.getFile(fileId);
+
+      if (!file) {
+        res.status(404).json({ success: false, error: 'Fichier non trouvé' });
+        return;
+      }
+
+      const filePath = downloadService.getFilePath(file.filename);
+
+      if (!fs.existsSync(filePath)) {
+        res.status(404).json({ success: false, error: 'Fichier non trouvé sur le disque' });
+        return;
+      }
+
+      // Définir les headers pour le téléchargement
+      const mimeType = file.mime_type || 'application/octet-stream';
+      const filename = file.original_name || file.filename;
+
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', file.size_bytes.toString());
+      res.setHeader('X-File-Id', file.id.toString());
+      res.setHeader('X-File-Source', file.source);
+
+      // Streamer le fichier
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+
+      logger.info('Routes', `Fichier servi: ${filename} (ID: ${fileId})`);
+
+    } catch (error) {
+      logger.error('Routes', `Erreur lors du service du fichier ${fileId}: ${(error as Error).message}`);
+      res.status(500).json({ success: false, error: 'Erreur interne' });
+    }
+  });
+
+  // Liste des fichiers (avec pagination)
+  router.get('/files', async (req: Request, res: Response) => {
+    const source = req.query.source as 'webapp' | 'telegram' | undefined;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    try {
+      const files = await downloadService.listFiles(source);
+      const totalSize = await downloadService.getTotalSize();
+
+      // Pagination
+      const paginatedFiles = files.slice(offset, offset + limit);
+
+      res.json({
+        success: true,
+        data: {
+          files: paginatedFiles.map(f => ({
+            id: f.id,
+            filename: f.original_name || f.filename,
+            size: f.size_bytes,
+            mimeType: f.mime_type,
+            source: f.source,
+            downloadedAt: f.downloaded_at,
+            url: `/api/files/${f.id}`
+          })),
+          pagination: {
+            total: files.length,
+            limit,
+            offset,
+            hasMore: offset + limit < files.length
+          },
+          storage: {
+            used: totalSize,
+            usedFormatted: formatBytes(totalSize)
+          }
+        }
+      });
+    } catch (error) {
+      logger.error('Routes', `Erreur lors de la liste des fichiers: ${(error as Error).message}`);
+      res.status(500).json({ success: false, error: 'Erreur interne' });
+    }
+  });
+
+  // Supprimer un fichier
+  router.delete('/files/:id', async (req: Request, res: Response) => {
+    const fileId = parseInt(req.params.id, 10);
+
+    if (isNaN(fileId)) {
+      res.status(400).json({ success: false, error: 'ID de fichier invalide' });
+      return;
+    }
+
+    try {
+      const deleted = await downloadService.deleteFile(fileId);
+
+      if (deleted) {
+        res.json({ success: true, message: `Fichier #${fileId} supprimé` });
+      } else {
+        res.status(404).json({ success: false, error: 'Fichier non trouvé' });
+      }
+    } catch (error) {
+      logger.error('Routes', `Erreur lors de la suppression du fichier ${fileId}: ${(error as Error).message}`);
+      res.status(500).json({ success: false, error: 'Erreur interne' });
+    }
+  });
+
   return router;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }

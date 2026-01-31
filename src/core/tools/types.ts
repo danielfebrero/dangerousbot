@@ -20,4 +20,6 @@ export interface ToolContext {
   lifecycle: any; // Lifecycle
   mistral: any; // MistralConsultant | null
   rollbackManager: any; // RollbackManager | null
+  telegramChatId?: string; // Chat ID pour Telegram
+  bot?: any; // Instance TelegramBot
 }
