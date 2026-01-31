@@ -235,7 +235,8 @@ export class HistoryManager {
 
   /**
    * Validates tool chains and removes incomplete ones.
-   * Kimi API requires that every tool_use has a corresponding tool_result.
+   * Kimi API requires that every tool_use has a corresponding tool_result,
+   * and every tool_result must reference an existing tool_use.
    */
   private validateToolChains(): void {
     // Collect all tool_use IDs and tool_result IDs
@@ -255,22 +256,29 @@ export class HistoryManager {
     }
 
     // Find unresolved tool_use IDs (tool calls without results)
-    const unresolvedIds = new Set<string>();
+    const unresolvedToolUseIds = new Set<string>();
     for (const id of toolUseIds) {
       if (!toolResultIds.has(id)) {
-        unresolvedIds.add(id);
+        unresolvedToolUseIds.add(id);
       }
     }
 
-    if (unresolvedIds.size === 0) {
+    // Find orphaned tool_result IDs (results without corresponding tool_use)
+    const orphanedToolResultIds = new Set<string>();
+    for (const id of toolResultIds) {
+      if (!toolUseIds.has(id)) {
+        orphanedToolResultIds.add(id);
+      }
+    }
+
+    const totalIssues = unresolvedToolUseIds.size + orphanedToolResultIds.size;
+    if (totalIssues === 0) {
       return; // All tool chains are complete
     }
 
-    console.warn(`[HistoryManager] Found ${unresolvedIds.size} incomplete tool chains, removing them...`);
+    console.warn(`[HistoryManager] Found ${unresolvedToolUseIds.size} unresolved tool_use and ${orphanedToolResultIds.size} orphaned tool_results, cleaning up...`);
 
     // Remove messages with incomplete tool chains
-    // Strategy: Remove assistant messages that have unresolved tool_use blocks
-    // and any orphaned tool_result messages
     this.conversationHistory = this.conversationHistory.filter(msg => {
       if (!Array.isArray(msg.content)) {
         return true; // Keep simple string messages
@@ -278,17 +286,30 @@ export class HistoryManager {
 
       // Check if this message has any unresolved tool_use
       const hasUnresolvedToolUse = msg.content.some(
-        block => block.type === 'tool_use' && block.id && unresolvedIds.has(block.id)
+        block => block.type === 'tool_use' && block.id && unresolvedToolUseIds.has(block.id)
       );
 
-      if (hasUnresolvedToolUse) {
-        // If the message has ONLY tool_use blocks (no text), remove it entirely
+      // Check if this message has any orphaned tool_result
+      const hasOrphanedToolResult = msg.content.some(
+        block => block.type === 'tool_result' && block.tool_use_id && orphanedToolResultIds.has(block.tool_use_id)
+      );
+
+      if (hasUnresolvedToolUse || hasOrphanedToolResult) {
+        // Check if there's text content worth keeping
         const hasText = msg.content.some(block => block.type === 'text' && block.text?.trim());
         if (!hasText) {
           return false; // Remove message entirely
         }
-        // Otherwise, strip the tool_use blocks but keep text
-        msg.content = msg.content.filter(block => block.type !== 'tool_use');
+        // Strip problematic blocks but keep text
+        msg.content = msg.content.filter(block => {
+          if (block.type === 'tool_use' && block.id && unresolvedToolUseIds.has(block.id)) {
+            return false;
+          }
+          if (block.type === 'tool_result' && block.tool_use_id && orphanedToolResultIds.has(block.tool_use_id)) {
+            return false;
+          }
+          return true;
+        });
       }
 
       return true;

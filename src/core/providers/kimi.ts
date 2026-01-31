@@ -5,6 +5,9 @@
 
 import { BaseProvider } from './base-provider.js';
 import { AIMessage, AIResponse, AIToolDefinition, AIContentBlock, AIProviderConfig } from './types.js';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 
 interface KimiMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -57,7 +60,14 @@ export class KimiProvider extends BaseProvider {
   }
 
   protected convertMessages(messages: AIMessage[]): KimiMessage[] {
+    // IMPORTANT: Kimi reuses tool_call_ids like "read_file:0", "read_file:1"
+    // We must process in order and track "pending" tool_calls
+    // A tool_result is only valid if its ID is currently pending (defined BEFORE it)
+
     const result: KimiMessage[] = [];
+    // Track pending tool_call IDs - a Set that accumulates tool_use IDs as we go
+    // When we see a tool_result, we check if its ID is pending
+    const pendingToolCalls = new Set<string>();
 
     for (const msg of messages) {
       if (typeof msg.content === 'string') {
@@ -73,9 +83,11 @@ export class KimiProvider extends BaseProvider {
         for (const block of msg.content) {
           if (block.type === 'text' && block.text) {
             textContent += block.text;
-          } else if (block.type === 'tool_use') {
+          } else if (block.type === 'tool_use' && block.id) {
+            // Add ALL tool_use IDs to pending - we'll filter later
+            pendingToolCalls.add(block.id);
             toolCalls.push({
-              id: block.id || `call_${Date.now()}`,
+              id: block.id,
               type: 'function',
               function: {
                 name: block.name || '',
@@ -103,6 +115,7 @@ export class KimiProvider extends BaseProvider {
       } else if (msg.role === 'user') {
         const toolResults: KimiMessage[] = [];
         const contentParts: Array<{type: 'text'; text: string} | {type: 'image_url'; image_url: {url: string}}> = [];
+        let hasToolResults = false;
 
         for (const block of msg.content) {
           if (block.type === 'text' && block.text) {
@@ -111,26 +124,37 @@ export class KimiProvider extends BaseProvider {
             const dataUrl = `data:${block.source.media_type};base64,${block.source.data}`;
             contentParts.push({ type: 'image_url', image_url: { url: dataUrl } });
           } else if (block.type === 'tool_result') {
-            let resultContent = '';
-            if (typeof block.content === 'string') {
-              resultContent = block.content;
-            } else if (Array.isArray(block.content)) {
-              resultContent = (block.content as any[])
-                .filter((c: any) => c.type === 'text')
-                .map((c: any) => c.text)
-                .join('\n');
+            // Only include tool_result if its ID is in pendingToolCalls
+            // This ensures the tool_use came BEFORE this tool_result
+            if (block.tool_use_id && pendingToolCalls.has(block.tool_use_id)) {
+              hasToolResults = true;
+              // Remove from pending since it's now resolved
+              pendingToolCalls.delete(block.tool_use_id);
+              let resultContent = '';
+              if (typeof block.content === 'string') {
+                resultContent = block.content;
+              } else if (Array.isArray(block.content)) {
+                resultContent = (block.content as any[])
+                  .filter((c: any) => c.type === 'text')
+                  .map((c: any) => c.text)
+                  .join('\n');
+              }
+              toolResults.push({
+                role: 'tool',
+                content: resultContent || 'OK',
+                tool_call_id: block.tool_use_id
+              });
+            } else {
+              console.warn(`[Kimi] Skipping orphaned tool_result with id: ${block.tool_use_id} (not in pending: ${Array.from(pendingToolCalls).join(', ')})`);
             }
-            toolResults.push({
-              role: 'tool',
-              content: resultContent || 'OK',
-              tool_call_id: block.tool_use_id
-            });
           }
         }
 
         result.push(...toolResults);
 
-        if (contentParts.length > 0) {
+        // Don't push user content if this was a tool_result message
+        // (would only contain timestamp text which breaks Kimi's tool_call sequence)
+        if (!hasToolResults && contentParts.length > 0) {
           if (contentParts.length === 1 && contentParts[0].type === 'text') {
             result.push({ role: 'user', content: contentParts[0].text });
           } else {
@@ -140,7 +164,85 @@ export class KimiProvider extends BaseProvider {
       }
     }
 
-    return result;
+    // Now pendingToolCalls contains tool_use IDs that were never resolved
+    // We need to remove those from the result
+    if (pendingToolCalls.size > 0) {
+      console.warn(`[Kimi] ${pendingToolCalls.size} unresolved tool_calls: ${Array.from(pendingToolCalls).join(', ')}`);
+    }
+
+    // Collect all tool_call IDs that were resolved (have tool results)
+    const resolvedToolCallIds = new Set<string>();
+    for (const msg of result) {
+      if (msg.role === 'tool' && msg.tool_call_id) {
+        resolvedToolCallIds.add(msg.tool_call_id);
+      }
+    }
+
+    // Strip unresolved tool_calls from assistant messages
+    for (const msg of result) {
+      if (msg.role === 'assistant' && msg.tool_calls) {
+        const resolvedToolCalls = msg.tool_calls.filter(tc => resolvedToolCallIds.has(tc.id));
+        if (resolvedToolCalls.length !== msg.tool_calls.length) {
+          console.warn(`[Kimi] Stripped ${msg.tool_calls.length - resolvedToolCalls.length} unresolved tool_calls from assistant message`);
+        }
+        if (resolvedToolCalls.length === 0) {
+          delete msg.tool_calls;
+          // Restore content if it was nullified
+          if (msg.content === null && msg.reasoning_content) {
+            msg.content = msg.reasoning_content;
+          }
+        } else {
+          msg.tool_calls = resolvedToolCalls;
+        }
+      }
+    }
+
+    // Final filter: remove any remaining orphan tool messages (shouldn't happen but safety check)
+    const finalToolCallIds = new Set<string>();
+    for (const msg of result) {
+      if (msg.role === 'assistant' && msg.tool_calls) {
+        for (const tc of msg.tool_calls) {
+          finalToolCallIds.add(tc.id);
+        }
+      }
+    }
+
+    const filteredResult = result.filter(msg => {
+      if (msg.role === 'tool' && msg.tool_call_id) {
+        if (!finalToolCallIds.has(msg.tool_call_id)) {
+          console.error(`[Kimi] Final filter removing orphaned tool message: ${msg.tool_call_id}`);
+          return false;
+        }
+      }
+      return true;
+    });
+
+    // Log to file for debugging
+    this.logToFile('kimi-messages', {
+      timestamp: new Date().toISOString(),
+      inputMessagesCount: messages.length,
+      outputMessagesCount: filteredResult.length,
+      unresolvedToolCalls: Array.from(pendingToolCalls),
+      resolvedToolCallIds: Array.from(resolvedToolCallIds),
+      finalToolCallIds: Array.from(finalToolCallIds),
+      messages: filteredResult
+    });
+
+    return filteredResult;
+  }
+
+  private logToFile(prefix: string, data: unknown): void {
+    try {
+      const logsDir = path.join(os.homedir(), 'dev', 'dangerousbot', 'logs');
+      if (!fs.existsSync(logsDir)) {
+        fs.mkdirSync(logsDir, { recursive: true });
+      }
+      const filename = `${prefix}-${Date.now()}.json`;
+      fs.writeFileSync(path.join(logsDir, filename), JSON.stringify(data, null, 2));
+      console.log(`[Kimi] Logged to ${filename}`);
+    } catch (err) {
+      console.error('[Kimi] Failed to write log:', err);
+    }
   }
 
   protected convertTools(tools?: AIToolDefinition[]): unknown[] | undefined {

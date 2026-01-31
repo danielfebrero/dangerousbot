@@ -125,8 +125,6 @@ export class DangerousBotServer {
     const memory = getMemory();
     memory.addMessage('user', userMessage, undefined, images);
 
-    // Collecter tous les tool_calls pour cette réponse
-    const allToolCalls: Array<{ id?: string; name: string; input: unknown }> = [];
 
     try {
       const tools = getToolDefinitionsForProvider();
@@ -161,7 +159,22 @@ export class DangerousBotServer {
           console.log('[Server] Abort détecté dans la boucle tool_use');
           throw new Error('Request aborted by user');
         }
-        
+
+        // Save assistant message with tool_calls BEFORE executing tools
+        // This ensures correct order: assistant (with tool_use) → tool_results
+        const roundToolCalls: Array<{ id?: string; name: string; input: unknown }> = [];
+        let roundText = '';
+        for (const block of response.content) {
+          if (block.type === 'text' && block.text) {
+            roundText += block.text;
+          } else if (block.type === 'tool_use') {
+            roundToolCalls.push({ id: block.id, name: block.name, input: block.input });
+          }
+        }
+        if (roundToolCalls.length > 0) {
+          memory.addMessage('assistant', roundText, roundToolCalls);
+        }
+
         for (const block of response.content) {
           if (block.type === 'text') {
             // Seulement si du texte n'a pas déjà été streamé
@@ -169,9 +182,6 @@ export class DangerousBotServer {
               this.wsManager.sendBotMessage(block.text);
             }
           } else if (block.type === 'tool_use') {
-            // Collecter le tool_call (include id for proper reconstruction on load)
-            allToolCalls.push({ id: block.id, name: block.name, input: block.input });
-            
             // Générer un ID unique pour ce tool call
             const executionId = `exec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
             
@@ -260,9 +270,10 @@ export class DangerousBotServer {
         }
       }
 
-      // Sauvegarder le message assistant avec les tool_calls
-      if (finalText || allToolCalls.length > 0) {
-        memory.addMessage('assistant', finalText, allToolCalls.length > 0 ? allToolCalls : undefined);
+      // Sauvegarder le message assistant final (sans tool_calls car ils ont déjà été sauvés par round)
+      // Only save if there's final text and this is not a tool_use response (already saved above)
+      if (finalText && response.stopReason !== 'tool_use') {
+        memory.addMessage('assistant', finalText);
       }
 
       // Envoyer les stats d'usage des tokens et du coût

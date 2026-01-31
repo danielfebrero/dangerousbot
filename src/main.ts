@@ -335,13 +335,16 @@ async function main(): Promise<void> {
   // Configurer le provider d'historique (avec support images)
   wsManager.setHistoryProvider(() => {
     const history = memory.getMessages();
-    return history.map(msg => ({
-      role: msg.role,
-      content: msg.content,
-      timestamp: msg.timestamp,
-      tool_calls: msg.tool_calls,
-      images: msg.images
-    }));
+    return history
+      // Filter out internal __TOOL_RESULT__ messages (used for persistence, not display)
+      .filter(msg => !(msg.role === 'user' && msg.content?.startsWith('__TOOL_RESULT__')))
+      .map(msg => ({
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.timestamp,
+        tool_calls: msg.tool_calls,
+        images: msg.images
+      }));
   });
 
   // Configurer le callback pour la première connexion (message de continuation après redémarrage)
