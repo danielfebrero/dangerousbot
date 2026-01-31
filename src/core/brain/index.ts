@@ -107,12 +107,12 @@ export class Brain {
       this.triggerCompressionAsync();
     }
 
-    // Préparer les données
-    const cleanedHistory = this.historyManager.getCleanedHistory();
+    // Préparer les données (avec horodatages pour l'API)
+    const apiHistory = this.historyManager.getHistoryForAPI();
     const aiTools = this.formatTools(tools);
 
     // Appeler le provider
-    const response = await this.providerManager.chatStreamWithFallback(cleanedHistory, {
+    const response = await this.providerManager.chatStreamWithFallback(apiHistory, {
       system: this.promptBuilder.getSystemPrompt(),
       tools: aiTools,
       abortSignal,
@@ -143,10 +143,10 @@ export class Brain {
       this.triggerCompressionAsync();
     }
 
-    const cleanedHistory = this.historyManager.getCleanedHistory();
+    const apiHistory = this.historyManager.getHistoryForAPI();
     const aiTools = this.formatTools(tools);
 
-    const response = await this.providerManager.chatWithFallback(cleanedHistory, {
+    const response = await this.providerManager.chatWithFallback(apiHistory, {
       system: this.promptBuilder.getSystemPrompt(),
       tools: aiTools,
       abortSignal
@@ -165,10 +165,10 @@ export class Brain {
     abortSignal?: AbortSignal,
     onChunk?: StreamCallback
   ): Promise<BrainResponse> {
-    const cleanedHistory = this.historyManager.getCleanedHistory();
+    const apiHistory = this.historyManager.getHistoryForAPI();
     const aiTools = this.formatTools(tools);
 
-    const response = await this.providerManager.chatStreamWithFallback(cleanedHistory, {
+    const response = await this.providerManager.chatStreamWithFallback(apiHistory, {
       system: this.promptBuilder.getSystemPrompt(),
       tools: aiTools,
       abortSignal,
@@ -187,10 +187,10 @@ export class Brain {
     tools: Tool[],
     abortSignal?: AbortSignal
   ): Promise<BrainResponse> {
-    const cleanedHistory = this.historyManager.getCleanedHistory();
+    const apiHistory = this.historyManager.getHistoryForAPI();
     const aiTools = this.formatTools(tools);
 
-    const response = await this.providerManager.chatWithFallback(cleanedHistory, {
+    const response = await this.providerManager.chatWithFallback(apiHistory, {
       system: this.promptBuilder.getSystemPrompt(),
       tools: aiTools,
       abortSignal

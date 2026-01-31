@@ -258,6 +258,26 @@ html, body {
   padding: var(--space-4) 0;
 }
 
+/* Timestamp hover tooltip */
+.message-timestamp-hover {
+  position: absolute;
+  bottom: -20px;
+  right: 0;
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  opacity: 0.8;
+  padding: 2px 6px;
+  background: var(--bg-elevated);
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.message {
+  position: relative;
+}
+
 .message.system .message-content,
 .message.provider_switch .message-content {
   font-size: 0.8rem;

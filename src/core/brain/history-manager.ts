@@ -73,7 +73,50 @@ export class HistoryManager {
   }
 
   /**
-   * Retourne l'historique nettoyé (tool_results compressés, messages vides filtrés)
+   * Ajoute un horodatage au contenu du message pour le contexte LLM
+   */
+  private addTimestampToContent(content: string | AIContentBlock[], timestamp?: string): string | AIContentBlock[] {
+    const ts = timestamp || new Date().toISOString();
+    const formatted = `[Timestamp: ${ts}]`;
+    
+    if (typeof content === 'string') {
+      return `${formatted} ${content}`;
+    }
+    
+    // Pour les content blocks (multimodal), ajouter au début
+    if (Array.isArray(content) && content.length > 0) {
+      return [
+        { type: 'text', text: formatted },
+        ...content
+      ];
+    }
+    
+    return content;
+  }
+
+  /**
+   * Retourne l'historique nettoyé avec horodatages pour l'API (tool_results compressés, messages vides filtrés)
+   */
+  getHistoryForAPI(): AIMessage[] {
+    const cleaned = cleanOldToolResults(this.conversationHistory as any[]) as AIMessage[];
+
+    // Filtrer les messages avec contenu vide (cause d'erreur API) et ajouter horodatages
+    return cleaned.filter(msg => {
+      if (typeof msg.content === 'string') {
+        return msg.content.trim().length > 0;
+      }
+      if (Array.isArray(msg.content)) {
+        return msg.content.length > 0;
+      }
+      return true;
+    }).map(msg => ({
+      ...msg,
+      content: this.addTimestampToContent(msg.content, msg.timestamp)
+    }));
+  }
+
+  /**
+   * Retourne l'historique nettoyé (sans horodatages pour usage interne)
    */
   getCleanedHistory(): AIMessage[] {
     const cleaned = cleanOldToolResults(this.conversationHistory as any[]) as AIMessage[];
