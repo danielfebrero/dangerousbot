@@ -15,7 +15,11 @@ import { DangerousBotServer } from './server/index.js';
 import { Lifecycle } from './core/lifecycle.js';
 import { getMemory } from './core/memory.js';
 import { initRollbackManager } from './core/rollback.js';
+import { logger, enableConsoleCapture } from './core/logger.js';
 import { SERVER, PATHS, APIS, initializeApiKeys, reloadProviderConfig } from './config.js';
+
+// Activer la capture des console.* dès le démarrage
+enableConsoleCapture();
 
 // Configuration
 const PORT = parseInt(process.env.PORT || String(SERVER.DEFAULT_PORT), 10);
@@ -221,16 +225,19 @@ async function main(): Promise<void> {
   }
 
   print('✓ Lock acquis (single instance)', 'green');
+  logger.info('Main', 'Lock acquis (single instance)');
 
   // Récupérer la clé API
   const apiKey = await getApiKey();
   if (!apiKey) {
     print('Erreur: Clé API requise pour démarrer.', 'red');
+    logger.error('Main', 'Clé API requise pour démarrer');
     lifecycle.releaseLock();
     process.exit(1);
   }
 
   print('✓ Clé API configurée', 'green');
+  logger.info('Main', 'Clé API configurée');
 
   // Vérifier et démarrer SearxNG si nécessaire
   const searxngRunning = await isSearxNGRunning();

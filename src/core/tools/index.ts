@@ -23,6 +23,7 @@ import { searxngSearchHandler, searxngSearchDefinition } from './searxng-search'
 import { getKimiBalanceHandler, getKimiBalanceDefinition } from './get-kimi-balance';
 import { todoHandler, todoDefinition } from './todo';
 import { retrieveCodeHandler, retrieveCodeDefinition } from './retrieve-code';
+import { logHandler, logDefinition, setLogLevelHandler, setLogLevelDefinition, clearLogsHandler, clearLogsDefinition } from './log';
 
 import { PROVIDER } from '../../config';
 
@@ -50,7 +51,10 @@ export function registerAllTools(): void {
     searxngSearchHandler,
     getKimiBalanceHandler,
     todoHandler,
-    retrieveCodeHandler
+    retrieveCodeHandler,
+    logHandler,
+    setLogLevelHandler,
+    clearLogsHandler
   ];
   
   for (const handler of handlers) {
@@ -77,7 +81,10 @@ export function getToolDefinitions(): Tool[] {
     searxngSearchDefinition,
     getKimiBalanceDefinition,
     todoDefinition,
-    retrieveCodeDefinition
+    retrieveCodeDefinition,
+    logDefinition,
+    setLogLevelDefinition,
+    clearLogsDefinition
   ];
 }
 
@@ -137,5 +144,8 @@ export {
   searxngSearchHandler,
   getKimiBalanceHandler,
   todoHandler,
-  retrieveCodeHandler
+  retrieveCodeHandler,
+  logHandler,
+  setLogLevelHandler,
+  clearLogsHandler
 };

@@ -8,6 +8,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import { Message, Knowledge } from './types';
+import { logger } from './logger';
 
 const DATA_DIR = path.join(os.homedir(), '.dangerousbot', 'data');
 const DB_PATH = path.join(DATA_DIR, 'dangerousbot.db');
@@ -23,7 +24,7 @@ export class Memory {
     // Reprendre la dernière session si elle existe, sinon en créer une nouvelle
     const lastSession = this.getLastSessionIdInternal();
     this.currentSessionId = lastSession || this.generateSessionId();
-    console.log(`[Memory] Session: ${this.currentSessionId} (${lastSession ? 'reprise' : 'nouvelle'})`);
+    logger.info('Memory', `Session: ${this.currentSessionId} (${lastSession ? 'reprise' : 'nouvelle'})`);
   }
 
   private getLastSessionIdInternal(): string | null {
@@ -168,7 +169,7 @@ export class Memory {
     `).get(this.currentSessionId, role, content) as { id: number } | undefined;
     
     if (recentDuplicate) {
-      console.log(`[Memory] Doublon détecté et ignoré: ${role} - ${content.substring(0, 50)}...`);
+      logger.debug('Memory', `Doublon détecté et ignoré: ${role}`, { content: content.substring(0, 50) });
       return recentDuplicate.id;
     }
     

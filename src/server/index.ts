@@ -15,6 +15,7 @@ import { getToolDefinitions, getToolDefinitionsForProvider, ToolExecutor } from 
 import { getMemory } from '../core/memory.js';
 import { ServerConfig, ToolInput } from '../core/types.js';
 import { Lifecycle } from '../core/lifecycle.js';
+import { logger } from '../core/logger.js';
 import * as os from 'os';
 
 // Signal pour le message de continuation après redémarrage
@@ -60,7 +61,7 @@ export class DangerousBotServer {
     for (const webPath of webPaths) {
       if (fs.existsSync(webPath)) {
         this.app.use(express.static(webPath));
-        console.log(`[Server] Serving static files from: ${webPath}`);
+        logger.info('Server', `Serving static files from: ${webPath}`);
         break;
       }
     }
@@ -97,12 +98,12 @@ export class DangerousBotServer {
   // Initialiser le brain avec la clé API
   initBrain(apiKey: string, openRouterApiKey?: string): void {
     this.brain = new Brain(apiKey);
-    console.log('[Server] Brain initialisé');
+    logger.info('Server', 'Brain initialisé');
 
     // Initialiser le système de contexte si la clé OpenRouter est fournie
     if (openRouterApiKey) {
       this.brain.initContextSystem(openRouterApiKey, apiKey);
-      console.log('[Server] Système de contexte (embeddings) initialisé');
+      logger.info('Server', 'Système de contexte (embeddings) initialisé');
     }
   }
 
@@ -156,7 +157,7 @@ export class DangerousBotServer {
       while (response.stopReason === 'tool_use') {
         // Vérifier si abort a été demandé
         if (abortSignal?.aborted) {
-          console.log('[Server] Abort détecté dans la boucle tool_use');
+          logger.debug('Server', 'Abort détecté dans la boucle tool_use');
           throw new Error('Request aborted by user');
         }
 
@@ -226,7 +227,7 @@ export class DangerousBotServer {
 
             // Vérifier si abort a été demandé après l'exécution d'un tool
             if (abortSignal?.aborted) {
-              console.log('[Server] Abort détecté après exécution tool');
+              logger.debug('Server', 'Abort détecté après exécution tool');
               throw new Error('Request aborted by user');
             }
 
@@ -289,7 +290,7 @@ export class DangerousBotServer {
       const pendingRestart = (global as any).__pendingRestart;
       if (pendingRestart) {
         delete (global as any).__pendingRestart;
-        console.log(`[Server] Restart programmé: ${pendingRestart.reason}`);
+        logger.info('Server', `Restart programmé: ${pendingRestart.reason}`);
         this.wsManager.sendSystem(`Redémarrage dans 2 secondes: ${pendingRestart.reason}`);
         
         // Attendre un peu pour s'assurer que tout est sauvegardé
@@ -301,7 +302,7 @@ export class DangerousBotServer {
       if ((error as Error).message === 'Request aborted by user' || 
           (error as Error).name === 'AbortError' ||
           abortSignal?.aborted) {
-        console.log('[Server] Requête annulée par l\'utilisateur');
+        logger.info('Server', 'Requête annulée par l\'utilisateur');
         this.wsManager.sendSystem('🛑 Génération arrêtée.');
         // Envoyer message_complete pour signaler la fin du stream
         this.wsManager.broadcast({
@@ -309,7 +310,7 @@ export class DangerousBotServer {
           payload: { input_tokens: 0, output_tokens: 0, cost: { input_cost: 0, output_cost: 0, total_cost: 0 } }
         });
       } else {
-        console.error('[Server] Erreur:', error);
+        logger.error('Server', 'Erreur lors du traitement du message', { error: (error as Error).message });
         this.wsManager.sendError(`Erreur: ${(error as Error).message}`);
       }
     } finally {
@@ -329,7 +330,14 @@ export class DangerousBotServer {
 
     if (messages.length > 0) {
       this.brain.loadHistory();
-      console.log(`[Server] Historique chargé: ${messages.length} messages`);
+      logger.info('Server', `Historique chargé: ${messages.length} messages`);
+      // Log détaillé des messages uniquement en mode VERBOSE
+      if (logger.getLevel() === 'VERBOSE') {
+        logger.verbose('Server', 'Messages history loaded', { 
+          count: messages.length, 
+          messages: messages.map(m => ({ role: m.role, content: m.content?.substring(0, 100) })) 
+        });
+      }
     }
   }
 
@@ -344,12 +352,12 @@ export class DangerousBotServer {
     const restartInfo = this.lifecycle.checkRestarted();
     if (restartInfo.restarted) {
       this.pendingContinuationMessage = `🔄 Redémarrage effectué ! Je suis de retour et prêt à continuer.\n\n_(Provider actif: **${this.brain?.getCurrentProvider().name || 'inconnu'}**)_`;
-      console.log('[Server] Message de continuation en attente (redémarrage détecté)');
+      logger.info('Server', 'Message de continuation en attente (redémarrage détecté)');
     }
 
     return new Promise((resolve) => {
       this.server.listen(port, host, () => {
-        console.log(`[Server] DangerousBot écoute sur http://${host}:${port}`);
+        logger.info('Server', `DangerousBot écoute sur http://${host}:${port}`);
         resolve();
       });
     });
@@ -367,7 +375,7 @@ export class DangerousBotServer {
         this.wsManager.sendBotMessage(this.pendingContinuationMessage!);
         this.pendingContinuationMessage = null;
         this.lifecycle.clearRestarted();
-        console.log('[Server] Message de continuation envoyé et sauvegardé');
+        logger.info('Server', 'Message de continuation envoyé et sauvegardé');
       }, 500);
     }
   }
@@ -377,7 +385,7 @@ export class DangerousBotServer {
     return new Promise((resolve) => {
       this.wsManager.close();
       this.server.close(() => {
-        console.log('[Server] Serveur arrêté');
+        logger.info('Server', 'Serveur arrêté');
         resolve();
       });
     });
