@@ -108,38 +108,50 @@ export class MessageProcessor {
 
       // Préparer les tools
       const tools = getToolDefinitions();
-
-      // Appeler le provider
-      const response = await providerManager.chatWithFallback(messages, {
-        system: systemPrompt,
-        tools: tools.map(t => ({
-          name: t.name,
-          description: t.description,
-          input_schema: t.input_schema,
-        })),
-      });
-
-      // Extraire le texte et les tool calls
+      
+      // Boucle principale de traitement
       let responseText = '';
-      const toolCalls: ToolCall[] = [];
+      let hasMoreToolCalls = true;
+      let iteration = 0;
+      const maxIterations = 10; // Limite de sécurité
+      const allToolResults: Array<{ name: string; success: boolean; result?: unknown }> = [];
 
-      for (const block of response.content) {
-        if (block.type === 'text') {
-          responseText += block.text;
-        } else if (block.type === 'tool_use') {
-          toolCalls.push({
-            name: block.name,
-            input: block.input as Record<string, unknown>,
-          });
+      while (hasMoreToolCalls && iteration < maxIterations) {
+        iteration++;
+        
+        // Appeler le provider
+        const response = await providerManager.chatWithFallback(messages, {
+          system: systemPrompt,
+          tools: tools.map(t => ({
+            name: t.name,
+            description: t.description,
+            input_schema: t.input_schema,
+          })),
+        });
+
+        // Extraire le texte et les tool calls
+        responseText = '';
+        const toolCalls: ToolCall[] = [];
+
+        for (const block of response.content) {
+          if (block.type === 'text') {
+            responseText += block.text;
+          } else if (block.type === 'tool_use') {
+            toolCalls.push({
+              name: block.name,
+              input: block.input as Record<string, unknown>,
+            });
+          }
         }
-      }
 
-      // Résultats des tools
-      const toolResults: Array<{ name: string; success: boolean; result?: unknown }> = [];
+        // S'il n'y a pas de tool calls, on a fini
+        if (toolCalls.length === 0) {
+          hasMoreToolCalls = false;
+          break;
+        }
 
-      // Exécuter les tool calls si présents
-      if (toolCalls.length > 0) {
-        // D'abord exécuter TOUS les tools avec le contexte de la plateforme
+        // Exécuter TOUS les tools de cette itération avec le contexte de la plateforme
+        const iterationResults: Array<{ name: string; success: boolean; result?: unknown }> = [];
         for (const tc of toolCalls) {
           try {
             const result = await this.toolExecutor.execute(
@@ -147,29 +159,31 @@ export class MessageProcessor {
               tc.input,
               platformContext
             );
-            toolResults.push({
+            iterationResults.push({
               name: tc.name,
               success: result.success !== false,
               result,
             });
           } catch (e) {
             const error = e as Error;
-            toolResults.push({
+            iterationResults.push({
               name: tc.name,
               success: false,
               result: { success: false, error: error.message },
             });
           }
         }
+        
+        allToolResults.push(...iterationResults);
 
-        // Ajouter le message assistant UNE SEULE FOIS
+        // Ajouter le message assistant avec les tool calls
         (messages as any[]).push({
           role: 'assistant',
           content: response.content,
         });
 
         // Ajouter TOUS les résultats de tools
-        for (const tr of toolResults) {
+        for (const tr of iterationResults) {
           (messages as any[]).push({
             role: 'user',
             content: [{
@@ -181,20 +195,9 @@ export class MessageProcessor {
         }
 
         // Notifier les tools exécutés
-        await callbacks?.onToolsExecuted?.(toolResults);
-
-        // Continuer avec le provider pour obtenir la réponse finale
-        const continuation = await providerManager.chatWithFallback(messages, {
-          system: systemPrompt,
-          tools: [],
-        });
-
-        // Extraire le texte de la continuation
-        for (const block of continuation.content) {
-          if (block.type === 'text') {
-            responseText += block.text;
-          }
-        }
+        await callbacks?.onToolsExecuted?.(iterationResults);
+        
+        // Continuer la boucle pour potentiellement d'autres tool calls
       }
 
       // Sauvegarder dans la mémoire avec la source et les images
@@ -218,7 +221,7 @@ export class MessageProcessor {
 
       return {
         text: responseText,
-        toolCalls: toolResults,
+        toolCalls: allToolResults,
       };
     } catch (error) {
       await callbacks?.onProcessingEnd?.();
