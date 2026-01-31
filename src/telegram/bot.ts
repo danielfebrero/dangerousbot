@@ -17,7 +17,6 @@ import { getMemory } from '../core/memory.js';
 import { getContextInjector } from '../core/context-injector.js';
 import { PROVIDER, MODELS } from '../config';
 import { ProviderManager } from '../core/brain/provider-manager.js';
-import { ToolExecutor } from '../core/executor';
 import { getToolDefinitions, Tool } from '../core/tools';
 
 export class TelegramBotService extends EventEmitter {
@@ -191,9 +190,103 @@ export class TelegramBotService extends EventEmitter {
         { role: 'user' as const, content }
       ];
 
-      // TODO: Appeler le provider et gérer les tool calls
-      // Pour l'instant, réponse simple
-      await this.bot.sendMessage(chatId, '💬 Je réfléchis... (intégration en cours)');
+      // Appeler le ProviderManager pour traiter le message
+      const providerManager = new ProviderManager({
+        anthropic: this.config.anthropicApiKey || '',
+        kimi: this.config.kimiApiKey,
+        openRouter: this.config.openRouterApiKey
+      });
+
+      // Préparer les tools
+      const tools = getToolDefinitions();
+
+      // Envoyer une réponse "typing" en attendant
+      await this.bot.sendMessage(chatId, '💬 Je réfléchis...');
+
+      // Appeler le provider
+      const response = await providerManager.chatWithFallback(messages, {
+        system: contextBlock || 'Tu es DangerousBot, un assistant IA autonome.',
+        tools: tools.map(t => ({
+          name: t.name,
+          description: t.description,
+          input_schema: t.input_schema
+        }))
+      });
+
+      // Traiter la réponse
+      let responseText = '';
+      const toolCalls: ToolCall[] = [];
+
+      for (const block of response.content) {
+        if (block.type === 'text') {
+          responseText += block.text;
+        } else if (block.type === 'tool_use') {
+          toolCalls.push({
+            id: block.id,
+            name: block.name,
+            arguments: block.input as Record<string, unknown>
+          });
+        }
+      }
+
+      // Exécuter les tool calls si présents
+      if (toolCalls.length > 0) {
+        const toolResults = [];
+        
+        for (const tc of toolCalls) {
+          // Import dynamique des handlers
+          const { getToolHandler } = await import('../core/tools/index.js');
+          const handler = getToolHandler(tc.name);
+          
+          if (handler) {
+            try {
+              const result = await handler.execute(tc.arguments, {});
+              toolResults.push({
+                id: tc.id,
+                name: tc.name,
+                result
+              });
+            } catch (e) {
+              toolResults.push({
+                id: tc.id,
+                name: tc.name,
+                result: { success: false, error: (e as Error).message }
+              });
+            }
+          }
+        }
+
+        // Renvoyer les résultats au provider pour continuation
+        messages.push({
+          role: 'assistant',
+          content: response.content
+        });
+
+        for (const tr of toolResults) {
+          messages.push({
+            role: 'user',
+            content: JSON.stringify({ tool_result: tr })
+          });
+        }
+
+        const continuation = await providerManager.chatWithFallback(messages, {
+          system: contextBlock || 'Tu es DangerousBot, un assistant IA autonome.',
+          tools: []
+        });
+
+        // Extraire le texte de la continuation
+        for (const block of continuation.content) {
+          if (block.type === 'text') {
+            responseText += block.text;
+          }
+        }
+      }
+
+      // Sauvegarder la réponse
+      memory.addMessage('assistant', responseText);
+
+      // Envoyer la réponse à Telegram
+      await this.sendResponse(chatId, responseText, toolCalls);
 
     } catch (error) {
       console.error('[Telegram] Error handling message:', error);
