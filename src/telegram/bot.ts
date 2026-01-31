@@ -1,59 +1,105 @@
 /**
- * TelegramBot - Intégration complète Telegram pour DangerousBot
- * 
- * Features:
- * - Messages texte synchronisés avec le web
- * - Photos et documents
- * - Tool calls visuels
- * - Commandes (/start, /status, etc.)
- * - Auth sécurisée (whitelist)
+ * TelegramBot - Intégration Telegram pour DangerousBot
+ *
+ * Architecture refactorisée:
+ * - Utilise MessageProcessor pour le traitement des messages
+ * - Utilise les modules constants et formatters
+ * - Implémente ChatAdapter
  */
 
 import TelegramBot from 'node-telegram-bot-api';
 import { EventEmitter } from 'events';
-import { TelegramConfig, TelegramMessage, TelegramCommand } from './types.js';
-import { Message as CoreMessage, ToolCall, ImageContent } from '../core/types.js';
+import { TelegramConfig, TelegramCommand } from './types.js';
+import { MESSAGES, COMMAND_MESSAGES } from './constants.js';
+import { formatToolBadges, splitMessage } from './formatters.js';
 import { getMemory } from '../core/memory.js';
-import { getContextInjector } from '../core/context-injector.js';
-import { PROVIDER, MODELS, APIS } from '../config';
-import { ProviderManager } from '../core/brain/provider-manager.js';
-import { getToolDefinitions, Tool, ToolExecutor } from '../core/tools';
-import * as path from 'path';
+import { PROVIDER } from '../config.js';
+import { ChatAdapter, ChatSource, ChatImage } from '../core/chat-adapter.js';
+import { MessageProcessor, initMessageProcessor } from '../core/message-processor.js';
 
+/**
+ * Adaptateur Telegram implémentant ChatAdapter
+ */
+class TelegramChatAdapter implements ChatAdapter {
+  readonly source: ChatSource = 'telegram';
+  private bot: TelegramBot;
+  private chatId: number;
+
+  constructor(bot: TelegramBot, chatId: number) {
+    this.bot = bot;
+    this.chatId = chatId;
+  }
+
+  async sendMessage(text: string): Promise<void> {
+    const parts = splitMessage(text);
+    for (const part of parts) {
+      await this.sendMessageSafe(part);
+    }
+  }
+
+  sendTyping(): void {
+    this.bot.sendChatAction(this.chatId, 'typing');
+  }
+
+  async sendToolNotification(tools: Array<{ name: string; success: boolean }>): Promise<void> {
+    const message = formatToolBadges(tools);
+    await this.sendMessageSafe(message);
+  }
+
+  private async sendMessageSafe(text: string): Promise<void> {
+    try {
+      await this.bot.sendMessage(this.chatId, text, {
+        parse_mode: 'Markdown',
+        disable_web_page_preview: true,
+      });
+    } catch (error: any) {
+      if (error?.response?.body?.description?.includes("can't parse entities")) {
+        console.log('[Telegram] Markdown parsing failed, sending as plain text');
+        await this.bot.sendMessage(this.chatId, text, {
+          disable_web_page_preview: true,
+        });
+      } else {
+        throw error;
+      }
+    }
+  }
+}
+
+/**
+ * Service principal du bot Telegram
+ */
 export class TelegramBotService extends EventEmitter {
   private bot: TelegramBot | null = null;
   private config: TelegramConfig;
-  private sessions: Map<number, string> = new Map(); // userId -> conversationId
-  private userChatMap: Map<number, number> = new Map(); // userId -> chatId
-  private toolExecutor: ToolExecutor;
+  private sessions: Map<number, string> = new Map();
+  private userChatMap: Map<number, number> = new Map();
+  private messageProcessor: MessageProcessor | null = null;
 
   constructor(config: TelegramConfig) {
     super();
     this.config = config;
-    // Initialiser le ToolExecutor
-    const projectRoot = path.resolve(process.cwd());
-    this.toolExecutor = new ToolExecutor(projectRoot);
   }
 
-  /**
-   * Démarre le bot
-   */
   async start(): Promise<void> {
+    // Initialiser le MessageProcessor
+    this.messageProcessor = initMessageProcessor({
+      anthropicApiKey: this.config.anthropicApiKey,
+      kimiApiKey: this.config.kimiApiKey,
+      openRouterApiKey: this.config.openRouterApiKey,
+    });
+
+    // Démarrer le bot
     if (this.config.usePolling) {
       this.bot = new TelegramBot(this.config.token, { polling: true });
       console.log('[Telegram] Bot started with polling mode');
     } else {
       this.bot = new TelegramBot(this.config.token);
-      // Webhook setup would go here
       console.log('[Telegram] Bot started with webhook mode');
     }
 
     this.setupHandlers();
   }
 
-  /**
-   * Arrête le bot
-   */
   async stop(): Promise<void> {
     if (this.bot) {
       await this.bot.stopPolling();
@@ -62,48 +108,35 @@ export class TelegramBotService extends EventEmitter {
     }
   }
 
-  /**
-   * Vérifie si l'utilisateur est autorisé (lit depuis la DB)
-   * Un seul master user possible
-   */
   private isAuthorized(userId: number, username?: string): boolean {
     const memory = getMemory();
     const master = memory.getTelegramMaster();
-    
-    if (!master) {
-      return false; // Pas de master défini = personne n'est autorisé
-    }
-    
-    // Vérifier par ID numérique
+
+    if (!master) return false;
+
     if (master.user_id !== null && userId === master.user_id) {
       return true;
     }
-    
-    // Vérifier par username (sans le @)
+
     if (master.username && username) {
-      const cleanMasterUsername = master.username.toLowerCase().replace(/^@/, '');
-      const cleanUserUsername = username.toLowerCase().replace(/^@/, '');
-      if (cleanUserUsername === cleanMasterUsername) {
-        return true;
-      }
+      const cleanMaster = master.username.toLowerCase().replace(/^@/, '');
+      const cleanUser = username.toLowerCase().replace(/^@/, '');
+      if (cleanUser === cleanMaster) return true;
     }
-    
+
     return false;
   }
 
-  /**
-   * Configure les handlers de messages
-   */
   private setupHandlers(): void {
     if (!this.bot) return;
 
-    // Message texte
     this.bot.on('message', async (msg) => {
       const userId = msg.from?.id;
       const username = msg.from?.username;
+
       if (!userId || !this.isAuthorized(userId, username)) {
         if (userId) {
-          this.bot?.sendMessage(msg.chat.id, '⛔ Vous n\'êtes pas autorisé à utiliser ce bot.');
+          this.bot?.sendMessage(msg.chat.id, MESSAGES.UNAUTHORIZED);
         }
         return;
       }
@@ -115,332 +148,91 @@ export class TelegramBotService extends EventEmitter {
     this.bot.onText(/\/start/, (msg) => this.handleCommand(msg, '/start'));
     this.bot.onText(/\/status/, (msg) => this.handleCommand(msg, '/status'));
     this.bot.onText(/\/web/, (msg) => this.handleCommand(msg, '/web'));
-    this.bot.onText(/\/clear/, (msg) => this.handleCommand(msg, '/clear'));
     this.bot.onText(/\/provider/, (msg) => this.handleCommand(msg, '/provider'));
     this.bot.onText(/\/help/, (msg) => this.handleCommand(msg, '/help'));
   }
 
-  /**
-   * Traite un message entrant
-   */
   private async handleMessage(msg: TelegramBot.Message): Promise<void> {
-    if (!this.bot) return;
+    if (!this.bot || !this.messageProcessor) return;
 
     const chatId = msg.chat.id;
     const userId = msg.from!.id;
 
-    // Stocker le mapping userId -> chatId pour pouvoir envoyer des messages plus tard
     this.userChatMap.set(userId, chatId);
 
-    // Message de typing
-    this.bot.sendChatAction(chatId, 'typing');
+    const adapter = new TelegramChatAdapter(this.bot, chatId);
+    adapter.sendTyping();
 
     try {
-      // Extraire le contenu du message
-      let content = '';
-      let images: Array<{ url: string; mimeType: string }> = [];
+      // Extraire le contenu
+      const { text, images } = await this.extractMessageContent(msg);
 
-      // Texte (inclut la légende des images si présente)
-      if (msg.text) {
-        content = msg.text;
-      } else if (msg.caption) {
-        content = msg.caption;
-      }
-
-      // Photo (prend la plus grande résolution)
-      if (msg.photo && msg.photo.length > 0) {
-        const photo = msg.photo[msg.photo.length - 1];
-        const fileUrl = await this.bot.getFileLink(photo.file_id);
-        
-        // Télécharger et convertir en base64
-        try {
-          const base64Data = await this.downloadImageAsBase64(fileUrl);
-          images.push({ url: base64Data, mimeType: 'image/jpeg' });
-          if (!content) {
-            content = '[Image]'; // Placeholder si pas de texte
-          }
-        } catch (e) {
-          console.error('[Telegram] Failed to download image:', e);
-        }
-      }
-
-      // Document
-      if (msg.document) {
-        const fileUrl = await this.bot.getFileLink(msg.document.file_id);
-        content = content || `[Document: ${msg.document.file_name}]`;
-      }
-
-      if (!content) {
-        await this.bot.sendMessage(chatId, '❓ Je ne comprends pas ce type de message.');
+      if (!text) {
+        await adapter.sendMessage(MESSAGES.UNKNOWN_MESSAGE_TYPE);
         return;
       }
 
-      // Sauvegarder le message utilisateur
-      const memory = getMemory();
-      const conversationId = this.getOrCreateSession(userId, chatId);
+      const conversationId = this.getOrCreateSession(userId);
 
-      // Sauvegarder dans la session courante
-      memory.addMessage('user', content);
+      // Traiter le message
+      const result = await this.messageProcessor.process(
+        { text, images },
+        {
+          source: 'telegram',
+          conversationId,
+          historyLimit: 20,
+          callbacks: {
+            onToolsExecuted: async (tools) => {
+              await adapter.sendToolNotification(tools);
+            },
+          },
+        }
+      );
 
-      // Récupérer l'historique (20 derniers messages)
-      const history = memory.getMessages(conversationId, 20);
-
-      // Injecter le contexte
-      const injector = getContextInjector();
-      const contextBlock = await injector.injectContext(content);
-
-      // Instructions spécifiques Telegram
-      const telegramInstructions = `
-## Source du message
-L'utilisateur écrit depuis: telegram
-
-## Instructions Telegram
-L'utilisateur écrit depuis un appareil mobile (Telegram). Sauf indication contraire:
-- Réponds de manière brève et concise
-- Évite les longues listes et explications détaillées
-- Va droit au but
-- Utilise un formatage simple (pas de tableaux complexes)
-- Si une réponse longue est nécessaire, propose de la détailler sur demande`;
-
-      const basePrompt = contextBlock || 'Tu es DangerousBot, un assistant IA autonome.';
-      const systemPrompt = basePrompt + telegramInstructions;
-
-      // Construire les messages pour le provider
-      // Inclure les images si présentes
-      const userContent: any[] = [{ type: 'text', text: content }];
-      for (const img of images) {
-        userContent.push({
-          type: 'image',
-          source: {
-            type: 'base64',
-            media_type: img.mimeType,
-            data: img.url.replace(/^data:image\/\w+;base64,/, '')
-          }
-        });
+      if (result.error) {
+        console.error('[Telegram] Processing error:', result.error);
+        await adapter.sendMessage(MESSAGES.ERROR);
+        return;
       }
 
-      const messages = [
-        { role: 'system' as const, content: systemPrompt },
-        ...history.map(m => ({
-          role: m.role as 'user' | 'assistant',
-          content: m.content
-        })),
-        { role: 'user' as const, content: userContent }
-      ];
-
-      // Appeler le ProviderManager pour traiter le message
-      const providerManager = new ProviderManager({
-        anthropic: this.config.anthropicApiKey || '',
-        kimi: this.config.kimiApiKey,
-        openRouter: this.config.openRouterApiKey
-      });
-
-      // Préparer les tools
-      const tools = getToolDefinitions();
-
-      // Appeler le provider
-      const response = await providerManager.chatWithFallback(messages, {
-        system: systemPrompt,
-        tools: tools.map(t => ({
-          name: t.name,
-          description: t.description,
-          input_schema: t.input_schema
-        }))
-      });
-
-      // Traiter la réponse
-      let responseText = '';
-      const toolCalls: ToolCall[] = [];
-
-      for (const block of response.content) {
-        if (block.type === 'text') {
-          responseText += block.text;
-        } else if (block.type === 'tool_use') {
-          toolCalls.push({
-            id: block.id,
-            name: block.name,
-            arguments: block.input as Record<string, unknown>
-          });
-        }
-      }
-
-      // Exécuter les tool calls si présents
-      if (toolCalls.length > 0) {
-        const toolResults = [];
-        const toolBadges: string[] = [];
-
-        for (const tc of toolCalls) {
-          const toolEmoji = this.getToolEmoji(tc.name);
-
-          try {
-            const result = await this.toolExecutor.execute(tc.name, tc.arguments);
-            toolResults.push({
-              id: tc.id,
-              name: tc.name,
-              result
-            });
-            toolBadges.push(`${toolEmoji} ${tc.name} ✓`);
-          } catch (e) {
-            const errorResult = { success: false, error: (e as Error).message };
-            toolResults.push({
-              id: tc.id,
-              name: tc.name,
-              result: errorResult
-            });
-            toolBadges.push(`${toolEmoji} ${tc.name} ✗`);
-          }
-        }
-
-        // Envoyer un seul message avec tous les badges
-        await this.sendMessageSafe(chatId, `🔧 ${toolBadges.join(' | ')}`);
-
-        // Ajouter la réponse assistant avec les tool_use blocks (format Claude)
-        (messages as any[]).push({
-          role: 'assistant',
-          content: response.content
-        });
-
-        // Ajouter les résultats en format Claude (tool_result blocks dans un message user)
-        for (const tr of toolResults) {
-          (messages as any[]).push({
-            role: 'user',
-            content: [{
-              type: 'tool_result',
-              tool_use_id: tr.id,
-              content: JSON.stringify(tr.result)
-            }]
-          });
-        }
-
-        const continuation = await providerManager.chatWithFallback(messages, {
-          system: systemPrompt,
-          tools: []
-        });
-
-        // Extraire le texte de la continuation
-        for (const block of continuation.content) {
-          if (block.type === 'text') {
-            responseText += block.text;
-          }
-        }
-      }
-
-      // Sauvegarder la réponse
-      memory.addMessage('assistant', responseText);
-
-      // Envoyer la réponse à Telegram
-      await this.sendResponse(chatId, responseText, toolCalls);
-
+      await adapter.sendMessage(result.text);
     } catch (error) {
       console.error('[Telegram] Error handling message:', error);
-      await this.bot.sendMessage(chatId, '❌ Une erreur s\'est produite. Veuillez réessayer.');
+      await adapter.sendMessage(MESSAGES.ERROR);
     }
   }
 
-  /**
-   * Envoie un message avec fallback vers texte brut si Markdown échoue
-   */
-  private async sendMessageSafe(chatId: number, text: string): Promise<void> {
-    if (!this.bot) return;
+  private async extractMessageContent(
+    msg: TelegramBot.Message
+  ): Promise<{ text: string; images: ChatImage[] }> {
+    let text = msg.text || msg.caption || '';
+    const images: ChatImage[] = [];
 
-    try {
-      await this.bot.sendMessage(chatId, text, {
-        parse_mode: 'Markdown',
-        disable_web_page_preview: true,
-      });
-    } catch (error: any) {
-      // Si erreur de parsing Markdown, renvoyer en texte brut
-      if (error?.response?.body?.description?.includes("can't parse entities")) {
-        console.log('[Telegram] Markdown parsing failed, sending as plain text');
-        await this.bot.sendMessage(chatId, text, {
-          disable_web_page_preview: true,
+    // Photos
+    if (msg.photo && msg.photo.length > 0 && this.bot) {
+      const photo = msg.photo[msg.photo.length - 1];
+      try {
+        const fileUrl = await this.bot.getFileLink(photo.file_id);
+        const base64Data = await this.downloadImageAsBase64(fileUrl);
+        images.push({
+          data: base64Data.replace(/^data:image\/\w+;base64,/, ''),
+          mimeType: 'image/jpeg',
         });
-      } else {
-        throw error;
-      }
-    }
-  }
-
-  /**
-   * Envoie une réponse formatée
-   */
-  private async sendResponse(
-    chatId: number,
-    content: string,
-    toolCalls?: ToolCall[]
-  ): Promise<void> {
-    if (!this.bot) return;
-
-    // Découper si trop long (limite Telegram: 4096 caractères)
-    const maxLength = 4000;
-    const parts = this.splitMessage(content, maxLength);
-
-    for (let i = 0; i < parts.length; i++) {
-      let text = parts[i];
-
-      // Ajouter les tool calls à la fin du dernier message
-      if (i === parts.length - 1 && toolCalls && toolCalls.length > 0) {
-        const toolText = this.formatToolCalls(toolCalls);
-        if (text.length + toolText.length < maxLength) {
-          text += toolText;
-        }
-      }
-
-      await this.sendMessageSafe(chatId, text);
-    }
-
-    // Si les tool calls sont trop longs, les envoyer séparément
-    if (toolCalls && toolCalls.length > 0) {
-      const toolText = this.formatToolCalls(toolCalls);
-      if (toolText.length > 1000) {
-        await this.sendMessageSafe(chatId, toolText);
-      }
-    }
-  }
-
-  /**
-   * Formate les tool calls pour Telegram
-   */
-  private formatToolCalls(toolCalls: ToolCall[]): string {
-    return '\n\n🔧 *Actions exécutées:*\n' +
-      toolCalls.map(tc => {
-        const args = Object.entries(tc.arguments || {})
-          .map(([k, v]) => `${k}: ${JSON.stringify(v).slice(0, 50)}`)
-          .join(', ');
-        return `• \`${tc.name}\` (${args})`;
-      }).join('\n');
-  }
-
-  /**
-   * Découpe un message trop long
-   */
-  private splitMessage(text: string, maxLength: number): string[] {
-    if (text.length <= maxLength) return [text];
-
-    const parts: string[] = [];
-    let current = '';
-
-    const lines = text.split('\n');
-    for (const line of lines) {
-      if (current.length + line.length + 1 > maxLength) {
-        parts.push(current);
-        current = line;
-      } else {
-        current += (current ? '\n' : '') + line;
+        if (!text) text = MESSAGES.IMAGE_PLACEHOLDER;
+      } catch (e) {
+        console.error('[Telegram] Failed to download image:', e);
       }
     }
 
-    if (current) parts.push(current);
-    return parts;
+    // Documents
+    if (msg.document && this.bot) {
+      text = text || `[Document: ${msg.document.file_name}]`;
+    }
+
+    return { text, images };
   }
 
-  /**
-   * Gère les commandes
-   */
-  private async handleCommand(
-    msg: TelegramBot.Message,
-    command: TelegramCommand
-  ): Promise<void> {
+  private async handleCommand(msg: TelegramBot.Message, command: TelegramCommand): Promise<void> {
     if (!this.bot) return;
 
     const chatId = msg.chat.id;
@@ -448,101 +240,56 @@ L'utilisateur écrit depuis un appareil mobile (Telegram). Sauf indication contr
     const username = msg.from?.username;
 
     if (!userId || !this.isAuthorized(userId, username)) {
-      await this.bot.sendMessage(chatId, '⛔ Non autorisé.');
+      await this.bot.sendMessage(chatId, MESSAGES.UNAUTHORIZED);
       return;
     }
 
     switch (command) {
       case '/start':
-        await this.bot.sendMessage(
-          chatId,
-          '🤖 *DangerousBot*\n\n' +
-          'Je suis ton assistant IA auto-modifiable.\n\n' +
-          '• Envoi-moi des messages texte\n' +
-          '• Partage des photos\n' +
-          '• Pose-moi des questions sur ton code\n\n' +
-          'Toutes les conversations sont synchronisées avec l\'interface web.',
-          { parse_mode: 'Markdown' }
-        );
+        await this.bot.sendMessage(chatId, COMMAND_MESSAGES.START, { parse_mode: 'Markdown' });
         break;
 
       case '/status':
         const provider = PROVIDER.ACTIVE;
         const memory = getMemory();
-        const history = memory.getMessages();
-        const messagesCount = history.length;
-        
+        const messagesCount = memory.getMessages().length;
         await this.bot.sendMessage(
           chatId,
-          `📊 *Statut*\n\n` +
-          `*Provider:* ${provider}\n` +
-          `*Messages:* ${messagesCount}\n` +
-          `*Session:* active`,
+          `📊 *Statut*\n\n*Provider:* ${provider}\n*Messages:* ${messagesCount}\n*Session:* active`,
           { parse_mode: 'Markdown' }
         );
         break;
 
       case '/web':
-        await this.bot.sendMessage(
-          chatId,
-          '🌐 Interface web:\n\nhttp://localhost:3000',
-          { disable_web_page_preview: true }
-        );
+        await this.bot.sendMessage(chatId, COMMAND_MESSAGES.WEB, { disable_web_page_preview: true });
         break;
-
-      // Dani: je ne veux pas que l'on puisse supprimer la conversation
-      // case '/clear':
-      //   const session = this.sessions.get(userId);
-      //   if (session) {
-      //     await getMemory().clearConversation(session);
-      //     this.sessions.delete(userId);
-      //   }
-      //   await this.bot.sendMessage(chatId, '🧹 Conversation effacée.');
-      //   break;
 
       case '/provider':
         const current = PROVIDER.ACTIVE;
         const other = current === 'claude' ? 'kimi' : 'claude';
         await this.bot.sendMessage(
           chatId,
-          `⚙️ Provider actuel: *${current}*\n\n` +
-          `Pour changer, utilise l\'interface web ou dis-moi "passe sur ${other}".`,
+          `⚙️ Provider actuel: *${current}*\n\nPour changer, utilise l'interface web ou dis-moi "passe sur ${other}".`,
           { parse_mode: 'Markdown' }
         );
         break;
 
       case '/help':
-        await this.bot.sendMessage(
-          chatId,
-          '*Commandes disponibles:*\n\n' +
-          '/start - Démarrer\n' +
-          '/status - Voir le statut\n' +
-          '/web - Lien vers l\'interface web\n' +
-          '/provider - Voir le provider actif\n' +
-          '/help - Cette aide',
-          { parse_mode: 'Markdown' }
-        );
+        await this.bot.sendMessage(chatId, COMMAND_MESSAGES.HELP, { parse_mode: 'Markdown' });
         break;
     }
   }
 
-  /**
-   * Télécharge une image et la convertit en base64
-   */
   private async downloadImageAsBase64(url: string): Promise<string> {
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`Failed to download image: ${response.status}`);
     }
     const buffer = await response.arrayBuffer();
-    const base64 = Buffer.from(buffer).toString('base64');
-    return `data:image/jpeg;base64,${base64}`;
+    return `data:image/jpeg;base64,${Buffer.from(buffer).toString('base64')}`;
   }
 
-  /**
-   * Récupère ou crée une session
-   */
-  private getOrCreateSession(userId: number, chatId: number): string {
+  private getOrCreateSession(userId: number): string {
     let conversationId = this.sessions.get(userId);
     if (!conversationId) {
       conversationId = `telegram-${userId}-${Date.now()}`;
@@ -551,32 +298,28 @@ L'utilisateur écrit depuis un appareil mobile (Telegram). Sauf indication contr
     return conversationId;
   }
 
-  /**
-   * Récupère l'ID de conversation Telegram
-   */
   getTelegramConversationId(userId: number): string | undefined {
     return this.sessions.get(userId);
   }
 
-  /**
-   * Envoie un message au master user
-   * Retourne true si envoyé, false sinon
-   */
+  getChatIdForUser(userId: number): number | undefined {
+    return this.userChatMap.get(userId);
+  }
+
   async sendMessageToMaster(message: string): Promise<boolean> {
     if (!this.bot) return false;
 
     const memory = getMemory();
     const master = memory.getTelegramMaster();
-    
+
     if (!master) {
       console.log('[Telegram] Pas de master user défini');
       return false;
     }
 
     try {
-      // Si on a un user_id, on essaie de trouver le chat_id correspondant
       if (master.user_id) {
-        const chatId = this.findChatIdForUser(master.user_id);
+        const chatId = this.userChatMap.get(master.user_id);
         if (chatId) {
           await this.bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
           console.log(`[Telegram] Message envoyé à ${master.user_id}`);
@@ -584,58 +327,12 @@ L'utilisateur écrit depuis un appareil mobile (Telegram). Sauf indication contr
         }
       }
 
-      // Si on n'a pas trouvé de chat_id, on ne peut pas envoyer le message
-      // L'utilisateur doit d'abord interagir avec le bot
       console.log('[Telegram] Impossible d\'envoyer le message - aucune session active');
       return false;
     } catch (err) {
       console.error('[Telegram] Erreur lors de l\'envoi:', err);
       return false;
     }
-  }
-
-  /**
-   * Trouve le chat_id pour un user_id donné (si une session existe)
-   */
-  private findChatIdForUser(userId: number): number | undefined {
-    return this.userChatMap.get(userId);
-  }
-
-  /**
-   * Récupère le chatId d'un user
-   */
-  getChatIdForUser(userId: number): number | undefined {
-    return this.userChatMap.get(userId);
-  }
-
-  /**
-   * Retourne un emoji pour un tool name
-   */
-  private getToolEmoji(toolName: string): string {
-    const emojis: Record<string, string> = {
-      'execute_code': '💻',
-      'shell': '🐚',
-      'read_file': '📄',
-      'write_file': '📝',
-      'edit_file': '✏️',
-      'delete_file': '🗑️',
-      'list_files': '📁',
-      'remember': '🧠',
-      'recall': '📚',
-      'self_update': '🔄',
-      'restart_server': '🔁',
-      'switch_provider': '🔀',
-      'consult_mistral': '💭',
-      'searxng_search': '🔍',
-      'get_kimi_balance': '💰',
-      'todo': '✅',
-      'retrieve_code': '🔎',
-      'log': '📋',
-      'set_log_level': '⚙️',
-      'clear_logs': '🧹',
-      'telegram': '👤',
-    };
-    return emojis[toolName] || '🔧';
   }
 }
 
