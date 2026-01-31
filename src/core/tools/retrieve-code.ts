@@ -69,9 +69,13 @@ export const retrieveCodeHandler: ToolHandler = {
         };
       }
 
-      // Calculer les similarités
+      // Formater les chemins absolus
+      const path = await import('path');
+      const projectRoot = context.projectRoot;
+
+      // Calculer les similarités avec chemins absolus
       const scored = allEmbeddings.map((item: any) => ({
-        file_path: item.file_path,
+        file_path: item.file_path.startsWith('/') ? item.file_path : path.join(projectRoot, item.file_path),
         content: item.content,
         similarity: CodeEmbeddingService.cosineSimilarity(queryEmbedding.vector, item.embedding)
       }));
@@ -82,13 +86,10 @@ export const retrieveCodeHandler: ToolHandler = {
         .slice(0, topK);
 
       // Formater la réponse avec chemins absolus
-      const path = await import('path');
-      const projectRoot = context.projectRoot;
       const lines = topResults.map((r: any, i: number) => {
         const pct = Math.round(r.similarity * 100);
         const preview = r.content.substring(0, 200).replace(/\n/g, ' ');
-        const absolutePath = r.file_path.startsWith('/') ? r.file_path : path.join(projectRoot, r.file_path);
-        return `**${i + 1}. ${absolutePath}** (${pct}% match)\n\`\`\`typescript\n${preview}${r.content.length > 200 ? '...' : ''}\n\`\`\``;
+        return `**${i + 1}. ${r.file_path}** (${pct}% match)\n\`\`\`typescript\n${preview}${r.content.length > 200 ? '...' : ''}\n\`\`\``;
       });
 
       return {
