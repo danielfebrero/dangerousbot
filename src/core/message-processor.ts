@@ -131,7 +131,7 @@ export class MessageProcessor {
 
         // Extraire le texte et les tool calls
         responseText = '';
-        const toolCalls: ToolCall[] = [];
+        const toolCalls: Array<{ name: string; input: Record<string, unknown>; id: string }> = [];
 
         for (const block of response.content) {
           if (block.type === 'text') {
@@ -140,6 +140,7 @@ export class MessageProcessor {
             toolCalls.push({
               name: block.name,
               input: block.input as Record<string, unknown>,
+              id: block.id,
             });
           }
         }
@@ -151,7 +152,7 @@ export class MessageProcessor {
         }
 
         // Exécuter TOUS les tools de cette itération avec le contexte de la plateforme
-        const iterationResults: Array<{ name: string; success: boolean; result?: unknown }> = [];
+        const iterationResults: Array<{ name: string; success: boolean; result?: unknown; id: string }> = [];
         for (const tc of toolCalls) {
           try {
             const result = await this.toolExecutor.execute(
@@ -163,6 +164,7 @@ export class MessageProcessor {
               name: tc.name,
               success: result.success !== false,
               result,
+              id: tc.id,
             });
           } catch (e) {
             const error = e as Error;
@@ -170,6 +172,7 @@ export class MessageProcessor {
               name: tc.name,
               success: false,
               result: { success: false, error: error.message },
+              id: tc.id,
             });
           }
         }
@@ -182,13 +185,13 @@ export class MessageProcessor {
           content: response.content,
         });
 
-        // Ajouter TOUS les résultats de tools
+        // Ajouter TOUS les résultats de tools avec le bon tool_use_id
         for (const tr of iterationResults) {
           (messages as any[]).push({
             role: 'user',
             content: [{
               type: 'tool_result',
-              tool_use_id: tr.name,
+              tool_use_id: tr.id,
               content: JSON.stringify(tr.result),
             }],
           });
