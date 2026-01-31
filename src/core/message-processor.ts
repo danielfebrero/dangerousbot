@@ -190,10 +190,10 @@ export class MessageProcessor {
         }
       }
 
-      // Sauvegarder dans la mémoire
+      // Sauvegarder dans la mémoire avec la source
       if (conversationId) {
-        memory.addMessage('user', message.text);
-        memory.addMessage('assistant', responseText);
+        memory.addMessage('user', message.text, undefined, undefined, source);
+        memory.addMessage('assistant', responseText, undefined, undefined, source);
       }
 
       // Notifier la fin du traitement

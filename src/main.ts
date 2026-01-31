@@ -367,7 +367,7 @@ async function main(): Promise<void> {
     console.log('[Main] Signal STOP reçu, annulation de la requête...');
   });
 
-  // Configurer le provider d'historique (avec support images)
+  // Configurer le provider d'historique (avec support images et source)
   wsManager.setHistoryProvider(() => {
     const history = memory.getMessages();
     return history
@@ -378,7 +378,8 @@ async function main(): Promise<void> {
         content: msg.content,
         timestamp: msg.timestamp,
         tool_calls: msg.tool_calls,
-        images: msg.images
+        images: msg.images,
+        source: msg.source
       }));
   });
 

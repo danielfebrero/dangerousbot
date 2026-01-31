@@ -44,6 +44,7 @@ export interface Message {
     to: string;
     reason: string;
   };
+  source?: 'webapp' | 'telegram';
 }
 
 export interface WSMessage {

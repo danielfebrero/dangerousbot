@@ -13,7 +13,8 @@ export type HistoryMessage = {
   content: string; 
   timestamp: string; 
   tool_calls?: Array<{ name: string; input: unknown }>; 
-  images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }> 
+  images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>;
+  source?: 'webapp' | 'telegram';
 };
 export type HistoryProvider = () => HistoryMessage[];
 

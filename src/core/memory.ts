@@ -55,10 +55,12 @@ export class Memory {
         content TEXT NOT NULL,
         tool_calls TEXT,
         images TEXT,
+        source TEXT CHECK(source IN ('webapp', 'telegram')),
         timestamp TEXT NOT NULL,
         created_at TEXT DEFAULT (datetime('now'))
       );
       CREATE INDEX IF NOT EXISTS idx_conversations_session ON conversations(session_id);
+      CREATE INDEX IF NOT EXISTS idx_conversations_source ON conversations(source);
     `);
     
     // Migration: ajouter la colonne tool_calls si elle n'existe pas
@@ -168,7 +170,8 @@ export class Memory {
     role: 'user' | 'assistant' | 'system', 
     content: string, 
     toolCalls?: Array<{ id?: string; name: string; input: unknown }>,
-    images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>
+    images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>,
+    source?: 'webapp' | 'telegram'
   ): number {
     // Vérifier si un message identique existe déjà dans les 5 dernières secondes (anti-doublon)
     const recentDuplicate = this.db.prepare(`
@@ -183,16 +186,22 @@ export class Memory {
       return recentDuplicate.id;
     }
     
-    // Migration: ajouter la colonne images si nécessaire
+    // Migration: ajouter les colonnes si nécessaire
     try {
       this.db.exec(`ALTER TABLE conversations ADD COLUMN images TEXT`);
     } catch (e) {
       // Colonne existe déjà
     }
     
+    try {
+      this.db.exec(`ALTER TABLE conversations ADD COLUMN source TEXT CHECK(source IN ('webapp', 'telegram'))`);
+    } catch (e) {
+      // Colonne existe déjà
+    }
+    
     const stmt = this.db.prepare(`
-      INSERT INTO conversations (session_id, role, content, tool_calls, images, timestamp)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO conversations (session_id, role, content, tool_calls, images, source, timestamp)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
     const result = stmt.run(
       this.currentSessionId,
@@ -200,21 +209,36 @@ export class Memory {
       content,
       toolCalls ? JSON.stringify(toolCalls) : null,
       images ? JSON.stringify(images) : null,
+      source || null,
       new Date().toISOString()
     );
     return result.lastInsertRowid as number;
   }
 
-  getMessages(sessionId?: string, limit: number = 100): (Message & { images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }> })[] {
+  getMessages(
+    sessionId?: string, 
+    limit: number = 100, 
+    sourceFilter?: 'webapp' | 'telegram' | null
+  ): (Message & { images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>; source?: 'webapp' | 'telegram' })[] {
     const sid = sessionId || this.currentSessionId;
-    // Prendre les N plus récents (ORDER BY id DESC), puis inverser pour avoir l'ordre chronologique
-    const rows = this.db.prepare(`
-      SELECT id, session_id, role, content, tool_calls, images, timestamp
+    
+    // Construire la requête avec filtre optionnel
+    let query = `
+      SELECT id, session_id, role, content, tool_calls, images, source, timestamp
       FROM conversations
       WHERE session_id = ?
-      ORDER BY id DESC
-      LIMIT ?
-    `).all(sid, limit) as Array<Message & { tool_calls?: string; images?: string }>;
+    `;
+    const params: (string | number)[] = [sid];
+    
+    if (sourceFilter) {
+      query += ` AND (source = ? OR source IS NULL)`;
+      params.push(sourceFilter);
+    }
+    
+    query += ` ORDER BY id DESC LIMIT ?`;
+    params.push(limit);
+    
+    const rows = this.db.prepare(query).all(...params) as Array<Message & { tool_calls?: string; images?: string; source?: 'webapp' | 'telegram' }>;
     
     // Inverser pour ordre chronologique + parser les JSON
     return rows.reverse().map(row => ({
@@ -224,14 +248,23 @@ export class Memory {
     }));
   }
 
-  getRecentMessages(count: number = 20): Message[] {
-    const rows = this.db.prepare(`
-      SELECT id, session_id, role, content, tool_calls, timestamp
+  getRecentMessages(count: number = 20, sourceFilter?: 'webapp' | 'telegram' | null): Message[] {
+    let query = `
+      SELECT id, session_id, role, content, tool_calls, source, timestamp
       FROM conversations
       WHERE session_id = ?
-      ORDER BY id DESC
-      LIMIT ?
-    `).all(this.currentSessionId, count) as Array<Message & { tool_calls?: string }>;
+    `;
+    const params: (string | number)[] = [this.currentSessionId];
+    
+    if (sourceFilter) {
+      query += ` AND (source = ? OR source IS NULL)`;
+      params.push(sourceFilter);
+    }
+    
+    query += ` ORDER BY id DESC LIMIT ?`;
+    params.push(count);
+    
+    const rows = this.db.prepare(query).all(...params) as Array<Message & { tool_calls?: string; source?: 'webapp' | 'telegram' }>;
     
     return rows.reverse().map(row => ({
       ...row,

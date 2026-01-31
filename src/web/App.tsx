@@ -1,11 +1,8 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useWebSocket } from './hooks/useWebSocket';
-import { useToolPanel } from './hooks/useToolPanel';
 import { Header } from './components/Header';
 import { MessageList } from './components/MessageList';
 import { MessageInput } from './components/MessageInput';
-import { ToolPanel } from './components/ToolPanel';
-import { ToolPanelToggle } from './components/ToolPanelToggle';
 import { DragOverlay } from './components/DragOverlay';
 import { Message, WSMessage, TokenUsage, ContentPart, ToolCallExecution } from './types';
 import './styles/global.css';
@@ -15,20 +12,9 @@ function App() {
   const [isTyping, setIsTyping] = useState(false);
   const [tokenUsage, setTokenUsage] = useState<TokenUsage | null>(null);
   const [headerVisible, setHeaderVisible] = useState(true);
-  const lastScrollY = useRef(0);
   const [droppedImages, setDroppedImages] = useState<ContentPart[]>([]);
-
-  // Tool panel state
-  const {
-    isOpen: toolPanelOpen,
-    togglePanel,
-    closePanel,
-    executions,
-    addExecution,
-    completeExecution,
-    failExecution,
-    hasRunningTools
-  } = useToolPanel();
+  const [showAllSources, setShowAllSources] = useState(true);
+  const lastScrollY = useRef(0);
 
   // Track tool execution IDs for matching results
   const toolExecutionMapRef = useRef<Record<string, string>>({});
@@ -65,7 +51,8 @@ function App() {
           content: string;
           timestamp: string;
           tool_calls?: Array<{ name: string; input: unknown }>;
-          images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>
+          images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>;
+          source?: 'webapp' | 'telegram';
         }) => {
           const isProviderSwitch = msg.role === 'system' && (
             msg.content.includes('Provider changé') ||
@@ -108,6 +95,7 @@ function App() {
             contentParts,
             toolCalls: msg.tool_calls,
             providerSwitch,
+            source: msg.source,
             timestamp: new Date(msg.timestamp)
           };
         });
@@ -194,9 +182,6 @@ function App() {
           break;
         }
         
-        const execId = addExecution(toolName, toolInput, executionId);
-        toolExecutionMapRef.current[executionId] = execId;
-
         // Create a new tool execution message in the chat
         // Use executionId as the message ID for easy lookup on tool_result
         const newExecution: ToolCallExecution = {
@@ -228,56 +213,50 @@ function App() {
         break;
 
       case 'tool_result':
-        // Update tool panel
+        // Update tool execution
         const resultExecutionId = wsMessage.payload.executionId;
-        const resultExecId = toolExecutionMapRef.current[resultExecutionId];
-        if (resultExecId) {
-          const result = wsMessage.payload.result;
-          const isError = result?.success === false || result?.error;
-          
-          if (isError) {
-            failExecution(resultExecId, result.error || 'Unknown error');
-          } else {
-            completeExecution(resultExecId, result);
-          }
-          
-          // Update the tool execution message in chat using executionId
-          setMessages(prev => {
-            return prev.map(msg => {
-              // Use message.id (which is executionId) for lookup
-              if (msg.type === 'tool_execution' && msg.id === resultExecutionId) {
-                return {
-                  ...msg,
-                  toolExecution: {
-                    ...msg.toolExecution,
-                    status: isError ? 'error' : 'completed',
-                    output: isError ? undefined : result,
-                    error: isError ? (result.error || 'Unknown error') : undefined,
-                    endTime: new Date()
-                  }
-                };
-              }
-              return msg;
-            });
-          });
-          
-          // Update active executions ref using executionId
-          activeToolExecutionsRef.current = activeToolExecutionsRef.current.map(exec => {
-            if (exec.id === resultExecutionId) {
+        
+        // Update the tool execution message in chat using executionId
+        setMessages(prev => {
+          return prev.map(msg => {
+            // Use message.id (which is executionId) for lookup
+            if (msg.type === 'tool_execution' && msg.id === resultExecutionId) {
+              const result = wsMessage.payload.result;
+              const isError = result?.success === false || result?.error;
+              
               return {
-                ...exec,
-                status: isError ? 'error' : 'completed',
-                output: isError ? undefined : result,
-                error: isError ? (result.error || 'Unknown error') : undefined,
-                endTime: new Date()
+                ...msg,
+                toolExecution: {
+                  ...msg.toolExecution,
+                  status: isError ? 'error' : 'completed',
+                  output: isError ? undefined : result,
+                  error: isError ? (result.error || 'Unknown error') : undefined,
+                  endTime: new Date()
+                }
               };
             }
-            return exec;
+            return msg;
           });
-          setActiveToolExecutions(activeToolExecutionsRef.current);
-          
-          delete toolExecutionMapRef.current[resultExecutionId];
-        }
+        });
+        
+        // Update active executions ref using executionId
+        activeToolExecutionsRef.current = activeToolExecutionsRef.current.map(exec => {
+          if (exec.id === resultExecutionId) {
+            const result = wsMessage.payload.result;
+            const isError = result?.success === false || result?.error;
+            return {
+              ...exec,
+              status: isError ? 'error' : 'completed',
+              output: isError ? undefined : result,
+              error: isError ? (result.error || 'Unknown error') : undefined,
+              endTime: new Date()
+            };
+          }
+          return exec;
+        });
+        setActiveToolExecutions(activeToolExecutionsRef.current);
+        
+        delete toolExecutionMapRef.current[resultExecutionId];
         break;
 
       case 'system':
@@ -321,7 +300,7 @@ function App() {
         }]);
         break;
     }
-  }, [addExecution, completeExecution, failExecution]);
+  }, []);
 
   const { status, sendMessage, sendStop } = useWebSocket({ onMessage: handleMessage });
 
@@ -382,21 +361,30 @@ function App() {
         type: 'user',
         content,
         contentParts,
+        source: 'webapp',
         timestamp: new Date()
       }]);
     }
   }, [sendMessage]);
 
+  // Filter messages based on showAllSources setting
+  const filteredMessages = showAllSources 
+    ? messages 
+    : messages.filter(m => !m.source || m.source === 'webapp');
+
   return (
-    <div className={`app ${toolPanelOpen ? 'panel-open' : ''}`}>
+    <div className="app">
       <Header
         status={status}
         visible={headerVisible}
+        tokenUsage={tokenUsage}
+        showAllSources={showAllSources}
+        onToggleSources={setShowAllSources}
       />
 
       <main className="main-content">
         <div className="chat-container">
-          <MessageList messages={messages} isTyping={isTyping} />
+          <MessageList messages={filteredMessages} isTyping={isTyping} />
         </div>
       </main>
 
@@ -412,19 +400,6 @@ function App() {
       <DragOverlay
         onFilesDrop={handleFilesDrop}
         disabled={status !== 'connected'}
-      />
-
-      <ToolPanelToggle
-        isOpen={toolPanelOpen}
-        onClick={togglePanel}
-        hasActivity={hasRunningTools}
-      />
-
-      <ToolPanel
-        isOpen={toolPanelOpen}
-        onClose={closePanel}
-        executions={executions}
-        tokenUsage={tokenUsage}
       />
     </div>
   );
