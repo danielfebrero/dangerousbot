@@ -201,7 +201,7 @@ html, body {
   flex-direction: column;
   gap: var(--space-3);
   padding-top: var(--space-4);
-  padding-bottom: 4rem;
+  padding-bottom: 250px; /* Espace pour le textarea qui s'agrandit */
 }
 
 /* ═══════════════════════════════════════
@@ -214,8 +214,9 @@ html, body {
   animation: message-enter var(--duration-normal) var(--ease-out);
 }
 
+/* Suppression du margin spécial sur le dernier message */
 .message:last-of-type .message-content {
-  margin-bottom: 4rem;
+  margin-bottom: 0;
 }
 
 @keyframes message-enter {
@@ -258,20 +259,34 @@ html, body {
   padding: var(--space-4) 0;
 }
 
-/* Timestamp hover tooltip */
+/* Timestamp hover tooltip - plus visible et aligné selon le type */
 .message-timestamp-hover {
   position: absolute;
-  bottom: -20px;
-  right: 0;
+  bottom: -24px;
   font-size: 0.7rem;
-  color: var(--text-tertiary);
-  opacity: 0.8;
-  padding: 2px 6px;
-  background: var(--bg-elevated);
-  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 6px;
   white-space: nowrap;
   pointer-events: none;
   z-index: 10;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Alignement pour messages assistant (bot) - à gauche */
+.message.bot .message-timestamp-hover,
+.message.tool_execution .message-timestamp-hover {
+  left: 0;
+  right: auto;
+}
+
+/* Alignement pour messages user - à droite */
+.message.user .message-timestamp-hover {
+  right: 0;
+  left: auto;
 }
 
 .message {
