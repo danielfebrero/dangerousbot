@@ -161,7 +161,13 @@ export class TelegramBotService extends EventEmitter {
     this.userChatMap.set(userId, chatId);
 
     const adapter = new TelegramChatAdapter(this.bot, chatId);
+    
+    // Garder l'indicateur "typing" actif pendant tout le traitement
+    // L'API Telegram expire après ~5 secondes, donc on renouvelle toutes les 4 secondes
     adapter.sendTyping();
+    const typingInterval = setInterval(() => {
+      adapter.sendTyping();
+    }, 4000);
 
     try {
       // Extraire le contenu
@@ -193,6 +199,9 @@ export class TelegramBotService extends EventEmitter {
         }
       );
 
+      // Arrêter l'indicateur typing
+      clearInterval(typingInterval);
+
       if (result.error) {
         console.error('[Telegram] Processing error:', result.error);
         await adapter.sendMessage(MESSAGES.ERROR);
@@ -201,6 +210,8 @@ export class TelegramBotService extends EventEmitter {
 
       await adapter.sendMessage(result.text);
     } catch (error) {
+      // Arrêter l'indicateur typing même en cas d'erreur
+      clearInterval(typingInterval);
       console.error('[Telegram] Error handling message:', error);
       await adapter.sendMessage(MESSAGES.ERROR);
     }
