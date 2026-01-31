@@ -190,9 +190,19 @@ export class MessageProcessor {
         }
       }
 
-      // Sauvegarder dans la mémoire avec la source
+      // Sauvegarder dans la mémoire avec la source et les images
       if (conversationId) {
-        memory.addMessage('user', message.text, undefined, undefined, source);
+        // Convertir les images au format attendu par la DB
+        const imagesForDb = message.images?.map(img => ({
+          type: 'image' as const,
+          source: {
+            type: 'base64' as const,
+            media_type: img.mimeType,
+            data: img.data
+          }
+        }));
+        
+        memory.addMessage('user', message.text, undefined, imagesForDb, source);
         memory.addMessage('assistant', responseText, undefined, undefined, source);
       }
 
