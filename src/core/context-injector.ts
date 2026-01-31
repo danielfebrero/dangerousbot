@@ -11,6 +11,8 @@ import { getMemory, Memory } from './memory';
 import { getCompressor, MemoryCompressor, CompressedMemory } from './compressor';
 import { getEmbeddingService, EmbeddingService } from './embedding';
 import { Knowledge } from './types';
+import { PROVIDER } from '../config.js';
+import { logger } from './logger.js';
 
 export interface InjectedContext {
   memories: string[];      // Résumés de conversations passées pertinentes
@@ -80,6 +82,9 @@ export class ContextInjector {
   formatContextBlock(context: InjectedContext): string {
     const sections: string[] = [];
 
+    // Section configuration système (toujours présente)
+    sections.push(this.buildConfigSection());
+
     // Section mémoires passées
     if (context.memories.length > 0) {
       sections.push(`## 📚 Mémoires de conversations passées
@@ -101,10 +106,6 @@ ${context.knowledge.join('\n')}`);
 ${context.recentSummary}`);
     }
 
-    if (sections.length === 0) {
-      return '';
-    }
-
     return `
 ---
 # CONTEXTE INJECTÉ (mémoire long-terme)
@@ -113,6 +114,19 @@ ${sections.join('\n\n')}
 
 ---
 `;
+  }
+
+  /**
+   * Construit la section de configuration système
+   */
+  private buildConfigSection(): string {
+    const provider = PROVIDER.ACTIVE;
+    const logLevel = logger.getLevel();
+
+    return `## ⚙️ Configuration Système
+
+- **Provider actif**: ${provider}
+- **Niveau de log**: ${logLevel}`;
   }
 
   /**

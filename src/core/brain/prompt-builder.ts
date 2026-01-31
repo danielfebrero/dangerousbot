@@ -5,6 +5,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { ContextInjector, getContextInjector } from '../context-injector.js';
+import { PROVIDER } from '../../config.js';
+import { logger } from '../logger.js';
 
 export class PromptBuilder {
   private baseIdentity: string;
