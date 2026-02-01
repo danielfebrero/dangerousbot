@@ -32,10 +32,19 @@ export class CodeIndexer {
 
   /**
    * Liste tous les fichiers source du projet
+   * Pour DangerousBot: scanne src/
+   * Pour projets externes: scanne la racine + tous les sous-dossiers pertinents
    */
   private getSourceFiles(): string[] {
-    const srcDir = path.join(this.projectRoot, 'src');
     const files: string[] = [];
+    const srcDir = path.join(this.projectRoot, 'src');
+    const hasSrcDir = fs.existsSync(srcDir) && fs.statSync(srcDir).isDirectory();
+    
+    // Pour DangerousBot (projet par défaut), scanner uniquement src/
+    // Pour les autres projets, scanner la racine complète
+    const rootsToScan = (this.projectName === 'dangerousbot' && hasSrcDir) 
+      ? [srcDir] 
+      : [this.projectRoot];
 
     const walk = (dir: string) => {
       if (!fs.existsSync(dir)) return;
@@ -47,7 +56,7 @@ export class CodeIndexer {
 
         if (entry.isDirectory()) {
           // Ignorer node_modules et autres dossiers non pertinents
-          if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name === '.git') {
+          if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name === '.git' || entry.name === '.backups') {
             continue;
           }
           walk(fullPath);
@@ -57,7 +66,9 @@ export class CodeIndexer {
       }
     };
 
-    walk(srcDir);
+    for (const root of rootsToScan) {
+      walk(root);
+    }
     return files;
   }
 
@@ -229,6 +240,7 @@ export class CodeIndexer {
 
   /**
    * Indexe uniquement les fichiers modifiés (appelé après self_update)
+   * Note: Cette méthode est principalement pour DangerousBot (self_update)
    */
   async indexModifiedFiles(filePaths: string[]): Promise<IndexingResult> {
     if (this.isIndexing) {
@@ -242,8 +254,9 @@ export class CodeIndexer {
 
     try {
       for (const filePath of filePaths) {
-        // Ignorer les fichiers hors du dossier src
-        if (!filePath.startsWith('src/')) {
+        // Pour DangerousBot: ignorer les fichiers hors du dossier src
+        // Pour autres projets: accepter tous les fichiers
+        if (this.projectName === 'dangerousbot' && !filePath.startsWith('src/')) {
           continue;
         }
 
