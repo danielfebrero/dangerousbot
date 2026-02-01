@@ -23,6 +23,7 @@ import { searxngSearchHandler, searxngSearchDefinition } from './searxng-search'
 import { getKimiBalanceHandler, getKimiBalanceDefinition } from './get-kimi-balance';
 import { todoHandler, todoDefinition } from './todo';
 import { retrieveCodeHandler, retrieveCodeDefinition } from './retrieve-code';
+import { codeIndexHandler, codeIndexDefinition } from './code-index';
 import { logHandler, logDefinition, setLogLevelHandler, setLogLevelDefinition, clearLogsHandler, clearLogsDefinition } from './log';
 import { telegramHandler, telegramDefinition } from './telegram';
 import { configHandler, configDefinition } from './config';
@@ -90,6 +91,7 @@ export function getToolDefinitions(): Tool[] {
     getKimiBalanceDefinition,
     todoDefinition,
     retrieveCodeDefinition,
+    codeIndexDefinition,
     logDefinition,
     setLogLevelDefinition,
     clearLogsDefinition,
@@ -170,6 +172,7 @@ export {
   getKimiBalanceHandler,
   todoHandler,
   retrieveCodeHandler,
+  codeIndexHandler,
   logHandler,
   setLogLevelHandler,
   clearLogsHandler

@@ -20,12 +20,14 @@ export class CodeIndexer {
   private memory: Memory;
   private embeddingService: CodeEmbeddingService;
   private projectRoot: string;
+  private projectName: string;
   private isIndexing: boolean = false;
 
-  constructor(projectRoot: string, memory: Memory, embeddingService: CodeEmbeddingService) {
+  constructor(projectRoot: string, memory: Memory, embeddingService: CodeEmbeddingService, projectName: string = 'dangerousbot') {
     this.projectRoot = projectRoot;
     this.memory = memory;
     this.embeddingService = embeddingService;
+    this.projectName = projectName;
   }
 
   /**
@@ -85,8 +87,8 @@ export class CodeIndexer {
       const stats = fs.statSync(fullPath);
       const hash = this.computeHash(content);
 
-      // Vérifier si le fichier est déjà indexé et à jour
-      const existing = this.memory.getCodeEmbedding(filePath);
+      // Vérifier si le fichier est déjà indexé et à jour pour ce projet
+      const existing = this.memory.getCodeEmbedding(filePath, this.projectName);
       if (existing && existing.content_hash === hash) {
         return { indexed: false, updated: false }; // Déjà à jour
       }
@@ -94,7 +96,7 @@ export class CodeIndexer {
       // Générer l'embedding
       const result = await this.embeddingService.embedCode(content, filePath);
 
-      // Sauvegarder dans la DB
+      // Sauvegarder dans la DB avec le nom du projet
       this.memory.addCodeEmbedding(
         filePath,
         content,
@@ -102,7 +104,8 @@ export class CodeIndexer {
         result.vector,
         result.tokenCount,
         stats.size,
-        stats.mtime.toISOString()
+        stats.mtime.toISOString(),
+        this.projectName
       );
 
       return { indexed: true, updated: existing ? true : false };
@@ -159,18 +162,21 @@ export class CodeIndexer {
         }
       }
 
-      // 4. Supprimer les fichiers qui n'existent plus
-      for (const indexedFile of indexedFiles) {
+      // 4. Supprimer les fichiers qui n'existent plus (pour ce projet uniquement)
+      const projectIndexedFiles = new Set(
+        this.memory.getAllCodeEmbeddings(this.projectName).map(e => e.file_path)
+      );
+      for (const indexedFile of projectIndexedFiles) {
         if (!sourceFiles.includes(indexedFile)) {
-          this.memory.deleteCodeEmbedding(indexedFile);
+          this.memory.deleteCodeEmbedding(indexedFile, this.projectName);
           result.deleted++;
         }
       }
 
       // 5. Afficher les stats
-      const stats = this.memory.getCodeEmbeddingStats();
-      console.log(`[CodeIndexer] Terminé! ${result.indexed} nouveaux, ${result.updated} mis à jour, ${result.deleted} supprimés`);
-      console.log(`[CodeIndexer] Total: ${stats.total_files} fichiers, ${stats.total_tokens} tokens`);
+      const stats = this.memory.getCodeEmbeddingStats(this.projectName);
+      console.log(`[CodeIndexer] [${this.projectName}] Terminé! ${result.indexed} nouveaux, ${result.updated} mis à jour, ${result.deleted} supprimés`);
+      console.log(`[CodeIndexer] [${this.projectName}] Total: ${stats.total_files} fichiers, ${stats.total_tokens} tokens`);
 
     } catch (error) {
       result.errors.push(`Global error: ${(error as Error).message}`);
@@ -229,14 +235,11 @@ export class CodeIndexer {
   }
 
   /**
-   * Supprime tous les embeddings (utile pour reset)
+   * Supprime tous les embeddings de ce projet (utile pour reset)
    */
-  clearAll(): void {
-    const embeddings = this.memory.getAllCodeEmbeddings();
-    for (const e of embeddings) {
-      this.memory.deleteCodeEmbedding(e.file_path);
-    }
-    console.log(`[CodeIndexer] ${embeddings.length} embeddings supprimés`);
+  clearProject(): void {
+    this.memory.deleteProjectEmbeddings(this.projectName);
+    console.log(`[CodeIndexer] [${this.projectName}] Projet supprimé de l'index`);
   }
 
   /**
@@ -244,22 +247,63 @@ export class CodeIndexer {
    */
   needsIndexing(): boolean {
     const sourceFiles = this.getSourceFiles();
-    const indexedCount = this.memory.getCodeEmbeddingStats().total_files;
+    const indexedCount = this.memory.getCodeEmbeddingStats(this.projectName).total_files;
     return sourceFiles.length !== indexedCount;
   }
-}
 
-// Singleton
-let indexerInstance: CodeIndexer | null = null;
-
-export function getCodeIndexer(projectRoot: string, memory: Memory, embeddingService: CodeEmbeddingService): CodeIndexer {
-  if (!indexerInstance) {
-    indexerInstance = new CodeIndexer(projectRoot, memory, embeddingService);
+  /**
+   * Liste les projets indexés
+   */
+  listProjects(): string[] {
+    return this.memory.listIndexedProjects();
   }
-  return indexerInstance;
+
+  /**
+   * Supprime un projet de l'index
+   */
+  removeProject(projectName: string): void {
+    if (projectName === this.projectName) {
+      this.memory.deleteProjectEmbeddings(projectName);
+      console.log(`[CodeIndexer] Projet '${projectName}' supprimé de l'index`);
+    }
+  }
 }
 
-export function initCodeIndexer(projectRoot: string, memory: Memory, embeddingService: CodeEmbeddingService): CodeIndexer {
-  indexerInstance = new CodeIndexer(projectRoot, memory, embeddingService);
-  return indexerInstance;
+// Registry pour gérer plusieurs indexeurs
+export const indexerRegistry: Map<string, CodeIndexer> = new Map();
+
+/**
+ * Récupère ou crée un indexeur pour un projet
+ */
+export function getCodeIndexer(projectRoot: string, memory: Memory, embeddingService: CodeEmbeddingService, projectName: string = 'dangerousbot'): CodeIndexer {
+  const key = `${projectRoot}:${projectName}`;
+  if (!indexerRegistry.has(key)) {
+    indexerRegistry.set(key, new CodeIndexer(projectRoot, memory, embeddingService, projectName));
+  }
+  return indexerRegistry.get(key)!;
+}
+
+/**
+ * Crée un nouvel indexeur (force la création d'une nouvelle instance)
+ */
+export function initCodeIndexer(projectRoot: string, memory: Memory, embeddingService: CodeEmbeddingService, projectName: string = 'dangerousbot'): CodeIndexer {
+  const key = `${projectRoot}:${projectName}`;
+  const indexer = new CodeIndexer(projectRoot, memory, embeddingService, projectName);
+  indexerRegistry.set(key, indexer);
+  return indexer;
+}
+
+/**
+ * Supprime un indexeur du registre
+ */
+export function removeCodeIndexer(projectRoot: string, projectName: string): void {
+  const key = `${projectRoot}:${projectName}`;
+  indexerRegistry.delete(key);
+}
+
+/**
+ * Liste tous les projets indexés (via n'importe quel indexeur)
+ */
+export function listIndexedProjects(memory: Memory): string[] {
+  return memory.listIndexedProjects();
 }

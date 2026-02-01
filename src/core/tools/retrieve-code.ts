@@ -10,7 +10,7 @@ import { APIS, PATHS } from '../../config';
 
 export const retrieveCodeDefinition: Tool = {
   name: 'retrieve_code',
-  description: 'Recherche sémantique dans la codebase de DangerousBot. Utilise les embeddings pour retrouver les fichiers et snippets de code les plus pertinents par rapport à une requête. Parfait pour trouver où est implémentée une fonctionnalité ou comprendre l\'architecture.',
+  description: 'Recherche sémantique dans une codebase indexée. Utilise les embeddings pour retrouver les fichiers et snippets de code les plus pertinents par rapport à une requête. Par défaut, cherche dans la codebase de DangerousBot. Utilisez project_name pour chercher dans un projet spécifique indexé avec code_index.',
   input_schema: {
     type: 'object',
     properties: {
@@ -21,6 +21,10 @@ export const retrieveCodeDefinition: Tool = {
       top_k: { 
         type: 'number', 
         description: 'Nombre de résultats à retourner (défaut: 5)' 
+      },
+      project_name: {
+        type: 'string',
+        description: 'Nom du projet à chercher (ex: "dangerousbot", "mon_projet"). Par défaut: dangerousbot'
       }
     },
     required: ['query']
@@ -33,6 +37,7 @@ export const retrieveCodeHandler: ToolHandler = {
   async execute(input: ToolInput, context: ToolContext): Promise<ToolResult> {
     const query = input.query as string;
     const topK = (input.top_k as number) || 5;
+    const projectName = (input.project_name as string) || 'dangerousbot';
 
     try {
       // Obtenir le service d'embedding
@@ -58,15 +63,23 @@ export const retrieveCodeHandler: ToolHandler = {
       // Générer l'embedding de la requête
       const queryEmbedding = await embeddingService.embedCode(query);
 
-      // Récupérer tous les embeddings indexés
-      const allEmbeddings = context.memory.getAllCodeEmbeddings();
+      // Récupérer les embeddings du projet spécifié
+      const allEmbeddings = context.memory.getAllCodeEmbeddings(projectName);
 
       if (allEmbeddings.length === 0) {
-        return {
-          success: true,
-          results: [],
-          message: '📂 Aucun fichier indexé dans la base de données. Utilisez l\'indexation au démarrage.'
-        };
+        const projects = context.memory.listIndexedProjects();
+        if (projects.includes(projectName)) {
+          return {
+            success: true,
+            results: [],
+            message: `📂 Le projet '${projectName}' existe mais ne contient aucun fichier indexé.`
+          };
+        } else {
+          return {
+            success: false,
+            error: `Projet '${projectName}' non trouvé. Projets disponibles: ${projects.join(', ') || 'aucun'}. Utilisez code_index pour ajouter un projet.`
+          };
+        }
       }
 
       // Formater les chemins absolus
@@ -92,10 +105,13 @@ export const retrieveCodeHandler: ToolHandler = {
         return `**${i + 1}. ${r.file_path}** (${pct}% match)\n\`\`\`typescript\n${preview}${r.content.length > 200 ? '...' : ''}\n\`\`\``;
       });
 
+      // Message avec indication du projet
+      const projectLabel = projectName === 'dangerousbot' ? 'codebase DangerousBot' : `projet '${projectName}'`;
+      
       return {
         success: true,
         results: topResults,
-        message: `## 🔍 Résultats pour: "${query}"\n\n${lines.join('\n\n')}`
+        message: `## 🔍 Résultats pour: "${query}" (${projectLabel})\n\n${lines.join('\n\n')}`
       };
     } catch (error) {
       return {

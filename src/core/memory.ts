@@ -87,6 +87,20 @@ export class Memory {
       // Index existe déjà, ignorer
     }
 
+    // Migration: ajouter la colonne project_name à code_embeddings si elle n'existe pas
+    try {
+      this.db.exec(`ALTER TABLE code_embeddings ADD COLUMN project_name TEXT DEFAULT 'dangerousbot'`);
+    } catch (e) {
+      // Colonne existe déjà, ignorer
+    }
+
+    // Index pour project_name (après la migration)
+    try {
+      this.db.exec(`CREATE INDEX IF NOT EXISTS idx_code_embeddings_project ON code_embeddings(project_name)`);
+    } catch (e) {
+      // Index existe déjà, ignorer
+    }
+
     // Table des embeddings (préparé pour le futur)
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS embeddings (
@@ -368,13 +382,14 @@ export class Memory {
     embedding: number[],
     tokenCount?: number,
     fileSize?: number,
-    lastModified?: string
+    lastModified?: string,
+    projectName: string = 'dangerousbot'
   ): number {
     const buffer = Buffer.from(new Float64Array(embedding).buffer);
     const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO code_embeddings 
-      (file_path, content, content_hash, embedding, token_count, file_size, last_modified, indexed_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      (file_path, content, content_hash, embedding, token_count, file_size, last_modified, indexed_at, project_name)
+      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)
     `);
     const result = stmt.run(
       filePath,
@@ -383,16 +398,17 @@ export class Memory {
       buffer,
       tokenCount || 0,
       fileSize || 0,
-      lastModified || new Date().toISOString()
+      lastModified || new Date().toISOString(),
+      projectName
     );
     return result.lastInsertRowid as number;
   }
 
-  getCodeEmbedding(filePath: string): { id: number; file_path: string; content: string; content_hash: string; embedding: number[]; token_count: number; indexed_at: string } | null {
+  getCodeEmbedding(filePath: string, projectName: string = 'dangerousbot'): { id: number; file_path: string; content: string; content_hash: string; embedding: number[]; token_count: number; indexed_at: string } | null {
     const row = this.db.prepare(`
       SELECT id, file_path, content, content_hash, embedding, token_count, indexed_at
-      FROM code_embeddings WHERE file_path = ?
-    `).get(filePath) as { id: number; file_path: string; content: string; content_hash: string; embedding: Buffer; token_count: number; indexed_at: string } | undefined;
+      FROM code_embeddings WHERE file_path = ? AND project_name = ?
+    `).get(filePath, projectName) as { id: number; file_path: string; content: string; content_hash: string; embedding: Buffer; token_count: number; indexed_at: string } | undefined;
     
     if (!row) return null;
     
@@ -405,10 +421,14 @@ export class Memory {
     };
   }
 
-  getAllCodeEmbeddings(): Array<{ id: number; file_path: string; content: string; embedding: number[] }> {
-    const rows = this.db.prepare(`
-      SELECT id, file_path, content, embedding FROM code_embeddings
-    `).all() as Array<{ id: number; file_path: string; content: string; embedding: Buffer }>;
+  getAllCodeEmbeddings(projectName?: string): Array<{ id: number; file_path: string; content: string; embedding: number[] }> {
+    const sql = projectName 
+      ? `SELECT id, file_path, content, embedding FROM code_embeddings WHERE project_name = ?`
+      : `SELECT id, file_path, content, embedding FROM code_embeddings`;
+    
+    const rows = projectName
+      ? this.db.prepare(sql).all(projectName) as Array<{ id: number; file_path: string; content: string; embedding: Buffer }>
+      : this.db.prepare(sql).all() as Array<{ id: number; file_path: string; content: string; embedding: Buffer }>;
     
     return rows.map(row => {
       const floatArray = new Float64Array(row.embedding.buffer, row.embedding.byteOffset, row.embedding.byteLength / 8);
@@ -419,20 +439,33 @@ export class Memory {
     });
   }
 
-  deleteCodeEmbedding(filePath: string): void {
-    this.db.prepare(`DELETE FROM code_embeddings WHERE file_path = ?`).run(filePath);
+  deleteCodeEmbedding(filePath: string, projectName?: string): void {
+    if (projectName) {
+      this.db.prepare(`DELETE FROM code_embeddings WHERE file_path = ? AND project_name = ?`).run(filePath, projectName);
+    } else {
+      this.db.prepare(`DELETE FROM code_embeddings WHERE file_path = ?`).run(filePath);
+    }
   }
 
-  getCodeEmbeddingStats(): { total_files: number; total_tokens: number; last_indexed: string | null } {
-    const result = this.db.prepare(`
-      SELECT 
-        COUNT(*) as total_files,
-        SUM(token_count) as total_tokens,
-        MAX(indexed_at) as last_indexed
-      FROM code_embeddings
-    `).get() as { total_files: number; total_tokens: number; last_indexed: string | null };
+  deleteProjectEmbeddings(projectName: string): void {
+    this.db.prepare(`DELETE FROM code_embeddings WHERE project_name = ?`).run(projectName);
+  }
+
+  getCodeEmbeddingStats(projectName?: string): { total_files: number; total_tokens: number; last_indexed: string | null } {
+    const sql = projectName
+      ? `SELECT COUNT(*) as total_files, SUM(token_count) as total_tokens, MAX(indexed_at) as last_indexed FROM code_embeddings WHERE project_name = ?`
+      : `SELECT COUNT(*) as total_files, SUM(token_count) as total_tokens, MAX(indexed_at) as last_indexed FROM code_embeddings`;
+    
+    const result = projectName
+      ? this.db.prepare(sql).get(projectName) as { total_files: number; total_tokens: number; last_indexed: string | null }
+      : this.db.prepare(sql).get() as { total_files: number; total_tokens: number; last_indexed: string | null };
     
     return result;
+  }
+
+  listIndexedProjects(): string[] {
+    const rows = this.db.prepare(`SELECT DISTINCT project_name FROM code_embeddings`).all() as Array<{ project_name: string }>;
+    return rows.map(r => r.project_name);
   }
 
   // ============ Telegram Master ============
