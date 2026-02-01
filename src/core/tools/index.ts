@@ -57,6 +57,7 @@ export function registerAllTools(): void {
     getKimiBalanceHandler,
     todoHandler,
     retrieveCodeHandler,
+    codeIndexHandler,
     logHandler,
     setLogLevelHandler,
     clearLogsHandler,
