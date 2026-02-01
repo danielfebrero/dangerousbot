@@ -7,9 +7,10 @@ export interface ToolCallExecution {
   id: string;
   toolName: string;
   input: unknown;
-  status: 'running' | 'completed' | 'error';
+  status: 'running' | 'completed' | 'warning' | 'error';
   output?: unknown;
   error?: string;
+  warning?: string;
   startTime: Date;
   endTime?: Date;
 }

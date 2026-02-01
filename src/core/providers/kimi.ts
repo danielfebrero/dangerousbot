@@ -336,6 +336,117 @@ export class KimiProvider extends BaseProvider {
     };
   }
 
+  /**
+   * Parse les arguments JSON de manière robuste, même si le JSON est tronqué/malformé.
+   * Tente d'extraire le maximum de données utilisables.
+   */
+  private robustParseArguments(jsonStr: string, toolName: string): {
+    success: boolean;
+    partial: boolean;
+    data: Record<string, unknown>;
+    warning?: string;
+  } {
+    // 1. Essayer le parsing JSON standard
+    try {
+      const parsed = JSON.parse(jsonStr);
+      return { success: true, partial: false, data: parsed };
+    } catch {
+      // Continue avec le parsing robuste
+    }
+
+    // 2. Parsing robuste pour JSON tronqué
+    const result: Record<string, unknown> = {};
+    let warning = '';
+
+    // Extraire les champs connus selon le type d'outil
+    const fieldPatterns: Record<string, string[]> = {
+      write_file: ['path', 'content'],
+      edit_file: ['path', 'old_content', 'new_content', 'old_string', 'new_string'],
+      read_file: ['path'],
+      delete_file: ['path'],
+      shell: ['command', 'cwd'],
+      execute_code: ['code', 'language'],
+      default: ['path', 'content', 'command', 'query', 'text', 'message', 'name', 'value']
+    };
+
+    const fieldsToExtract = fieldPatterns[toolName] || fieldPatterns.default;
+
+    for (const field of fieldsToExtract) {
+      const extracted = this.extractJsonField(jsonStr, field);
+      if (extracted.found) {
+        result[field] = extracted.value;
+        if (extracted.truncated) {
+          warning += `Field '${field}' may be truncated. `;
+          // Marquer le résultat comme partiel
+          (result as any)._partialParse = true;
+          (result as any)._truncatedFields = (result as any)._truncatedFields || [];
+          (result as any)._truncatedFields.push(field);
+        }
+      }
+    }
+
+    const hasData = Object.keys(result).filter(k => !k.startsWith('_')).length > 0;
+
+    if (hasData) {
+      console.warn(`[Kimi] Robust parse recovered ${Object.keys(result).filter(k => !k.startsWith('_')).length} field(s) from malformed JSON for ${toolName}`);
+    }
+
+    return {
+      success: false,
+      partial: hasData,
+      data: result,
+      warning: warning || 'JSON parsing failed, attempted field extraction'
+    };
+  }
+
+  /**
+   * Extrait un champ spécifique d'un JSON potentiellement malformé.
+   */
+  private extractJsonField(jsonStr: string, fieldName: string): {
+    found: boolean;
+    value: unknown;
+    truncated: boolean;
+  } {
+    // Pattern pour trouver "fieldName": "value" ou "fieldName": value
+    // Gère les chaînes avec échappements
+    const stringPattern = new RegExp(
+      `"${fieldName}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)(?:"|$)`,
+      's'
+    );
+
+    const stringMatch = jsonStr.match(stringPattern);
+    if (stringMatch) {
+      let value = stringMatch[1];
+      // Vérifier si la valeur est tronquée (pas de guillemet fermant)
+      const fullPattern = new RegExp(`"${fieldName}"\\s*:\\s*"(?:[^"\\\\]|\\\\.)*"`, 's');
+      const isTruncated = !fullPattern.test(jsonStr);
+
+      // Décoder les échappements JSON
+      try {
+        value = JSON.parse(`"${value}"`);
+      } catch {
+        // Garder la valeur brute si le décodage échoue
+        value = value.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+      }
+
+      return { found: true, value, truncated: isTruncated };
+    }
+
+    // Essayer pour les valeurs non-string (nombres, booléens, null)
+    const nonStringPattern = new RegExp(`"${fieldName}"\\s*:\\s*(\\d+|true|false|null)`, 's');
+    const nonStringMatch = jsonStr.match(nonStringPattern);
+    if (nonStringMatch) {
+      let value: unknown = nonStringMatch[1];
+      if (value === 'true') value = true;
+      else if (value === 'false') value = false;
+      else if (value === 'null') value = null;
+      else value = Number(value);
+      return { found: true, value, truncated: false };
+    }
+
+    return { found: false, value: undefined, truncated: false };
+  }
+
   protected async* makeStreamingApiCall(
     messages: KimiMessage[],
     tools: unknown[] | undefined,
@@ -447,23 +558,30 @@ export class KimiProvider extends BaseProvider {
       reader.releaseLock();
     }
 
-    // Émettre les tool calls complétés (skip those with parse errors)
+    // Émettre les tool calls complétés (avec parsing robuste pour les JSON tronqués)
     for (const [, toolCall] of pendingToolCalls) {
       if (toolCall.name) {
-        let parsedInput = {};
-        try {
-          parsedInput = JSON.parse(toolCall.arguments || '{}');
-        } catch {
-          // Skip this tool_use entirely to avoid incomplete tool chains
-          console.error(`[Kimi] Skipping tool_use '${toolCall.name}' (id: ${toolCall.id}) due to parse error. Arguments:`, toolCall.arguments);
+        const parseResult = this.robustParseArguments(toolCall.arguments || '{}', toolCall.name);
+
+        // Compter seulement les champs de données (pas les métadonnées _xxx)
+        const dataFieldCount = Object.keys(parseResult.data).filter(k => !k.startsWith('_')).length;
+
+        if (!parseResult.success && dataFieldCount === 0) {
+          // Échec total du parsing, skip
+          console.error(`[Kimi] Skipping tool_use '${toolCall.name}' (id: ${toolCall.id}) - no usable data extracted. Arguments:`, toolCall.arguments);
           continue;
+        }
+
+        if (parseResult.partial) {
+          console.warn(`[Kimi] Partial parse for tool_use '${toolCall.name}' (id: ${toolCall.id}): ${parseResult.warning}`);
+          console.warn(`[Kimi] Extracted fields: ${Object.keys(parseResult.data).filter(k => !k.startsWith('_')).join(', ')}`);
         }
 
         yield {
           type: 'tool_use',
           id: toolCall.id,
           name: toolCall.name,
-          input: parsedInput
+          input: parseResult.data
         };
       }
     }

@@ -186,21 +186,39 @@ export class DangerousBotServer {
             // Générer un ID unique pour ce tool call
             const executionId = `exec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+            // Détecter si les arguments ont été partiellement parsés (JSON tronqué)
+            const toolInput = block.input as ToolInput & { _partialParse?: boolean; _truncatedFields?: string[] };
+            const isPartialParse = toolInput?._partialParse === true;
+            const truncatedFields = toolInput?._truncatedFields || [];
+
+            // Nettoyer les métadonnées internes avant exécution
+            if (isPartialParse) {
+              delete (toolInput as any)._partialParse;
+              delete (toolInput as any)._truncatedFields;
+              logger.warn('Server', `Tool '${block.name}' executing with partially parsed arguments`, { truncatedFields });
+            }
+
             // Envoyer le tool use avec l'ID unique
-            this.wsManager.sendToolUse(block.name, block.input, executionId);
+            this.wsManager.sendToolUse(block.name, toolInput, executionId);
 
             // Exécuter l'outil avec gestion des erreurs pour éviter les tool chains incomplètes
             let result: any;
             try {
               result = await this.toolExecutor.execute(
                 block.name,
-                block.input as ToolInput
+                toolInput as ToolInput
               );
             } catch (toolError) {
               // Créer un résultat d'erreur pour maintenir la cohérence de la tool chain
               const errorMessage = (toolError as Error).message || 'Tool execution failed';
               result = { error: errorMessage, success: false };
               logger.error('Server', `Tool execution failed: ${block.name}`, { error: errorMessage });
+            }
+
+            // Ajouter un avertissement si le parsing était partiel
+            if (isPartialParse && result && !result.error) {
+              result._warning = `Arguments partiellement parsés (champs potentiellement tronqués: ${truncatedFields.join(', ')})`;
+              result._status = 'warning';
             }
 
             this.wsManager.sendToolResult(block.name, result, executionId);

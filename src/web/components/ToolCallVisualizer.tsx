@@ -80,6 +80,8 @@ export function ToolCallVisualizer({ execution }: ToolCallVisualizerProps) {
         return <span className="tool-status-spinner" />;
       case 'completed':
         return <span className="tool-status-check">✓</span>;
+      case 'warning':
+        return <span className="tool-status-warning">⚠</span>;
       case 'error':
         return <span className="tool-status-error">✗</span>;
     }
@@ -115,11 +117,19 @@ export function ToolCallVisualizer({ execution }: ToolCallVisualizerProps) {
             </pre>
           </div>
 
+          {execution.status === 'warning' && execution.warning && (
+            <div className="tool-call-section warning-section">
+              <div className="tool-call-warning-message">
+                ⚠️ {execution.warning}
+              </div>
+            </div>
+          )}
+
           {execution.status !== 'running' && (
             <div className="tool-call-section">
               <div className="tool-call-section-title">
                 Résultat
-                <button 
+                <button
                   className="tool-call-toggle-output"
                   onClick={(e) => { e.stopPropagation(); setShowOutput(!showOutput); }}
                 >
@@ -127,9 +137,9 @@ export function ToolCallVisualizer({ execution }: ToolCallVisualizerProps) {
                 </button>
               </div>
               {showOutput && (
-                <pre className={`tool-call-code ${execution.status === 'error' ? 'error' : ''}`}>
-                  {execution.error 
-                    ? execution.error 
+                <pre className={`tool-call-code ${execution.status === 'error' ? 'error' : ''} ${execution.status === 'warning' ? 'warning' : ''}`}>
+                  {execution.error
+                    ? execution.error
                     : JSON.stringify(execution.output, null, 2)}
                 </pre>
               )}

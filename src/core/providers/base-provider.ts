@@ -205,6 +205,14 @@ export abstract class BaseProvider implements AIProvider {
         stopReason = 'max_tokens';
       }
 
+      // Fallback: si on a des tool_use blocks mais pas de finish_reason approprié,
+      // forcer stopReason à 'tool_use' pour que le serveur les exécute
+      const hasToolUse = content.some(block => block.type === 'tool_use');
+      if (hasToolUse && stopReason !== 'tool_use') {
+        console.warn('[BaseProvider] Detected tool_use blocks without proper finish_reason, forcing stopReason to tool_use');
+        stopReason = 'tool_use';
+      }
+
       return {
         content,
         stopReason,

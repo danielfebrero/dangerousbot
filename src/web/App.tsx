@@ -244,19 +244,28 @@ function App() {
         setMessages(prev => {
           return prev.map(msg => {
             // Use message.id (which is executionId) for lookup
-            if (msg.type === 'tool_execution' && msg.id === resultExecutionId) {
+            if (msg.type === 'tool_execution' && msg.id === resultExecutionId && msg.toolExecution) {
               const result = wsMessage.payload.result;
               const isError = result?.success === false || result?.error;
-              
+              const isWarning = result?._status === 'warning';
+
+              // Determine status: error > warning > completed
+              let status: 'running' | 'completed' | 'warning' | 'error' = 'completed';
+              if (isError) status = 'error';
+              else if (isWarning) status = 'warning';
+
+              const updatedExecution: ToolCallExecution = {
+                ...msg.toolExecution,
+                status,
+                output: result,
+                error: isError ? (result.error || 'Unknown error') : undefined,
+                warning: isWarning ? result._warning : undefined,
+                endTime: new Date()
+              };
+
               return {
                 ...msg,
-                toolExecution: {
-                  ...msg.toolExecution,
-                  status: isError ? 'error' : 'completed',
-                  output: isError ? undefined : result,
-                  error: isError ? (result.error || 'Unknown error') : undefined,
-                  endTime: new Date()
-                }
+                toolExecution: updatedExecution
               };
             }
             return msg;
@@ -268,11 +277,18 @@ function App() {
           if (exec.id === resultExecutionId) {
             const result = wsMessage.payload.result;
             const isError = result?.success === false || result?.error;
+            const isWarning = result?._status === 'warning';
+
+            let status: 'running' | 'completed' | 'warning' | 'error' = 'completed';
+            if (isError) status = 'error';
+            else if (isWarning) status = 'warning';
+
             return {
               ...exec,
-              status: isError ? 'error' : 'completed',
-              output: isError ? undefined : result,
+              status,
+              output: result,
               error: isError ? (result.error || 'Unknown error') : undefined,
+              warning: isWarning ? result._warning : undefined,
               endTime: new Date()
             };
           }
