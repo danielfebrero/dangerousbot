@@ -447,14 +447,16 @@ export class KimiProvider extends BaseProvider {
       reader.releaseLock();
     }
 
-    // Émettre les tool calls complétés
+    // Émettre les tool calls complétés (skip those with parse errors)
     for (const [, toolCall] of pendingToolCalls) {
       if (toolCall.name) {
         let parsedInput = {};
         try {
           parsedInput = JSON.parse(toolCall.arguments || '{}');
         } catch {
-          console.error('[Kimi] Failed to parse tool arguments:', toolCall.arguments);
+          // Skip this tool_use entirely to avoid incomplete tool chains
+          console.error(`[Kimi] Skipping tool_use '${toolCall.name}' (id: ${toolCall.id}) due to parse error. Arguments:`, toolCall.arguments);
+          continue;
         }
 
         yield {

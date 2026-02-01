@@ -185,15 +185,23 @@ export class DangerousBotServer {
           } else if (block.type === 'tool_use') {
             // Générer un ID unique pour ce tool call
             const executionId = `exec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            
+
             // Envoyer le tool use avec l'ID unique
             this.wsManager.sendToolUse(block.name, block.input, executionId);
 
-            // Exécuter l'outil
-            const result = await this.toolExecutor.execute(
-              block.name,
-              block.input as ToolInput
-            );
+            // Exécuter l'outil avec gestion des erreurs pour éviter les tool chains incomplètes
+            let result: any;
+            try {
+              result = await this.toolExecutor.execute(
+                block.name,
+                block.input as ToolInput
+              );
+            } catch (toolError) {
+              // Créer un résultat d'erreur pour maintenir la cohérence de la tool chain
+              const errorMessage = (toolError as Error).message || 'Tool execution failed';
+              result = { error: errorMessage, success: false };
+              logger.error('Server', `Tool execution failed: ${block.name}`, { error: errorMessage });
+            }
 
             this.wsManager.sendToolResult(block.name, result, executionId);
 
