@@ -128,7 +128,6 @@ export class MessageProcessor {
         });
 
         // Extraire le texte et les tool calls
-        // IMPORTANT: On accumule le texte, on ne réinitialise pas (pour ne pas perdre les textes intermédiaires)
         let iterationText = '';
         const toolCalls: Array<{ name: string; input: Record<string, unknown>; id: string }> = [];
 
@@ -144,8 +143,9 @@ export class MessageProcessor {
           }
         }
         
-        // Accumuler le texte de cette itération dans le texte final
-        // Seul le dernier texte (sans tool calls) ou les textes significatifs sont gardés
+        // Si on a du texte dans cette itération:
+        // - On le garde comme réponse finale potentielle
+        // - Si des tool calls vont suivre, on pourrait vouloir l'envoyer immédiatement
         if (iterationText.trim()) {
           responseText = iterationText;
         }
@@ -154,6 +154,12 @@ export class MessageProcessor {
         if (toolCalls.length === 0) {
           hasMoreToolCalls = false;
           break;
+        }
+        
+        // S'il y a du texte ET des tool calls, notifier via callback pour streaming
+        // (permet au Telegram bot d'afficher le texte avant les résultats des tools)
+        if (iterationText.trim() && callbacks?.onTextChunk) {
+          await callbacks.onTextChunk(iterationText);
         }
 
         // Exécuter TOUS les tools de cette itération avec le contexte de la plateforme
