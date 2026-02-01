@@ -9,7 +9,7 @@ import { Tool, ToolResult, ToolInput } from '../types';
 import { ToolHandler, ToolContext } from './types';
 import { getMemory } from '../memory';
 import { getCodeEmbeddingService } from '../code-embedding';
-import { getCodeIndexer, initCodeIndexer, listIndexedProjects, removeCodeIndexer, indexerRegistry } from '../code-indexer';
+import { getCodeIndexer, initCodeIndexer, indexerRegistry, removeCodeIndexer } from '../code-indexer';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -68,10 +68,8 @@ export const codeIndexHandler: ToolHandler = {
           // Vérifier que ce n'est pas déjà indexé
           const existingProjects = memory.listIndexedProjects();
           if (existingProjects.includes(projectName)) {
-            return {
-              success: false,
-              error: `Le projet '${projectName}' existe déjà. Utilisez 'refresh' pour le mettre à jour.`
-            };
+            // Supprimer l'ancien index pour le remplacer
+            memory.deleteProjectEmbeddings(projectName);
           }
 
           // Créer l'indexeur et indexer
@@ -182,7 +180,8 @@ export const codeIndexHandler: ToolHandler = {
           memory.deleteProjectEmbeddings(projectName);
           
           // Supprimer du registre
-          removeCodeIndexer('', projectName); // Le chemin n'importe pas pour la suppression
+          const key = `${''}:${projectName}`;
+          indexerRegistry.delete(key);
 
           return {
             success: true,

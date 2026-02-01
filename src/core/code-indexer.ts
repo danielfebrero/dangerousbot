@@ -116,6 +116,7 @@ export class CodeIndexer {
 
   /**
    * Indexe toute la codebase (appelé au démarrage)
+   * OPTIMISÉ: Compare les mtimes avant de lire les fichiers pour éviter les appels API inutiles
    */
   async indexAll(): Promise<IndexingResult> {
     if (this.isIndexing) {
@@ -124,58 +125,97 @@ export class CodeIndexer {
     }
 
     this.isIndexing = true;
-    console.log('[CodeIndexer] Démarrage de l\'indexation...');
+    console.log(`[CodeIndexer] [${this.projectName}] Démarrage de l'indexation...`);
 
     const result: IndexingResult = { indexed: 0, updated: 0, deleted: 0, errors: [] };
 
     try {
       // 1. Lister tous les fichiers source
       const sourceFiles = this.getSourceFiles();
-      console.log(`[CodeIndexer] ${sourceFiles.length} fichiers à indexer`);
+      const sourceFilesSet = new Set(sourceFiles);
 
-      // 2. Récupérer tous les fichiers déjà indexés
-      const indexedFiles = new Set(
-        this.memory.getAllCodeEmbeddings().map(e => e.file_path)
-      );
+      // 2. Récupérer les métadonnées légères des fichiers déjà indexés (sans embedding)
+      const indexedMetadata = this.memory.getCodeEmbeddingMetadata(this.projectName);
 
-      // 3. Indexer les fichiers (par batch de 10 pour éviter de surcharger l'API)
-      const batchSize = 10;
-      for (let i = 0; i < sourceFiles.length; i += batchSize) {
-        const batch = sourceFiles.slice(i, i + batchSize);
-        console.log(`[CodeIndexer] Batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(sourceFiles.length/batchSize)}`);
+      console.log(`[CodeIndexer] [${this.projectName}] ${sourceFiles.length} fichiers source, ${indexedMetadata.size} déjà indexés`);
 
-        for (const filePath of batch) {
-          const fileResult = await this.indexFile(filePath);
-          
-          if (fileResult.error) {
-            result.errors.push(fileResult.error);
-          } else if (fileResult.updated) {
-            result.updated++;
-          } else if (fileResult.indexed) {
-            result.indexed++;
+      // 3. Identifier les fichiers à traiter
+      const filesToIndex: string[] = [];  // Nouveaux fichiers
+      const filesToCheck: string[] = [];  // Fichiers potentiellement modifiés (mtime plus récent)
+      let skippedCount = 0;
+
+      for (const filePath of sourceFiles) {
+        const existing = indexedMetadata.get(filePath);
+
+        if (!existing) {
+          // Nouveau fichier - à indexer
+          filesToIndex.push(filePath);
+        } else {
+          // Fichier existant - vérifier le mtime
+          const fullPath = path.join(this.projectRoot, filePath);
+          try {
+            const stats = fs.statSync(fullPath);
+            const fileMtime = stats.mtime.toISOString();
+
+            // Si le fichier a été modifié après le dernier index
+            if (fileMtime > existing.last_modified) {
+              filesToCheck.push(filePath);
+            } else {
+              skippedCount++;
+            }
+          } catch {
+            // Fichier inaccessible, on le skip
+            skippedCount++;
           }
-        }
-
-        // Petite pause entre les batches
-        if (i + batchSize < sourceFiles.length) {
-          await new Promise(resolve => setTimeout(resolve, 100));
         }
       }
 
-      // 4. Supprimer les fichiers qui n'existent plus (pour ce projet uniquement)
-      const projectIndexedFiles = new Set(
-        this.memory.getAllCodeEmbeddings(this.projectName).map(e => e.file_path)
-      );
-      for (const indexedFile of projectIndexedFiles) {
-        if (!sourceFiles.includes(indexedFile)) {
+      console.log(`[CodeIndexer] [${this.projectName}] ${filesToIndex.length} nouveaux, ${filesToCheck.length} à vérifier, ${skippedCount} inchangés`);
+
+      // 4. Indexer les nouveaux fichiers
+      if (filesToIndex.length > 0) {
+        const batchSize = 10;
+        for (let i = 0; i < filesToIndex.length; i += batchSize) {
+          const batch = filesToIndex.slice(i, i + batchSize);
+
+          for (const filePath of batch) {
+            const fileResult = await this.indexFile(filePath);
+            if (fileResult.error) {
+              result.errors.push(fileResult.error);
+            } else if (fileResult.indexed) {
+              result.indexed++;
+            }
+          }
+
+          // Petite pause entre les batches
+          if (i + batchSize < filesToIndex.length) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        }
+      }
+
+      // 5. Vérifier et mettre à jour les fichiers potentiellement modifiés
+      for (const filePath of filesToCheck) {
+        const fileResult = await this.indexFile(filePath);
+        if (fileResult.error) {
+          result.errors.push(fileResult.error);
+        } else if (fileResult.updated) {
+          result.updated++;
+        }
+        // Si fileResult.indexed est false et updated est false, le hash n'a pas changé
+      }
+
+      // 6. Supprimer les fichiers qui n'existent plus
+      for (const [indexedFile] of indexedMetadata) {
+        if (!sourceFilesSet.has(indexedFile)) {
           this.memory.deleteCodeEmbedding(indexedFile, this.projectName);
           result.deleted++;
         }
       }
 
-      // 5. Afficher les stats
+      // 7. Afficher les stats
       const stats = this.memory.getCodeEmbeddingStats(this.projectName);
-      console.log(`[CodeIndexer] [${this.projectName}] Terminé! ${result.indexed} nouveaux, ${result.updated} mis à jour, ${result.deleted} supprimés`);
+      console.log(`[CodeIndexer] [${this.projectName}] Terminé! ${result.indexed} nouveaux, ${result.updated} mis à jour, ${result.deleted} supprimés (${skippedCount} inchangés)`);
       console.log(`[CodeIndexer] [${this.projectName}] Total: ${stats.total_files} fichiers, ${stats.total_tokens} tokens`);
 
     } catch (error) {

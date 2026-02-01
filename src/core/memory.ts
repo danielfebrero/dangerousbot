@@ -468,6 +468,26 @@ export class Memory {
     return rows.map(r => r.project_name);
   }
 
+  /**
+   * Récupère les métadonnées légères des fichiers indexés (sans embedding ni contenu)
+   * Utilisé pour la comparaison rapide au démarrage
+   */
+  getCodeEmbeddingMetadata(projectName: string): Map<string, { content_hash: string; last_modified: string }> {
+    const rows = this.db.prepare(`
+      SELECT file_path, content_hash, last_modified
+      FROM code_embeddings WHERE project_name = ?
+    `).all(projectName) as Array<{ file_path: string; content_hash: string; last_modified: string }>;
+
+    const result = new Map<string, { content_hash: string; last_modified: string }>();
+    for (const row of rows) {
+      result.set(row.file_path, {
+        content_hash: row.content_hash,
+        last_modified: row.last_modified
+      });
+    }
+    return result;
+  }
+
   // ============ Telegram Master ============
 
   getTelegramMaster(): { user_id: number | null; username: string | null } | null {
