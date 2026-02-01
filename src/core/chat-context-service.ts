@@ -42,7 +42,11 @@ export class ChatContextService {
    */
   loadHistoryFromDatabase(sessionId?: string): LoadedHistory {
     const memory = getMemory();
+    // Si un sessionId est fourni, l'utiliser explicitement
+    // Sinon, utiliser la session courante de la mémoire
     const sid = sessionId || memory.getSessionId();
+    
+    console.log(`[ChatContextService] Loading history for session: ${sid}`);
     const messages = memory.getMessages(sid, 1000);
 
     const conversationHistory: AIMessage[] = [];

@@ -308,7 +308,9 @@ export class TelegramBotService extends EventEmitter {
   private getOrCreateSession(userId: number): string {
     let conversationId = this.sessions.get(userId);
     if (!conversationId) {
-      conversationId = `telegram-${userId}-${Date.now()}`;
+      // Utiliser un ID déterministe basé sur le userId pour persister la session
+      // entre les redémarrages
+      conversationId = `telegram-${userId}`;
       this.sessions.set(userId, conversationId);
     }
     return conversationId;
