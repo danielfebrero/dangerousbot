@@ -181,9 +181,6 @@ export class TelegramBotService extends EventEmitter {
 
       const conversationId = this.getOrCreateSession(userId);
 
-      // Accumulateur pour le texte intermédiaire à envoyer
-      let pendingText = '';
-      
       // Traiter le message
       const result = await this.messageProcessor.process(
         { text, images },
@@ -193,16 +190,11 @@ export class TelegramBotService extends EventEmitter {
           historyLimit: 20,
           callbacks: {
             onToolsExecuted: async (tools) => {
-              // Envoyer d'abord le texte pending s'il y en a
-              if (pendingText.trim()) {
-                await adapter.sendMessage(pendingText);
-                pendingText = '';
-              }
               await adapter.sendToolNotification(tools);
             },
             onTextChunk: async (chunk) => {
-              // Accumuler le texte pour l'envoyer avant les notifications de tools
-              pendingText += chunk;
+              // Envoyer immédiatement le texte intermédiaire
+              await adapter.sendMessage(chunk);
             },
           },
           platformContext: {
@@ -211,11 +203,6 @@ export class TelegramBotService extends EventEmitter {
           },
         }
       );
-      
-      // Envoyer le texte pending restant si besoin
-      if (pendingText.trim()) {
-        await adapter.sendMessage(pendingText);
-      }
 
       // Arrêter l'indicateur typing
       clearInterval(typingInterval);
@@ -226,7 +213,10 @@ export class TelegramBotService extends EventEmitter {
         return;
       }
 
-      await adapter.sendMessage(result.text);
+      // Envoyer le texte final (si non vide et différent des chunks déjà envoyés)
+      if (result.text.trim()) {
+        await adapter.sendMessage(result.text);
+      }
     } catch (error) {
       // Arrêter l'indicateur typing même en cas d'erreur
       clearInterval(typingInterval);
