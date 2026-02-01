@@ -128,12 +128,13 @@ export class MessageProcessor {
         });
 
         // Extraire le texte et les tool calls
-        responseText = '';
+        // IMPORTANT: On accumule le texte, on ne réinitialise pas (pour ne pas perdre les textes intermédiaires)
+        let iterationText = '';
         const toolCalls: Array<{ name: string; input: Record<string, unknown>; id: string }> = [];
 
         for (const block of response.content) {
           if (block.type === 'text') {
-            responseText += block.text;
+            iterationText += block.text;
           } else if (block.type === 'tool_use') {
             toolCalls.push({
               name: block.name,
@@ -141,6 +142,12 @@ export class MessageProcessor {
               id: block.id,
             });
           }
+        }
+        
+        // Accumuler le texte de cette itération dans le texte final
+        // Seul le dernier texte (sans tool calls) ou les textes significatifs sont gardés
+        if (iterationText.trim()) {
+          responseText = iterationText;
         }
 
         // S'il n'y a pas de tool calls, on a fini
