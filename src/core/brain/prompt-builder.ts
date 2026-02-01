@@ -126,6 +126,11 @@ Exemple: retrieve_code({query: "fonction qui gère les embeddings"})`;
   getSystemPrompt(source?: 'webapp' | 'telegram'): string {
     let prompt = this.identity;
 
+    // Ajouter la date/heure actuelle
+    const now = new Date();
+    const dateTimeStr = now.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+    prompt += `\n\n## 📅 Horodatage des messages\n\nLa date actuelle est ${dateTimeStr}.\n\nChaque message dans la conversation est horodaté. Tu as accès aux timestamps ISO 8601 pour :\n- **Messages utilisateur** : quand l'utilisateur a envoyé chaque message\n- **Messages assistant** : quand tu as répondu\n- **Tool calls** : quand chaque tool a été exécuté\n\nCes timestamps te permettent de :\n- Comprendre la chronologie de la conversation\n- Savoir quand une action a eu lieu (relative à maintenant)\n- Calculer des durées entre événements\n- Référencer des messages par leur date/heure\n\nFormat : \`2026-01-31T09:43:17.123Z\` (ISO 8601 UTC)`;
+
     if (source) {
       prompt += `\n\n## Source du message\nL'utilisateur écrit depuis: ${source}`;
 
