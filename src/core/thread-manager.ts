@@ -24,10 +24,11 @@ export interface Thread {
 export interface ThreadMessage {
   id: number;
   threadId: string;
-  role: 'user' | 'assistant' | 'system';
+  role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   timestamp: string;
   toolCalls?: Array<{ id?: string; name: string; input: unknown }>;
+  toolCallId?: string;  // Pour les messages de type 'tool'
   images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>;
 }
 
