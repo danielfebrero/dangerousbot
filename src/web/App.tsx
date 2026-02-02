@@ -86,10 +86,6 @@ function App() {
   
   // Ref pour toujours avoir le threadId actuel dans les callbacks
   const currentThreadIdRef = useRef<string | null>(null);
-  
-  useEffect(() => {
-    currentThreadIdRef.current = currentThreadId;
-  }, [currentThreadId]);
 
   const handleThreadSwitched = useCallback((threadId: string, title: string) => {
     setCurrentThreadTitle(title);
@@ -339,6 +335,11 @@ function App() {
     onThreadsList: handleThreadsList
   });
 
+  // Keep ref updated with current thread id for callbacks
+  useEffect(() => {
+    currentThreadIdRef.current = currentThreadId;
+  }, [currentThreadId]);
+
   // Load threads on mount
   useEffect(() => {
     if (status === 'connected') {
@@ -482,7 +483,23 @@ function App() {
                 onClick={() => handleSwitchThread(thread.id)}
               >
                 <span className="thread-title">{thread.title}</span>
-                {thread.id === currentThreadId && <span className="thread-active-badge">●</span>}
+                <div className="thread-actions">
+                  {thread.id === currentThreadId && <span className="thread-active-badge">●</span>}
+                  <button
+                    className="thread-delete-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteThread(thread.id);
+                    }}
+                    title="Supprimer ce thread"
+                    aria-label="Supprimer"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             ))}
           </div>

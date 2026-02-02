@@ -1763,6 +1763,35 @@ html, body {
   font-size: 0.75rem;
 }
 
+.thread-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.thread-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s ease;
+}
+
+.thread-item:hover .thread-delete-btn {
+  opacity: 1;
+}
+
+.thread-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--error);
+}
+
 /* Thread button in header */
 .thread-button {
   display: flex;
