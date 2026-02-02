@@ -248,6 +248,12 @@ function App() {
         break;
 
       case 'bot_message':
+        // Skip if we already have a streaming message for this response
+        // (prevents duplicate messages after tool use)
+        if (streamingMessageIdRef.current && streamingEndedRef.current) {
+          streamingMessageIdRef.current = null;
+          break;
+        }
         streamingMessageIdRef.current = null;
         setMessages(prev => [...prev, {
           id: crypto.randomUUID(),
