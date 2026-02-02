@@ -229,8 +229,21 @@ function App() {
           streamingMessageIdRef.current = null;
           streamingEndedRef.current = false;
         } else {
-          // Bot stopped typing
+          // Bot stopped typing - send notification if page not focused
           streamingEndedRef.current = true;
+
+          // Get the latest bot message for the notification
+          setMessages(prevMessages => {
+            const lastBotMessage = [...prevMessages].reverse().find(m => m.type === 'bot');
+            if (lastBotMessage && lastBotMessage.content) {
+              sendNotification({
+                title: 'DangerousBot',
+                body: lastBotMessage.content.slice(0, 100) + (lastBotMessage.content.length > 100 ? '...' : ''),
+                tag: 'dangerousbot-response'
+              });
+            }
+            return prevMessages;
+          });
         }
         break;
 
@@ -242,12 +255,8 @@ function App() {
           content: wsMessage.payload.text,
           timestamp: new Date()
         }]);
-        // Send notification when bot finishes responding
-        sendNotification({
-          title: 'DangerousBot',
-          body: wsMessage.payload.text.slice(0, 100) + (wsMessage.payload.text.length > 100 ? '...' : ''),
-          tag: 'dangerousbot-response'
-        });
+        // Note: Notification is now sent when bot_typing becomes false
+        // This ensures notifications work for both streaming and non-streaming responses
         break;
 
       case 'tool_use':
