@@ -289,15 +289,19 @@ export class WebSocketManager {
   }
 
   private sendThreadHistory(ws: WebSocket, threadId: string, limit: number = 100, offset: number = 0): void {
-    const messages = this.threadManager.getThreadMessages(threadId, limit, offset);
+    const allMessages = this.threadManager.getThreadMessages(threadId, limit, offset);
+    // Filter out internal __TOOL_RESULT__ messages (used for AI context reconstruction only)
+    const messages = allMessages.filter(msg =>
+      !(msg.role === 'user' && typeof msg.content === 'string' && msg.content.startsWith('__TOOL_RESULT__'))
+    );
     const totalCount = this.threadManager.getThreadMessageCount(threadId);
-    const hasMore = offset + messages.length < totalCount;
+    const hasMore = offset + allMessages.length < totalCount;
 
     this.sendTo(ws, {
       type: 'history',
       payload: { messages, threadId, hasMore, totalCount, offset },
     });
-    console.log(`[WebSocket] Historique envoyé pour thread ${threadId}: ${messages.length} messages (offset: ${offset}, total: ${totalCount})`);
+    console.log(`[WebSocket] Historique envoyé pour thread ${threadId}: ${messages.length} messages (${allMessages.length - messages.length} tool results filtrés, offset: ${offset}, total: ${totalCount})`);
   }
 
   private createAbortController(clientId: string): AbortController {
