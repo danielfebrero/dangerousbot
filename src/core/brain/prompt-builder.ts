@@ -149,11 +149,11 @@ Exemple: retrieve_code({query: "fonction qui gère les embeddings"})`;
   /**
    * Déclenche la compression en arrière-plan si nécessaire
    */
-  async maybeCompress(): Promise<boolean> {
+  async maybeCompress(threadId?: string): Promise<boolean> {
     if (!this.contextInjector) return false;
 
     try {
-      return await this.contextInjector.maybeCompress();
+      return await this.contextInjector.maybeCompress(threadId);
     } catch (error) {
       console.error('[PromptBuilder] Compression error:', error);
       return false;

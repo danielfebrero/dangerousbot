@@ -356,6 +356,15 @@ export class ThreadManager {
   }
 
   /**
+   * Ajoute un résultat d'outil à un thread
+   * Format spécial: __TOOL_RESULT__{toolUseId}__{result}
+   */
+  addToolResult(threadId: string, toolUseId: string, result: string): number {
+    const content = `__TOOL_RESULT__${toolUseId}__${result}`;
+    return this.addMessage(threadId, 'user', content);
+  }
+
+  /**
    * Récupère les statistiques des threads
    */
   getStats(): ThreadStats {

@@ -97,6 +97,9 @@ function App() {
     setActiveToolExecutions([]);
     // Réinitialiser l'état de streaming
     streamingEndedRef.current = false;
+    // IMPORTANT: Mettre à jour le ref immédiatement pour éviter les race conditions
+    // avec les messages qui arrivent pendant le switch
+    currentThreadIdRef.current = threadId;
   }, []);
 
   const handleThreadsList = useCallback((newThreads: Thread[], activeThreadId: string) => {

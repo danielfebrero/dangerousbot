@@ -252,6 +252,9 @@ export class DangerousBotServer {
           threadManager.addMessage(threadId, 'assistant', roundText, roundToolCalls as any);
         }
 
+        // Vérifier si un changement de thread a eu lieu (race condition protection)
+        // Note: Cette protection est gérée côté client via le filtrage des messages par threadId
+
         for (const block of response.content) {
           if (block.type === 'text') {
             if (block.text && block.text.trim()) {
@@ -300,16 +303,16 @@ export class DangerousBotServer {
             // Vérifier si le résultat contient une image
             if (result.type === 'image' && result.source) {
               const toolInputCasted = block.input as { path?: string };
-              this.brain.addUserMessage(`Image chargée depuis ${toolInputCasted?.path || 'fichier'}`, [{
+              threadManager.addMessage(threadId, 'user', `Image chargée depuis ${toolInputCasted?.path || 'fichier'}`, undefined, [{
                 type: 'image',
                 source: result.source
               }]);
             } else if (result._webSearchPassthrough) {
               const toolResultStr = JSON.stringify(result.arguments);
-              this.brain.addToolResult(block.id, toolResultStr);
+              threadManager.addToolResult(threadId, block.id, toolResultStr);
             } else {
               const toolResultStr = JSON.stringify(result);
-              this.brain.addToolResult(block.id, toolResultStr);
+              threadManager.addToolResult(threadId, block.id, toolResultStr);
             }
 
             // Vérifier si un redémarrage est nécessaire
@@ -349,7 +352,8 @@ export class DangerousBotServer {
             if (chunk.type === 'text' && chunk.text) {
               this.wsManager.sendStreamChunk(threadId, chunk.text);
             }
-          }
+          },
+          threadId // Passer le threadId pour maintenir l'isolation
         );
       }
 

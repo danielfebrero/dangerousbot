@@ -4,11 +4,13 @@
 
 import { AIMessage, AIContentBlock, ImageContent } from './types.js';
 import { getMemory } from '../memory.js';
+import { getThreadManager } from '../thread-manager.js';
 import { cleanOldToolResults } from '../contextCleaner.js';
 
 export class HistoryManager {
   private conversationHistory: AIMessage[] = [];
   private messageCount: number = 0;
+  private currentThreadId: string | null = null;
 
   /**
    * Ajoute un message utilisateur à l'historique (support multi-modal)
@@ -148,11 +150,27 @@ export class HistoryManager {
   }
 
   /**
-   * Charge l'historique depuis la base de données
+   * Définit le thread courant pour cet historique
+   */
+  setThreadId(threadId: string): void {
+    if (this.currentThreadId !== threadId) {
+      this.currentThreadId = threadId;
+      this.conversationHistory = []; // Reset history when switching threads
+      this.messageCount = 0;
+    }
+  }
+
+  /**
+   * Charge l'historique depuis la base de données pour le thread courant
    */
   loadFromDatabase(): void {
-    const memory = getMemory();
-    const messages = memory.getMessages();
+    if (!this.currentThreadId) {
+      console.warn('[HistoryManager] No thread ID set, cannot load history');
+      return;
+    }
+
+    const threadManager = getThreadManager();
+    const messages = threadManager.getThreadMessages(this.currentThreadId);
 
     this.conversationHistory = [];
 
@@ -186,7 +204,7 @@ export class HistoryManager {
         }
 
         // Reconstruct assistant messages with tool_use blocks from tool_calls column
-        if (msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0) {
+        if (msg.role === 'assistant' && msg.toolCalls && msg.toolCalls.length > 0) {
           const contentBlocks: AIContentBlock[] = [];
 
           // Add text content if present
@@ -195,7 +213,7 @@ export class HistoryManager {
           }
 
           // Add tool_use blocks from tool_calls
-          for (const toolCall of msg.tool_calls) {
+          for (const toolCall of msg.toolCalls) {
             contentBlocks.push({
               type: 'tool_use',
               id: (toolCall as any).id || `tool_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,

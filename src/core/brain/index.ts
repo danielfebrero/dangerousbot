@@ -15,15 +15,51 @@ import { StreamCallback } from '../providers/index.js';
 export class Brain {
   private promptBuilder: PromptBuilder;
   private providerManager: ProviderManager;
-  private historyManager: HistoryManager;
   private contextEnabled: boolean = false;
+  // Map pour stocker les HistoryManager actifs par thread (isolation par requête)
+  private activeHistoryManagers: Map<string, HistoryManager> = new Map();
 
   constructor(apiKey: string, identityPath?: string) {
     this.promptBuilder = new PromptBuilder(identityPath);
     this.providerManager = new ProviderManager({ anthropic: apiKey });
-    this.historyManager = new HistoryManager();
     
-    console.log(`[Brain] Initialized`);
+    console.log(`[Brain] Initialized (thread-isolated mode)`);
+  }
+
+  /**
+   * Récupère ou crée un HistoryManager pour un thread donné
+   * Garantit l'isolation entre threads parallèles
+   */
+  private getHistoryManager(threadId?: string): HistoryManager {
+    if (!threadId) {
+      // Fallback: créer un HistoryManager temporaire non partagé
+      return new HistoryManager();
+    }
+
+    // Nettoyer les HistoryManager inactifs (garbage collection simple)
+    if (this.activeHistoryManagers.size > 100) {
+      const entries = Array.from(this.activeHistoryManagers.entries());
+      const toDelete = entries.slice(0, entries.length - 50);
+      for (const [id] of toDelete) {
+        this.activeHistoryManagers.delete(id);
+      }
+    }
+
+    let manager = this.activeHistoryManagers.get(threadId);
+    if (!manager) {
+      manager = new HistoryManager();
+      manager.setThreadId(threadId);
+      manager.loadFromDatabase();
+      this.activeHistoryManagers.set(threadId, manager);
+    }
+    return manager;
+  }
+
+  /**
+   * Libère le HistoryManager d'un thread (appelé à la fin du traitement)
+   */
+  releaseHistoryManager(threadId: string): void {
+    this.activeHistoryManagers.delete(threadId);
   }
 
   /**
@@ -65,27 +101,6 @@ export class Brain {
   }
 
   /**
-   * Ajoute un message utilisateur
-   */
-  addUserMessage(content: string, images?: ImageContent[]): void {
-    this.historyManager.addUserMessage(content, images);
-  }
-
-  /**
-   * Ajoute un message assistant
-   */
-  addAssistantMessage(content: AIContentBlock[]): void {
-    this.historyManager.addAssistantMessage(content);
-  }
-
-  /**
-   * Ajoute un résultat d'outil
-   */
-  addToolResult(toolUseId: string, result: string): void {
-    this.historyManager.addToolResult(toolUseId, result);
-  }
-
-  /**
    * Penser avec streaming (méthode principale)
    */
   async thinkStream(
@@ -98,20 +113,29 @@ export class Brain {
     threadId?: string,
     threadTitle?: string
   ): Promise<BrainResponse> {
+    // CRITICAL: Créer un HistoryManager LOCAL pour cette requête uniquement
+    // Cela garantit l'isolation entre threads parallèles
+    const historyManager = new HistoryManager();
+    
+    if (threadId) {
+      historyManager.setThreadId(threadId);
+      historyManager.loadFromDatabase();
+    }
+
     // Ajouter le message à l'historique
-    this.historyManager.addUserMessage(userMessage, images);
+    historyManager.addUserMessage(userMessage, images);
 
     // Injecter le contexte pertinent avec infos du thread
     await this.promptBuilder.updateWithContext(userMessage, threadId, threadTitle);
 
     // Vérifier si compression nécessaire
-    const messageCount = this.historyManager.getMessageCount();
+    const messageCount = historyManager.getMessageCount();
     if (this.contextEnabled && messageCount % MEMORY.COMPRESSION_CHECK_INTERVAL === 0) {
-      this.triggerCompressionAsync();
+      this.triggerCompressionAsync(threadId);
     }
 
     // Préparer les données (avec horodatages pour l'API)
-    const apiHistory = this.historyManager.getHistoryForAPI();
+    const apiHistory = historyManager.getHistoryForAPI();
     const aiTools = this.formatTools(tools);
 
     // Appeler le provider
@@ -123,7 +147,7 @@ export class Brain {
     });
 
     // Sauvegarder la réponse
-    this.historyManager.addAssistantMessage(response.content);
+    historyManager.addAssistantMessage(response.content);
 
     return this.formatResponse(response);
   }
@@ -136,18 +160,27 @@ export class Brain {
     tools: Tool[],
     images?: ImageContent[],
     abortSignal?: AbortSignal,
-    source?: 'webapp' | 'telegram'
+    source?: 'webapp' | 'telegram',
+    threadId?: string
   ): Promise<BrainResponse> {
-    this.historyManager.addUserMessage(userMessage, images);
-
-    await this.promptBuilder.updateWithContext(userMessage);
-
-    const messageCount = this.historyManager.getMessageCount();
-    if (this.contextEnabled && messageCount % MEMORY.COMPRESSION_CHECK_INTERVAL === 0) {
-      this.triggerCompressionAsync();
+    // CRITICAL: Créer un HistoryManager LOCAL pour cette requête uniquement
+    const historyManager = new HistoryManager();
+    
+    if (threadId) {
+      historyManager.setThreadId(threadId);
+      historyManager.loadFromDatabase();
     }
 
-    const apiHistory = this.historyManager.getHistoryForAPI();
+    historyManager.addUserMessage(userMessage, images);
+
+    await this.promptBuilder.updateWithContext(userMessage, threadId);
+
+    const messageCount = historyManager.getMessageCount();
+    if (this.contextEnabled && messageCount % MEMORY.COMPRESSION_CHECK_INTERVAL === 0) {
+      this.triggerCompressionAsync(threadId);
+    }
+
+    const apiHistory = historyManager.getHistoryForAPI();
     const aiTools = this.formatTools(tools);
 
     const response = await this.providerManager.chatWithFallback(apiHistory, {
@@ -156,7 +189,7 @@ export class Brain {
       abortSignal
     });
 
-    this.historyManager.addAssistantMessage(response.content);
+    historyManager.addAssistantMessage(response.content);
 
     return this.formatResponse(response);
   }
@@ -167,9 +200,13 @@ export class Brain {
   async continueAfterToolStream(
     tools: Tool[],
     abortSignal?: AbortSignal,
-    onChunk?: StreamCallback
+    onChunk?: StreamCallback,
+    threadId?: string
   ): Promise<BrainResponse> {
-    const apiHistory = this.historyManager.getHistoryForAPI();
+    // CRITICAL: Récupérer le HistoryManager pour ce thread (créé dans thinkStream)
+    const historyManager = threadId ? this.getHistoryManager(threadId) : new HistoryManager();
+
+    const apiHistory = historyManager.getHistoryForAPI();
     const aiTools = this.formatTools(tools);
 
     const response = await this.providerManager.chatStreamWithFallback(apiHistory, {
@@ -179,7 +216,7 @@ export class Brain {
       onChunk
     });
 
-    this.historyManager.addAssistantMessage(response.content);
+    historyManager.addAssistantMessage(response.content);
 
     return this.formatResponse(response);
   }
@@ -189,9 +226,13 @@ export class Brain {
    */
   async continueAfterTool(
     tools: Tool[],
-    abortSignal?: AbortSignal
+    abortSignal?: AbortSignal,
+    threadId?: string
   ): Promise<BrainResponse> {
-    const apiHistory = this.historyManager.getHistoryForAPI();
+    // CRITICAL: Récupérer le HistoryManager pour ce thread
+    const historyManager = threadId ? this.getHistoryManager(threadId) : new HistoryManager();
+
+    const apiHistory = historyManager.getHistoryForAPI();
     const aiTools = this.formatTools(tools);
 
     const response = await this.providerManager.chatWithFallback(apiHistory, {
@@ -200,37 +241,52 @@ export class Brain {
       abortSignal
     });
 
-    this.historyManager.addAssistantMessage(response.content);
+    historyManager.addAssistantMessage(response.content);
 
     return this.formatResponse(response);
   }
 
   /**
-   * Charge l'historique depuis la base de données
+   * Charge l'historique depuis la base de données pour un thread
    */
-  loadHistory(): void {
-    this.historyManager.loadFromDatabase();
+  loadHistory(threadId?: string): void {
+    if (threadId) {
+      const manager = this.getHistoryManager(threadId);
+      manager.loadFromDatabase();
+    }
   }
 
   /**
-   * Efface l'historique
+   * Efface l'historique d'un thread spécifique
    */
-  clearHistory(): void {
-    this.historyManager.clear();
+  clearHistory(threadId?: string): void {
+    if (threadId) {
+      this.activeHistoryManagers.delete(threadId);
+    } else {
+      this.activeHistoryManagers.clear();
+    }
   }
 
   /**
-   * Retourne l'historique
+   * Retourne l'historique d'un thread
    */
-  getHistory(): AIMessage[] {
-    return this.historyManager.getHistory();
+  getHistory(threadId?: string): AIMessage[] {
+    if (threadId) {
+      const manager = this.getHistoryManager(threadId);
+      return manager.getHistory();
+    }
+    return [];
   }
 
   /**
    * Vérifie si c'est une nouvelle session
    */
-  isNewSession(): boolean {
-    return this.historyManager.isNewSession();
+  isNewSession(threadId?: string): boolean {
+    if (threadId) {
+      const manager = this.getHistoryManager(threadId);
+      return manager.isNewSession();
+    }
+    return true;
   }
 
   // --- Méthodes privées ---
@@ -272,13 +328,13 @@ export class Brain {
   }
 
   /**
-   * Déclenche la compression en arrière-plan
+   * Déclenche la compression en arrière-plan pour un thread spécifique
    */
-  private triggerCompressionAsync(): void {
-    this.promptBuilder.maybeCompress()
+  private triggerCompressionAsync(threadId?: string): void {
+    this.promptBuilder.maybeCompress(threadId)
       .then(compressed => {
         if (compressed) {
-          console.log('[Brain] Conversation history compressed');
+          console.log(`[Brain] Conversation history compressed for thread ${threadId || 'global'}`);
         }
       })
       .catch(err => console.error('[Brain] Compression error:', err));
