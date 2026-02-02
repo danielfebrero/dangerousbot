@@ -18,11 +18,13 @@ export class Brain {
   private contextEnabled: boolean = false;
   // Map pour stocker les HistoryManager actifs par thread (isolation par requête)
   private activeHistoryManagers: Map<string, HistoryManager> = new Map();
+  // Map pour tracker le dernier accès à chaque HistoryManager (pour LRU eviction)
+  private historyManagerLastAccess: Map<string, number> = new Map();
 
   constructor(apiKey: string, identityPath?: string) {
     this.promptBuilder = new PromptBuilder(identityPath);
     this.providerManager = new ProviderManager({ anthropic: apiKey });
-    
+
     console.log(`[Brain] Initialized (thread-isolated mode)`);
   }
 
@@ -36,14 +38,20 @@ export class Brain {
       return new HistoryManager();
     }
 
-    // Nettoyer les HistoryManager inactifs (garbage collection simple)
+    // Nettoyer les HistoryManager inactifs (LRU eviction)
     if (this.activeHistoryManagers.size > 100) {
-      const entries = Array.from(this.activeHistoryManagers.entries());
-      const toDelete = entries.slice(0, entries.length - 50);
-      for (const [id] of toDelete) {
+      // Trier par dernier accès et supprimer les 50 plus anciens
+      const entries = Array.from(this.historyManagerLastAccess.entries())
+        .sort((a, b) => a[1] - b[1])  // Plus ancien en premier
+        .slice(0, 50);
+      for (const [id] of entries) {
         this.activeHistoryManagers.delete(id);
+        this.historyManagerLastAccess.delete(id);
       }
     }
+
+    // Mettre à jour le timestamp d'accès
+    this.historyManagerLastAccess.set(threadId, Date.now());
 
     let manager = this.activeHistoryManagers.get(threadId);
     if (!manager) {
@@ -60,6 +68,7 @@ export class Brain {
    */
   releaseHistoryManager(threadId: string): void {
     this.activeHistoryManagers.delete(threadId);
+    this.historyManagerLastAccess.delete(threadId);
   }
 
   /**
@@ -113,16 +122,11 @@ export class Brain {
     threadId?: string,
     threadTitle?: string
   ): Promise<BrainResponse> {
-    // CRITICAL: Créer un HistoryManager LOCAL pour cette requête uniquement
-    // Cela garantit l'isolation entre threads parallèles
-    const historyManager = new HistoryManager();
-    
-    if (threadId) {
-      historyManager.setThreadId(threadId);
-      historyManager.loadFromDatabase();
-    }
+    // CRITICAL: Utiliser getHistoryManager pour garantir la cohérence avec continueAfterToolStream
+    // Le même HistoryManager sera réutilisé pour toute la chaîne de tool calls
+    const historyManager = this.getHistoryManager(threadId);
 
-    // Ajouter le message à l'historique
+    // Ajouter le message à l'historique (en mémoire seulement, DB gérée par server)
     historyManager.addUserMessage(userMessage, images);
 
     // Injecter le contexte pertinent avec infos du thread
@@ -146,8 +150,8 @@ export class Brain {
       onChunk
     });
 
-    // Sauvegarder la réponse immédiatement (persiste à la DB avec threadId)
-    historyManager.addAssistantMessage(response.content, threadId);
+    // Sauvegarder la réponse dans l'historique mémoire (DB gérée séparément pour éviter doublons)
+    historyManager.addAssistantMessage(response.content);
 
     return this.formatResponse(response);
   }
@@ -163,13 +167,8 @@ export class Brain {
     source?: 'webapp' | 'telegram',
     threadId?: string
   ): Promise<BrainResponse> {
-    // CRITICAL: Créer un HistoryManager LOCAL pour cette requête uniquement
-    const historyManager = new HistoryManager();
-    
-    if (threadId) {
-      historyManager.setThreadId(threadId);
-      historyManager.loadFromDatabase();
-    }
+    // CRITICAL: Utiliser getHistoryManager pour garantir la cohérence
+    const historyManager = this.getHistoryManager(threadId);
 
     historyManager.addUserMessage(userMessage, images);
 
@@ -189,7 +188,7 @@ export class Brain {
       abortSignal
     });
 
-    historyManager.addAssistantMessage(response.content, threadId);
+    historyManager.addAssistantMessage(response.content);
 
     return this.formatResponse(response);
   }
@@ -203,8 +202,8 @@ export class Brain {
     onChunk?: StreamCallback,
     threadId?: string
   ): Promise<BrainResponse> {
-    // CRITICAL: Récupérer le HistoryManager pour ce thread (créé dans thinkStream)
-    const historyManager = threadId ? this.getHistoryManager(threadId) : new HistoryManager();
+    // CRITICAL: Récupérer le MÊME HistoryManager utilisé dans thinkStream
+    const historyManager = this.getHistoryManager(threadId);
 
     const apiHistory = historyManager.getHistoryForAPI();
     const aiTools = this.formatTools(tools);
@@ -216,7 +215,8 @@ export class Brain {
       onChunk
     });
 
-    historyManager.addAssistantMessage(response.content, threadId);
+    // Sauvegarder en mémoire seulement (DB gérée par server/index.ts)
+    historyManager.addAssistantMessage(response.content);
 
     return this.formatResponse(response);
   }
@@ -229,8 +229,8 @@ export class Brain {
     abortSignal?: AbortSignal,
     threadId?: string
   ): Promise<BrainResponse> {
-    // CRITICAL: Récupérer le HistoryManager pour ce thread
-    const historyManager = threadId ? this.getHistoryManager(threadId) : new HistoryManager();
+    // CRITICAL: Récupérer le MÊME HistoryManager
+    const historyManager = this.getHistoryManager(threadId);
 
     const apiHistory = historyManager.getHistoryForAPI();
     const aiTools = this.formatTools(tools);
@@ -241,9 +241,19 @@ export class Brain {
       abortSignal
     });
 
-    historyManager.addAssistantMessage(response.content, threadId);
+    // Sauvegarder en mémoire seulement
+    historyManager.addAssistantMessage(response.content);
 
     return this.formatResponse(response);
+  }
+
+  /**
+   * Ajoute un résultat d'outil à l'historique en mémoire
+   * IMPORTANT: Doit être appelé par le serveur après chaque exécution de tool
+   */
+  addToolResult(toolUseId: string, result: string, threadId?: string): void {
+    const historyManager = this.getHistoryManager(threadId);
+    historyManager.addToolResult(toolUseId, result);
   }
 
   /**
@@ -262,8 +272,10 @@ export class Brain {
   clearHistory(threadId?: string): void {
     if (threadId) {
       this.activeHistoryManagers.delete(threadId);
+      this.historyManagerLastAccess.delete(threadId);
     } else {
       this.activeHistoryManagers.clear();
+      this.historyManagerLastAccess.clear();
     }
   }
 

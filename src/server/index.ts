@@ -238,8 +238,7 @@ export class DangerousBotServer {
           throw new Error('Request aborted by user');
         }
 
-        // Note: Assistant messages with tool_calls are now persisted to DB by brain.addAssistantMessage()
-        // So we don't need to save here to avoid duplicates
+        // Extraire les tool_calls et le texte de la réponse
         const roundToolCalls: Array<{ id?: string; name: string; input: unknown }> = [];
         let roundText = '';
         for (const block of response.content) {
@@ -250,8 +249,11 @@ export class DangerousBotServer {
           }
         }
 
-        // Vérifier si un changement de thread a eu lieu (race condition protection)
-        // Note: Cette protection est gérée côté client via le filtrage des messages par threadId
+        // CRITICAL: Sauvegarder le message assistant avec tool_calls en DB
+        // (HistoryManager ne persiste plus en DB pour éviter les doublons)
+        if (roundToolCalls.length > 0) {
+          threadManager.addMessage(threadId, 'assistant', roundText, roundToolCalls);
+        }
 
         for (const block of response.content) {
           if (block.type === 'text') {
@@ -305,12 +307,20 @@ export class DangerousBotServer {
                 type: 'image',
                 source: result.source
               }]);
+              // Ajouter aussi à l'historique mémoire du Brain
+              this.brain.addToolResult(block.id, JSON.stringify({ type: 'image_loaded' }), threadId);
             } else if (result._webSearchPassthrough) {
               const toolResultStr = JSON.stringify(result.arguments);
+              // Persister en DB
               threadManager.addToolResult(threadId, block.id, toolResultStr);
+              // CRITICAL: Ajouter à l'historique mémoire du Brain pour continueAfterToolStream
+              this.brain.addToolResult(block.id, toolResultStr, threadId);
             } else {
               const toolResultStr = JSON.stringify(result);
+              // Persister en DB
               threadManager.addToolResult(threadId, block.id, toolResultStr);
+              // CRITICAL: Ajouter à l'historique mémoire du Brain pour continueAfterToolStream
+              this.brain.addToolResult(block.id, toolResultStr, threadId);
             }
 
             // Vérifier si un redémarrage est nécessaire
@@ -363,7 +373,11 @@ export class DangerousBotServer {
         }
       }
 
-      // Note: Final assistant message is already persisted by brain.addAssistantMessage()
+      // CRITICAL: Sauvegarder le message assistant final en DB
+      // (HistoryManager ne persiste plus en DB, c'est le serveur qui gère)
+      if (finalText.trim()) {
+        threadManager.addMessage(threadId, 'assistant', finalText);
+      }
 
       // Envoyer les stats d'usage
       if (response.usage) {
@@ -404,6 +418,8 @@ export class DangerousBotServer {
     } finally {
       this.processingClients.delete(options.clientId);
       this.wsManager.sendBotTyping(threadId, false);
+      // Toujours libérer le HistoryManager, même en cas d'erreur
+      this.brain.releaseHistoryManager(threadId);
     }
   }
 

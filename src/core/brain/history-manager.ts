@@ -46,9 +46,10 @@ export class HistoryManager {
   }
 
   /**
-   * Ajoute un message assistant à l'historique et le persiste à la DB si threadId est fourni
+   * Ajoute un message assistant à l'historique EN MÉMOIRE SEULEMENT
+   * La persistance DB est gérée par server/index.ts pour éviter les doublons
    */
-  addAssistantMessage(content: AIContentBlock[], threadId?: string): void {
+  addAssistantMessage(content: AIContentBlock[]): void {
     // Ignorer les messages vides
     if (!content || content.length === 0) {
       console.warn('[HistoryManager] Ignored empty assistant message');
@@ -56,32 +57,6 @@ export class HistoryManager {
     }
     const timestamp = new Date().toISOString();
     this.conversationHistory.push({ role: 'assistant', content, timestamp });
-
-    // Extract text and tool_calls from content blocks for persistence
-    if (threadId) {
-      let textContent = '';
-      const toolCalls: Array<{ id?: string; name: string; input: unknown }> = [];
-
-      for (const block of content) {
-        if (block.type === 'text' && block.text) {
-          textContent += block.text;
-        } else if (block.type === 'tool_use') {
-          toolCalls.push({
-            id: (block as any).id,
-            name: (block as any).name,
-            input: (block as any).input
-          });
-        }
-      }
-
-      // Persist to database immediately
-      const threadManager = getThreadManager();
-      if (toolCalls.length > 0) {
-        threadManager.addMessage(threadId, 'assistant', textContent, toolCalls);
-      } else if (textContent.trim()) {
-        threadManager.addMessage(threadId, 'assistant', textContent);
-      }
-    }
   }
 
   /**
