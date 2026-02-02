@@ -92,6 +92,7 @@ export class DownloadService {
       filename?: string;
       source?: 'webapp' | 'telegram';
       telegramChatId?: string;
+      abortSignal?: AbortSignal;
     } = {}
   ): Promise<DownloadResult> {
     try {
@@ -108,11 +109,17 @@ export class DownloadService {
       const uniqueFilename = `${Date.now()}_${safeFilename}`;
       const filePath = path.join(this.downloadsDir, uniqueFilename);
 
+      // Vérifier l'annulation avant de lancer la requête
+      if (options.abortSignal?.aborted) {
+        throw new Error('Téléchargement annulé');
+      }
+
       // Télécharger le fichier
       const response = await fetch(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
+        },
+        signal: options.abortSignal
       });
 
       if (!response.ok) {

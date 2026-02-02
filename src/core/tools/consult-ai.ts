@@ -9,6 +9,7 @@
 
 import { Tool, ToolResult, ToolInput } from '../types';
 import { ToolHandler, ToolContext } from './types';
+import { checkCancellation } from '../tool-cancellation';
 
 export const consultAIDefinition: Tool = {
   name: 'consult_ai',
@@ -58,10 +59,14 @@ export const consultAIHandler: ToolHandler = {
   name: 'consult_ai',
   definition: consultAIDefinition,
   async execute(input: ToolInput, context: ToolContext): Promise<ToolResult> {
+    const signal = context.abortSignal;
+
+    checkCancellation(signal);
+
     if (!context.aiConsultant) {
-      return { 
-        success: false, 
-        error: 'AI Consultant non configuré. Vérifiez que les clés API Mistral et/ou Grok sont configurées.' 
+      return {
+        success: false,
+        error: 'AI Consultant non configuré. Vérifiez que les clés API Mistral et/ou Grok sont configurées.'
       };
     }
 
@@ -71,6 +76,8 @@ export const consultAIHandler: ToolHandler = {
     const ctx = input.context as string | undefined;
     const conversationId = input.conversation_id as string | undefined;
     const systemPrompt = input.system_prompt as string | undefined;
+
+    checkCancellation(signal);
 
     try {
       const result = await context.aiConsultant.consult({
@@ -92,9 +99,20 @@ export const consultAIHandler: ToolHandler = {
         usage: result.usage,
       };
     } catch (error) {
-      return { 
-        success: false, 
-        error: `Erreur AI consultation: ${(error as Error).message}` 
+      const errorMessage = (error as Error).message;
+
+      // Détecter si c'est une annulation
+      if (errorMessage.includes('cancelled') || errorMessage.includes('abort')) {
+        return {
+          success: false,
+          cancelled: true,
+          error: 'Consultation AI annulée par l\'utilisateur'
+        };
+      }
+
+      return {
+        success: false,
+        error: `Erreur AI consultation: ${errorMessage}`
       };
     }
   }

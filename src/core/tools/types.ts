@@ -23,4 +23,5 @@ export interface ToolContext {
   rollbackManager: any; // RollbackManager | null
   telegramChatId?: string; // Chat ID pour Telegram
   bot?: any; // Instance TelegramBot
+  abortSignal?: AbortSignal; // Signal d'annulation pour les tool calls longs
 }

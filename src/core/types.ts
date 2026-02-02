@@ -93,11 +93,13 @@ export interface Tool {
 export interface ToolResult {
   success: boolean;
   error?: string;
+  cancelled?: boolean;  // Indique si le tool a été annulé par l'utilisateur
   [key: string]: unknown;
 }
 
 export interface ToolInput {
   [key: string]: unknown;
+  abortSignal?: AbortSignal;  // Signal d'annulation pour les tool calls longs
 }
 
 // ============ Executor ============

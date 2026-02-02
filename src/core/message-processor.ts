@@ -169,6 +169,7 @@ export class MessageProcessor {
             const result = await this.toolExecutor.execute(
               tc.name, 
               tc.input,
+              undefined,
               platformContext
             );
             iterationResults.push({

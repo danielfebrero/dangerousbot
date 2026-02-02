@@ -195,6 +195,7 @@ export class DangerousBotServer {
     this.processingClients.add(options.clientId);
     (global as any).__busyThreads = this.processingClients;
     (global as any).__currentThreadId = threadId;
+    (global as any).__currentClientId = options.clientId;
     
     this.wsManager.sendBotTyping(threadId, true);
 
@@ -282,17 +283,33 @@ export class DangerousBotServer {
             // Envoyer le tool use avec l'ID unique
             this.wsManager.sendToolUse(threadId, block.name, toolInput, executionId);
 
+            // Créer le contexte d'exécution avec signal d'annulation
+            const { createExecutionContext, releaseExecutionContext } = await import('../core/tool-cancellation.js');
+            const { signal } = createExecutionContext(block.name, threadId);
+
             // Exécuter l'outil avec gestion des erreurs
             let result: any;
             try {
               result = await this.toolExecutor.execute(
                 block.name,
-                toolInput as ToolInput
+                toolInput as ToolInput,
+                signal
               );
             } catch (toolError) {
               const errorMessage = (toolError as Error).message || 'Tool execution failed';
-              result = { error: errorMessage, success: false };
+              // Détecter si c'est une annulation
+              if (errorMessage.includes('cancelled') || errorMessage.includes('abort')) {
+                result = {
+                  success: false,
+                  cancelled: true,
+                  error: 'Exécution annulée par l\'utilisateur'
+                };
+              } else {
+                result = { error: errorMessage, success: false };
+              }
               logger.error('Server', `Tool execution failed: ${block.name}`, { error: errorMessage });
+            } finally {
+              releaseExecutionContext(threadId);
             }
 
             // Ajouter un avertissement si le parsing était partiel
@@ -423,6 +440,7 @@ export class DangerousBotServer {
       // Mettre à jour les variables globales de suivi
       (global as any).__busyThreads = this.processingClients;
       delete (global as any).__currentThreadId;
+      delete (global as any).__currentClientId;
       this.wsManager.sendBotTyping(threadId, false);
       // Toujours libérer le HistoryManager, même en cas d'erreur
       this.brain.releaseHistoryManager(threadId);

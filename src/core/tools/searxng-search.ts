@@ -23,11 +23,17 @@ export const searxngSearchDefinition: Tool = {
   }
 };
 
+import { checkCancellation } from '../tool-cancellation';
+
 export const searxngSearchHandler: ToolHandler = {
   name: 'searxng_search',
   definition: searxngSearchDefinition,
   async execute(input: ToolInput, context: ToolContext): Promise<ToolResult> {
     try {
+      const signal = context.abortSignal;
+
+      checkCancellation(signal);
+
       const query = input.query as string;
       const engines = (input.engines as string) || 'google';
       const categories = (input.categories as string) || 'general';
@@ -37,7 +43,9 @@ export const searxngSearchHandler: ToolHandler = {
       const pageNo = input.pageno != null ? String(input.pageno) : '1';
 
       const searxngUrl = process.env.SEARXNG_URL || 'http://localhost:8080';
-      
+
+      checkCancellation(signal);
+
       const params = new URLSearchParams({
         q: query,
         format: 'json',
@@ -56,11 +64,14 @@ export const searxngSearchHandler: ToolHandler = {
         params.append('time_range', timeRange);
       }
 
+      checkCancellation(signal);
+
       const response = await fetch(`${searxngUrl}/search?${params.toString()}`, {
         headers: {
           'Accept': 'application/json',
           'X-Forwarded-For': '127.0.0.1'
-        }
+        },
+        signal: signal as AbortSignal
       });
 
       if (!response.ok) {
@@ -96,9 +107,20 @@ export const searxngSearchHandler: ToolHandler = {
         message: `## 🔍 Résultats pour: "${query}"\n\n*Moteurs: ${engines}*\n\n${formatted || 'Aucun résultat trouvé.'}`
       };
     } catch (error) {
+      const errorMessage = (error as Error).message;
+
+      // Détecter si c'est une annulation
+      if (errorMessage.includes('cancelled') || errorMessage.includes('abort')) {
+        return {
+          success: false,
+          cancelled: true,
+          error: 'Recherche annulée par l\'utilisateur'
+        };
+      }
+
       return {
         success: false,
-        error: `Erreur SearxNG: ${(error as Error).message}`
+        error: `Erreur SearxNG: ${errorMessage}`
       };
     }
   }

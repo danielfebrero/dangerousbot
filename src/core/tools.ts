@@ -57,6 +57,7 @@ export class ToolExecutor {
   async execute(
     toolName: string,
     input: any,
+    abortSignal?: AbortSignal,
     platformContext?: { telegramChatId?: string; bot?: any }
   ): Promise<any> {
     const memory = getMemory();
@@ -72,7 +73,8 @@ export class ToolExecutor {
       aiConsultant: this.aiConsultant,
       rollbackManager,
       telegramChatId: platformContext?.telegramChatId,
-      bot: platformContext?.bot
+      bot: platformContext?.bot,
+      abortSignal
     };
 
     return await executeTool(toolName, input, context);

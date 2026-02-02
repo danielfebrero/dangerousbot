@@ -152,8 +152,19 @@ export function useThreadedWebSocket(options: UseThreadedWebSocketOptions) {
       wsRef.current.send(JSON.stringify({ type: 'stop' }));
       return true;
     }
+
+    // Si le WebSocket n'est pas ouvert, essayer via l'API REST
+    if (currentThreadId) {
+      fetch('/api/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadId: currentThreadId })
+      }).catch(err => console.error('Error cancelling tool execution:', err));
+      return true;
+    }
+
     return false;
-  }, []);
+  }, [currentThreadId]);
 
   // Actions sur les threads
   const createThread = useCallback((title?: string) => {

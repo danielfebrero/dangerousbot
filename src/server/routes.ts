@@ -6,6 +6,7 @@ import { Router, Request, Response } from 'express';
 import { getMemory } from '../core/memory.js';
 import { logger } from '../core/logger.js';
 import { downloadService } from '../core/services/download.js';
+import { cancelThreadExecution, isExecutionActive } from '../core/tool-cancellation.js';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -289,6 +290,51 @@ export function createRoutes(): Router {
       logger.error('Routes', `Erreur lors de la suppression du fichier ${fileId}: ${(error as Error).message}`);
       res.status(500).json({ success: false, error: 'Erreur interne' });
     }
+  });
+
+  // Annuler l'exécution d'un tool sur un thread
+  router.post('/cancel', (req: Request, res: Response) => {
+    const { threadId } = req.body;
+
+    if (!threadId) {
+      res.status(400).json({ success: false, error: 'threadId requis' });
+      return;
+    }
+
+    const wasCancelled = cancelThreadExecution(threadId, 'user_cancelled');
+
+    if (wasCancelled) {
+      logger.info('Routes', `Tool execution cancelled on thread ${threadId}`);
+      res.json({
+        success: true,
+        message: 'Exécution annulée',
+        threadId
+      });
+    } else {
+      res.json({
+        success: false,
+        message: 'Aucune exécution active sur ce thread',
+        threadId
+      });
+    }
+  });
+
+  // Vérifier si une exécution est active sur un thread
+  router.get('/cancel/status', (req: Request, res: Response) => {
+    const threadId = req.query.threadId as string;
+
+    if (!threadId) {
+      res.status(400).json({ success: false, error: 'threadId requis' });
+      return;
+    }
+
+    const isActive = isExecutionActive(threadId);
+
+    res.json({
+      success: true,
+      isActive,
+      threadId
+    });
   });
 
   return router;

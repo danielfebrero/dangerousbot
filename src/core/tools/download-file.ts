@@ -6,6 +6,7 @@
 import { Tool, ToolResult, ToolInput } from '../types';
 import { ToolHandler, ToolContext } from './types';
 import { downloadService } from '../services/download';
+import { checkCancellation } from '../tool-cancellation';
 
 export const downloadFileDefinition: Tool = {
   name: 'download_file',
@@ -42,15 +43,19 @@ export const downloadFileHandler: ToolHandler = {
   async execute(input: ToolInput, context: ToolContext): Promise<ToolResult> {
     const url = input.url as string;
     const customFilename = input.filename as string | undefined;
+    const signal = context.abortSignal;
 
     if (!url) {
       return { success: false, error: 'URL requise' };
     }
 
     try {
+      checkCancellation(signal);
+
       const result = await downloadService.downloadFile(url, {
         filename: customFilename,
-        source: 'webapp'
+        source: 'webapp',
+        abortSignal: signal
       });
 
       if (!result.success) {
@@ -75,9 +80,20 @@ export const downloadFileHandler: ToolHandler = {
       };
 
     } catch (error) {
+      const errorMessage = (error as Error).message;
+
+      // Détecter si c'est une annulation
+      if (errorMessage.includes('cancelled') || errorMessage.includes('abort')) {
+        return {
+          success: false,
+          cancelled: true,
+          error: 'Téléchargement annulé par l\'utilisateur'
+        };
+      }
+
       return {
         success: false,
-        error: `Erreur lors du téléchargement: ${(error as Error).message}`
+        error: `Erreur lors du téléchargement: ${errorMessage}`
       };
     }
   }

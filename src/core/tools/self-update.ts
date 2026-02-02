@@ -29,10 +29,10 @@ export const selfUpdateHandler: ToolHandler = {
     
     // Vérifier si d'autres threads sont en cours de traitement
     const busyThreads = (global as any).__busyThreads || new Set<string>();
-    const currentThreadId = (global as any).__currentThreadId;
-    
-    // Compter les threads busy (en excluant le thread actuel si présent)
-    const otherBusyThreads = Array.from(busyThreads as Set<string>).filter(id => id !== currentThreadId);
+    const currentClientId = (global as any).__currentClientId;
+
+    // Compter les threads busy (en excluant le client actuel si présent)
+    const otherBusyThreads = Array.from(busyThreads as Set<string>).filter(id => id !== currentClientId);
     
     if (!force && otherBusyThreads.length > 0) {
       // D'autres threads sont busy, demander confirmation

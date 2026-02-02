@@ -4,6 +4,7 @@
 
 import { Tool, ToolResult, ToolInput } from '../types';
 import { ToolHandler, ToolContext } from './types';
+import { checkCancellation } from '../tool-cancellation';
 
 export const consultMistralDefinition: Tool = {
   name: 'consult_mistral',
@@ -24,6 +25,10 @@ export const consultMistralHandler: ToolHandler = {
   name: 'consult_mistral',
   definition: consultMistralDefinition,
   async execute(input: ToolInput, context: ToolContext): Promise<ToolResult> {
+    const signal = context.abortSignal;
+
+    checkCancellation(signal);
+
     if (!context.mistral) {
       return { success: false, error: 'Mistral API non configurée' };
     }
@@ -32,6 +37,8 @@ export const consultMistralHandler: ToolHandler = {
     const ctx = input.context as string | undefined;
     const complexity = input.complexity as 'low' | 'medium' | 'high' | 'auto' | undefined;
     const forceModel = input.force_model as 'large' | 'medium' | 'small' | undefined;
+
+    checkCancellation(signal);
 
     try {
       const result = await context.mistral.consult({
@@ -49,7 +56,18 @@ export const consultMistralHandler: ToolHandler = {
         tokens: result.usage
       };
     } catch (error) {
-      return { success: false, error: `Erreur Mistral: ${(error as Error).message}` };
+      const errorMessage = (error as Error).message;
+
+      // Détecter si c'est une annulation
+      if (errorMessage.includes('cancelled') || errorMessage.includes('abort')) {
+        return {
+          success: false,
+          cancelled: true,
+          error: 'Consultation Mistral annulée par l\'utilisateur'
+        };
+      }
+
+      return { success: false, error: `Erreur Mistral: ${errorMessage}` };
     }
   }
 };
