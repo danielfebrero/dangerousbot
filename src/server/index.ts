@@ -257,9 +257,8 @@ export class DangerousBotServer {
 
         for (const block of response.content) {
           if (block.type === 'text') {
-            if (block.text && block.text.trim()) {
-              this.wsManager.sendBotMessage(threadId, block.text);
-            }
+            // Le texte a déjà été streamé via le callback onChunk, pas besoin de renvoyer
+            // On skip pour éviter la duplication côté frontend
           } else if (block.type === 'tool_use') {
             // Générer un ID unique pour ce tool call
             const executionId = `exec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
