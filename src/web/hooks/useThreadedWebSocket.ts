@@ -227,6 +227,17 @@ export function useThreadedWebSocket(options: UseThreadedWebSocketOptions) {
     return false;
   }, []);
 
+  const forceRestart = useCallback((reason?: string) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'force_restart',
+        payload: { reason: reason || 'Force restart par l\'utilisateur' }
+      }));
+      return true;
+    }
+    return false;
+  }, []);
+
   return {
     status,
     currentThreadId,
@@ -240,5 +251,6 @@ export function useThreadedWebSocket(options: UseThreadedWebSocketOptions) {
     listThreads,
     clearThread,
     loadMoreHistory,
+    forceRestart,
   };
 }

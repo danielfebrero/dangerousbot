@@ -10,9 +10,10 @@ interface MessageListProps {
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
+  onForceRestart?: () => void;
 }
 
-export function MessageList({ messages, isTyping, hasMore, isLoadingMore, onLoadMore }: MessageListProps) {
+export function MessageList({ messages, isTyping, hasMore, isLoadingMore, onLoadMore, onForceRestart }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const prevMessagesLengthRef = useRef(messages.length);
   const prevScrollHeightRef = useRef(0);
@@ -84,7 +85,11 @@ export function MessageList({ messages, isTyping, hasMore, isLoadingMore, onLoad
         </div>
       )}
       {messages.map(message => (
-        <MessageItem key={message.id} message={message} />
+        <MessageItem 
+          key={message.id} 
+          message={message} 
+          onForceRestart={message.forceRestart ? onForceRestart : undefined}
+        />
       ))}
       {isTyping && <TypingIndicator />}
     </div>

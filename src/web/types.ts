@@ -46,10 +46,11 @@ export interface Message {
     reason: string;
   };
   source?: 'webapp' | 'telegram';
+  forceRestart?: boolean; // Pour afficher le bouton de force restart
 }
 
 export interface WSMessage {
-  type: 'user_message' | 'bot_message' | 'bot_typing' | 'tool_use' | 'tool_result' | 'system' | 'error' | 'connected' | 'history' | 'usage' | 'provider_switch' | 'stream_chunk' | 'threads_list' | 'thread_switched' | 'thread_created' | 'thread_renamed' | 'thread_deleted' | 'thread_cleared';
+  type: 'user_message' | 'bot_message' | 'bot_typing' | 'tool_use' | 'tool_result' | 'system' | 'error' | 'connected' | 'history' | 'usage' | 'provider_switch' | 'stream_chunk' | 'threads_list' | 'thread_switched' | 'thread_created' | 'thread_renamed' | 'thread_deleted' | 'thread_cleared' | 'restart_signal' | 'force_restart_prompt';
   payload: any;
   timestamp?: string;
 }

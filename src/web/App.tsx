@@ -295,18 +295,34 @@ function App() {
 
       case 'tool_result':
         const mappedExecutionId = toolExecutionMapRef.current[wsMessage.payload.executionId || 'unknown'];
-        
+
         if (mappedExecutionId) {
+          // Déterminer le statut en fonction du résultat
+          const result = wsMessage.payload.result;
+          let newStatus: 'completed' | 'warning' | 'error' = 'completed';
+          let warning: string | undefined;
+          let error: string | undefined;
+
+          if (result && typeof result === 'object') {
+            if (result.success === false) {
+              newStatus = 'error';
+              error = result.error || 'Tool execution failed';
+            } else if (result._status === 'warning') {
+              newStatus = 'warning';
+              warning = result._warning;
+            }
+          }
+
           activeToolExecutionsRef.current = activeToolExecutionsRef.current.map(exec =>
             exec.id === mappedExecutionId
-              ? { ...exec, status: 'completed', endTime: new Date(), output: wsMessage.payload.result }
+              ? { ...exec, status: newStatus, endTime: new Date(), output: result, error, warning }
               : exec
           );
           setActiveToolExecutions(activeToolExecutionsRef.current);
 
           setMessages(prev => prev.map(msg =>
             msg.id === mappedExecutionId && msg.toolExecution
-              ? { ...msg, toolExecution: { ...msg.toolExecution, status: 'completed', output: wsMessage.payload.result } }
+              ? { ...msg, toolExecution: { ...msg.toolExecution, status: newStatus, output: result, error, warning } }
               : msg
           ));
         }
@@ -325,6 +341,26 @@ function App() {
           id: crypto.randomUUID(),
           type: 'system',
           content: `Erreur: ${wsMessage.payload.error}`,
+          timestamp: new Date()
+        }]);
+        break;
+
+      case 'restart_signal':
+        setMessages(prev => [...prev, {
+          id: crypto.randomUUID(),
+          type: 'system',
+          content: `🔄 ${wsMessage.payload.message || 'Le serveur va redémarrer...'}`,
+          timestamp: new Date()
+        }]);
+        break;
+
+      case 'force_restart_prompt':
+        // Afficher le message busy avec bouton force restart
+        setMessages(prev => [...prev, {
+          id: crypto.randomUUID(),
+          type: 'system',
+          content: `⚠️ ${wsMessage.payload.message || 'Des threads sont encore en cours de traitement.'}`,
+          forceRestart: true,
           timestamp: new Date()
         }]);
         break;
@@ -350,7 +386,8 @@ function App() {
     deleteThread,
     listThreads,
     clearThread,
-    loadMoreHistory
+    loadMoreHistory,
+    forceRestart
   } = useThreadedWebSocket({
     onMessage: handleMessage,
     onThreadSwitched: handleThreadSwitched,
@@ -411,6 +448,10 @@ function App() {
   const handleSwitchThread = useCallback((threadId: string) => {
     switchThread(threadId);
   }, [switchThread]);
+
+  const handleForceRestart = useCallback(() => {
+    forceRestart('Force restart par l\'utilisateur');
+  }, [forceRestart]);
 
   const handleRenameThread = useCallback((threadId: string, newTitle: string) => {
     renameThread(threadId, newTitle);
@@ -560,6 +601,7 @@ function App() {
             hasMore={hasMoreMessages}
             isLoadingMore={isLoadingMore}
             onLoadMore={handleLoadMore}
+            onForceRestart={handleForceRestart}
           />
         </main>
 

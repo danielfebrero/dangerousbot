@@ -191,7 +191,11 @@ export class DangerousBotServer {
       return;
     }
 
+    // Marquer ce thread comme busy pour le mécanisme de force restart
     this.processingClients.add(options.clientId);
+    (global as any).__busyThreads = this.processingClients;
+    (global as any).__currentThreadId = threadId;
+    
     this.wsManager.sendBotTyping(threadId, true);
 
     // Sauvegarder le message utilisateur dans le thread
@@ -416,6 +420,9 @@ export class DangerousBotServer {
       }
     } finally {
       this.processingClients.delete(options.clientId);
+      // Mettre à jour les variables globales de suivi
+      (global as any).__busyThreads = this.processingClients;
+      delete (global as any).__currentThreadId;
       this.wsManager.sendBotTyping(threadId, false);
       // Toujours libérer le HistoryManager, même en cas d'erreur
       this.brain.releaseHistoryManager(threadId);

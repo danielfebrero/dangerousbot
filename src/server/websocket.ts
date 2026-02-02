@@ -229,6 +229,30 @@ export class WebSocketManager {
               break;
             }
 
+            case 'force_restart': {
+              const reason = message.payload?.reason || 'Force restart par l\'utilisateur';
+              console.log(`[WebSocket] Force restart demandé par ${client.clientId}: ${reason}`);
+              
+              // Vider la liste des clients busy
+              const busyThreads = (global as any).__busyThreads;
+              if (busyThreads) {
+                busyThreads.clear();
+              }
+              
+              // Relancer le self_update avec force=true
+              const selfUpdateResult = await this.handleForceRestart(reason, client.threadId);
+              
+              this.sendTo(ws, {
+                type: 'system',
+                payload: { 
+                  message: selfUpdateResult.success 
+                    ? '✅ Redémarrage forcé initié...'
+                    : `❌ Erreur: ${selfUpdateResult.error}` 
+                },
+              });
+              break;
+            }
+
             default:
               console.warn(`[WebSocket] Unknown message type: ${message.type}`);
           }
@@ -488,6 +512,73 @@ export class WebSocketManager {
       if (client.threadId === threadId) count++;
     }
     return count;
+  }
+
+  // Gérer le force restart
+  private async handleForceRestart(reason: string, threadId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Importer dynamiquement le handler self_update
+      const { selfUpdateHandler } = await import('../core/tools/self-update.js');
+      const { getRollbackManager } = await import('../core/rollback.js');
+      const { getMemory } = await import('../core/memory.js');
+      const { getCodeEmbeddingService } = await import('../core/code-embedding.js');
+      const { getCodeIndexer } = await import('../core/code-indexer.js');
+      const { Versioning } = await import('../core/versioning.js');
+      const { Lifecycle } = await import('../core/lifecycle.js');
+      
+      const rollbackManager = getRollbackManager();
+      const memory = getMemory();
+      const versioning = new Versioning(process.cwd());
+      const lifecycle = new Lifecycle(process.cwd());
+      
+      const context = {
+        projectRoot: process.cwd(),
+        executor: { shell: async (cmd: string) => {
+          const { execSync } = await import('child_process');
+          try {
+            execSync(cmd, { cwd: process.cwd(), encoding: 'utf-8' });
+            return { success: true };
+          } catch (e: any) {
+            return { success: false, error: e.message };
+          }
+        }},
+        memory,
+        versioning,
+        lifecycle,
+        mistral: null,
+        aiConsultant: null,
+        rollbackManager,
+      };
+      
+      const result = await selfUpdateHandler.execute({ reason, force: true }, context);
+      
+      if (result.success && result.needsRestart) {
+        // Programmer le redémarrage
+        const fs = await import('fs');
+        const path = await import('path');
+        const restartFile = path.join(process.cwd(), '.restart');
+        fs.writeFileSync(restartFile, JSON.stringify({
+          reason,
+          timestamp: new Date().toISOString()
+        }));
+        
+        // Stocker le flag pour le serveur
+        (global as any).__pendingRestart = { reason };
+        
+        // Envoyer le signal de redémarrage à tous les clients
+        this.sendRestartSignal(reason);
+        
+        // Redémarrer après un délai
+        setTimeout(() => {
+          lifecycle.restart(reason);
+        }, 2000);
+      }
+      
+      return { success: result.success, error: result.error };
+    } catch (error) {
+      console.error('[WebSocket] Erreur force restart:', error);
+      return { success: false, error: String(error) };
+    }
   }
 
   // Fermer toutes les connexions

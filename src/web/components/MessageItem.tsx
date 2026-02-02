@@ -7,6 +7,7 @@ import { ProviderSwitchMessage } from './ProviderSwitchMessage';
 
 interface MessageItemProps {
   message: Message;
+  onForceRestart?: () => void;
 }
 
 // Format relative time (x time ago)
@@ -26,7 +27,7 @@ function formatRelativeTime(date: Date): string {
   return date.toLocaleDateString('fr-FR');
 }
 
-export function MessageItem({ message }: MessageItemProps) {
+export function MessageItem({ message, onForceRestart }: MessageItemProps) {
   const [showTimestamp, setShowTimestamp] = useState(false);
 
   const renderImages = () => {
@@ -83,6 +84,21 @@ export function MessageItem({ message }: MessageItemProps) {
     }
   };
 
+  const renderForceRestartButton = () => {
+    if (!message.forceRestart) return null;
+    
+    return (
+      <div className="force-restart-container">
+        <button 
+          className="force-restart-btn"
+          onClick={() => message.onForceRestart?.()}
+        >
+          🔥 Vasy on s'en branle, redémarre quand même
+        </button>
+      </div>
+    );
+  };
+
   const renderToolCalls = () => {
     if (!message.toolCalls || message.toolCalls.length === 0) return null;
 
@@ -122,6 +138,7 @@ export function MessageItem({ message }: MessageItemProps) {
       <div className="message-content">
         {renderContent()}
         {renderToolCalls()}
+        {renderForceRestartButton()}
       </div>
       {showTimestamp && (
         <div className="message-timestamp-hover">

@@ -486,6 +486,39 @@ html, body {
   margin-bottom: 0;
 }
 
+/* Force Restart Button Styles */
+.force-restart-container {
+  margin-top: var(--space-3);
+  display: flex;
+  justify-content: center;
+}
+
+.force-restart-btn {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.force-restart-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+  background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+}
+
+.force-restart-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
 @keyframes message-enter {
   from {
     opacity: 0;

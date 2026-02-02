@@ -25,6 +25,25 @@ export const selfUpdateHandler: ToolHandler = {
   definition: selfUpdateDefinition,
   async execute(input: ToolInput, context: ToolContext): Promise<ToolResult> {
     const description = (input.reason as string) || 'Mise à jour du système';
+    const force = (input.force as boolean) || false;
+    
+    // Vérifier si d'autres threads sont en cours de traitement
+    const busyThreads = (global as any).__busyThreads || new Set<string>();
+    const currentThreadId = (global as any).__currentThreadId;
+    
+    // Compter les threads busy (en excluant le thread actuel si présent)
+    const otherBusyThreads = Array.from(busyThreads as Set<string>).filter(id => id !== currentThreadId);
+    
+    if (!force && otherBusyThreads.length > 0) {
+      // D'autres threads sont busy, demander confirmation
+      return {
+        success: false,
+        error: 'BUSY',
+        message: `⚠️ ${otherBusyThreads.length} autre(s) thread(s) en cours de traitement.`,
+        busyThreads: otherBusyThreads.length,
+        canForce: true
+      };
+    }
     
     // Utiliser le système de rollback si disponible
     const rollbackManager = context.rollbackManager;
