@@ -146,8 +146,8 @@ export class Brain {
       onChunk
     });
 
-    // Sauvegarder la réponse
-    historyManager.addAssistantMessage(response.content);
+    // Sauvegarder la réponse immédiatement (persiste à la DB avec threadId)
+    historyManager.addAssistantMessage(response.content, threadId);
 
     return this.formatResponse(response);
   }
@@ -189,7 +189,7 @@ export class Brain {
       abortSignal
     });
 
-    historyManager.addAssistantMessage(response.content);
+    historyManager.addAssistantMessage(response.content, threadId);
 
     return this.formatResponse(response);
   }
@@ -216,7 +216,7 @@ export class Brain {
       onChunk
     });
 
-    historyManager.addAssistantMessage(response.content);
+    historyManager.addAssistantMessage(response.content, threadId);
 
     return this.formatResponse(response);
   }
@@ -241,7 +241,7 @@ export class Brain {
       abortSignal
     });
 
-    historyManager.addAssistantMessage(response.content);
+    historyManager.addAssistantMessage(response.content, threadId);
 
     return this.formatResponse(response);
   }

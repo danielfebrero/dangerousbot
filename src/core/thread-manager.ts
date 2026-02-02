@@ -27,7 +27,7 @@ export interface ThreadMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: string;
-  toolCalls?: Array<{ name: string; input: unknown }>;
+  toolCalls?: Array<{ id?: string; name: string; input: unknown }>;
   images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>;
 }
 
@@ -322,7 +322,7 @@ export class ThreadManager {
     threadId: string,
     role: 'user' | 'assistant' | 'system',
     content: string,
-    toolCalls?: Array<{ name: string; input: unknown }>,
+    toolCalls?: Array<{ id?: string; name: string; input: unknown }>,
     images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>
   ): number {
     // Génère un session_id unique pour ce message

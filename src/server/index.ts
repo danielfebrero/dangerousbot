@@ -238,7 +238,8 @@ export class DangerousBotServer {
           throw new Error('Request aborted by user');
         }
 
-        // Save assistant message with tool_calls BEFORE executing tools
+        // Note: Assistant messages with tool_calls are now persisted to DB by brain.addAssistantMessage()
+        // So we don't need to save here to avoid duplicates
         const roundToolCalls: Array<{ id?: string; name: string; input: unknown }> = [];
         let roundText = '';
         for (const block of response.content) {
@@ -247,9 +248,6 @@ export class DangerousBotServer {
           } else if (block.type === 'tool_use') {
             roundToolCalls.push({ id: block.id, name: block.name, input: block.input });
           }
-        }
-        if (roundToolCalls.length > 0) {
-          threadManager.addMessage(threadId, 'assistant', roundText, roundToolCalls as any);
         }
 
         // Vérifier si un changement de thread a eu lieu (race condition protection)
@@ -365,10 +363,7 @@ export class DangerousBotServer {
         }
       }
 
-      // Sauvegarder le message assistant final
-      if (finalText && response.stopReason !== 'tool_use') {
-        threadManager.addMessage(threadId, 'assistant', finalText);
-      }
+      // Note: Final assistant message is already persisted by brain.addAssistantMessage()
 
       // Envoyer les stats d'usage
       if (response.usage) {
