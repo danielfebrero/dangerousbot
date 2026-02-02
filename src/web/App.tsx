@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useThreadedWebSocket, Thread } from './hooks/useThreadedWebSocket';
+import { useBrowserNotification } from './hooks/useBrowserNotification';
 import { Header } from './components/Header';
 import { MessageList } from './components/MessageList';
 import { MessageInput } from './components/MessageInput';
@@ -78,6 +79,11 @@ function App() {
   const streamingMessageIdRef = useRef<string | null>(null);
 
   // Thread callbacks
+  // Browser notifications
+  const { sendNotification } = useBrowserNotification();
+  const lastUserMessageRef = useRef<string>('');
+  const streamingEndedRef = useRef(false);
+
   const handleThreadSwitched = useCallback((threadId: string, title: string) => {
     setCurrentThreadTitle(title);
     setMessages([]);
@@ -190,6 +196,10 @@ function App() {
 
       case 'bot_typing':
         setIsTyping(wsMessage.payload.isTyping);
+        // If bot stops typing, mark streaming as ended
+        if (!wsMessage.payload.isTyping && streamingEndedRef.current) {
+          streamingEndedRef.current = false;
+        }
         break;
 
       case 'bot_message':
@@ -200,6 +210,12 @@ function App() {
           content: wsMessage.payload.text,
           timestamp: new Date()
         }]);
+        // Send notification when bot finishes responding
+        sendNotification({
+          title: 'DangerousBot',
+          body: wsMessage.payload.text.slice(0, 100) + (wsMessage.payload.text.length > 100 ? '...' : ''),
+          tag: 'dangerousbot-response'
+        });
         break;
 
       case 'tool_use':
@@ -306,6 +322,7 @@ function App() {
   }, [hasMoreMessages, isLoadingMore, currentOffset, loadMoreHistory]);
 
   const handleSendMessage = useCallback((text: string, images?: ContentPart[]) => {
+    lastUserMessageRef.current = text;
     const success = sendMessage(text, images);
     if (success) {
       setMessages(prev => [...prev, {
