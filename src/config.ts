@@ -36,6 +36,10 @@ export const MODELS = {
   MISTRAL_MEDIUM: 'mistral-medium-2505',    // Équilibré: brainstorming, validation
   MISTRAL_SMALL: 'mistral-small-2503',      // Rapide: tâches simples, formatting
   
+  /** Modèles Grok (xAI) */
+  GROK_4_1_FAST_REASONING: 'grok-4-1-fast-reasoning',       // Complexe/moyen: raisonnement avancé
+  GROK_4_1_FAST_NON_REASONING: 'grok-4-1-fast-non-reasoning', // Simple: rapide sans raisonnement
+  
   /** Modèles Kimi (Moonshot) */
   KIMI_DEFAULT: 'kimi-k2.5',                // Kimi 2.5 - modèle par défaut
   KIMI_LONG: 'kimi-k2.5',                   // Kimi 2.5 (supporte jusqu'à 128k)
@@ -133,6 +137,9 @@ export const PATHS = {
   /** Fichier de clé API Kimi (Moonshot) */
   get KIMI_KEY_FILE() { return path.join(this.SECRETS_DIR, 'kimi_api_key'); },
   
+  /** Fichier de clé API Grok (xAI) */
+  get GROK_KEY_FILE() { return path.join(this.SECRETS_DIR, 'grok_api_key'); },
+  
   /** Fichier pour l'ID utilisateur Telegram */
   get TELEGRAM_USER_ID_FILE() { return path.join(this.CONFIG_DIR, 'telegram.user'); },
   
@@ -159,12 +166,15 @@ export const APIS = {
   
   /** Clé API Mistral (chargée au runtime) */
   MISTRAL_API_KEY: '' as string,
-  
+
   /** Clé API OpenRouter (chargée au runtime) */
   OPENROUTER_API_KEY: '' as string,
-  
+
   /** Clé API Kimi/Moonshot (chargée au runtime) */
   KIMI_API_KEY: '' as string,
+
+  /** Clé API Grok/xAI (chargée au runtime) */
+  GROK_API_KEY: '' as string,
   
   /** Token API Telegram Bot */
   TELEGRAM_BOT_TOKEN: '***REMOVED***' as string,
@@ -207,6 +217,7 @@ export function initializeApiKeys(): void {
   APIS.MISTRAL_API_KEY = loadApiKey(PATHS.MISTRAL_KEY_FILE);
   APIS.OPENROUTER_API_KEY = loadApiKey(PATHS.OPENROUTER_KEY_FILE);
   APIS.KIMI_API_KEY = loadApiKey(PATHS.KIMI_KEY_FILE);
+  APIS.GROK_API_KEY = loadApiKey(PATHS.GROK_KEY_FILE);
 }
 
 /**

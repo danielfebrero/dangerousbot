@@ -19,6 +19,8 @@ import { selfUpdateHandler, selfUpdateDefinition } from './self-update';
 import { restartServerHandler, restartServerDefinition } from './restart-server';
 import { switchProviderHandler, switchProviderDefinition } from './switch-provider';
 import { consultMistralHandler, consultMistralDefinition } from './consult-mistral';
+import { consultAIHandler, consultAIDefinition } from './consult-ai';
+import { manageConversationsHandler, manageConversationsDefinition } from './manage-conversations';
 import { searxngSearchHandler, searxngSearchDefinition } from './searxng-search';
 import { getKimiBalanceHandler, getKimiBalanceDefinition } from './get-kimi-balance';
 import { todoHandler, todoDefinition } from './todo';
@@ -53,6 +55,8 @@ export function registerAllTools(): void {
     restartServerHandler,
     switchProviderHandler,
     consultMistralHandler,
+    consultAIHandler,
+    manageConversationsHandler,
     searxngSearchHandler,
     getKimiBalanceHandler,
     todoHandler,
@@ -88,6 +92,8 @@ export function getToolDefinitions(): Tool[] {
     restartServerDefinition,
     switchProviderDefinition,
     consultMistralDefinition,
+    consultAIDefinition,
+    manageConversationsDefinition,
     searxngSearchDefinition,
     getKimiBalanceDefinition,
     todoDefinition,
@@ -169,6 +175,8 @@ export {
   restartServerHandler,
   switchProviderHandler,
   consultMistralHandler,
+  consultAIHandler,
+  manageConversationsHandler,
   searxngSearchHandler,
   getKimiBalanceHandler,
   todoHandler,

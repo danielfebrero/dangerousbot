@@ -18,7 +18,8 @@ export interface ToolContext {
   memory: any; // Memory
   versioning: any; // Versioning
   lifecycle: any; // Lifecycle
-  mistral: any; // MistralConsultant | null
+  mistral: any; // MistralConsultant | null (legacy)
+  aiConsultant: any; // AIConsultant | null
   rollbackManager: any; // RollbackManager | null
   telegramChatId?: string; // Chat ID pour Telegram
   bot?: any; // Instance TelegramBot

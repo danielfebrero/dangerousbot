@@ -17,6 +17,7 @@ import { Executor } from './executor';
 import { Versioning } from './versioning';
 import { Lifecycle } from './lifecycle';
 import { MistralConsultant } from './mistral';
+import { AIConsultant, getAIConsultant } from './ai-consultant';
 import { getRollbackManager } from './rollback';
 import { getMemory } from './memory';
 
@@ -30,30 +31,37 @@ export class ToolExecutor {
   private versioning: Versioning;
   private lifecycle: Lifecycle;
   private mistral: MistralConsultant | null = null;
+  private aiConsultant: AIConsultant | null = null;
 
   constructor(projectRoot: string) {
     this.executor = new Executor(projectRoot);
     this.versioning = new Versioning(projectRoot);
     this.lifecycle = new Lifecycle(projectRoot);
-    
+
     try {
       this.mistral = new MistralConsultant();
     } catch (e) {
       console.warn('[Tools] Mistral not available:', (e as Error).message);
     }
-    
+
+    try {
+      this.aiConsultant = getAIConsultant();
+    } catch (e) {
+      console.warn('[Tools] AI Consultant not available:', (e as Error).message);
+    }
+
     // Initialiser le registry
     registerAllTools();
   }
 
   async execute(
-    toolName: string, 
-    input: any, 
+    toolName: string,
+    input: any,
     platformContext?: { telegramChatId?: string; bot?: any }
   ): Promise<any> {
     const memory = getMemory();
     const rollbackManager = getRollbackManager();
-    
+
     const context: ToolContext = {
       projectRoot: process.cwd(),
       executor: this.executor,
@@ -61,11 +69,12 @@ export class ToolExecutor {
       versioning: this.versioning,
       lifecycle: this.lifecycle,
       mistral: this.mistral,
+      aiConsultant: this.aiConsultant,
       rollbackManager,
       telegramChatId: platformContext?.telegramChatId,
       bot: platformContext?.bot
     };
-    
+
     return await executeTool(toolName, input, context);
   }
 }
