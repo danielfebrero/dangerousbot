@@ -168,8 +168,34 @@ export class GitignoreParser {
 
   /**
    * Match un glob simple (* et **)
+   * Supporte aussi les patterns sans wildcard pour match de préfixe
    */
   private matchGlob(str: string, pattern: string): boolean {
+    // Si le pattern ne contient pas de wildcard, c'est un match exact ou préfixe
+    if (!pattern.includes('*') && !pattern.includes('?')) {
+      // Match exact
+      if (str === pattern) return true;
+      // Match préfixe (ex: pattern "ubik/target" match "ubik/target/file.rs")
+      if (str.startsWith(pattern + '/')) return true;
+      // Match si str est un sous-répertoire (ex: "ubik/target/debug")
+      if (pattern.includes('/')) {
+        const patternParts = pattern.split('/');
+        const strParts = str.split('/');
+        // Vérifier que tous les segments du pattern sont présents au début de str
+        if (strParts.length >= patternParts.length) {
+          let matches = true;
+          for (let i = 0; i < patternParts.length; i++) {
+            if (strParts[i] !== patternParts[i]) {
+              matches = false;
+              break;
+            }
+          }
+          if (matches) return true;
+        }
+      }
+      return false;
+    }
+
     // Convertir le pattern glob en regex
     let regexPattern = pattern
       // Échapper les caractères spéciaux regex
@@ -186,9 +212,9 @@ export class GitignoreParser {
     // Pour les patterns qui ne contiennent pas de /, on ajoute une option
     // pour matcher soit le nom exact, soit un suffixe
     if (!pattern.includes('/')) {
-      regexPattern = `(?:^|/)${regexPattern}$`;
+      regexPattern = `(?:^|/)${regexPattern}(?:$|/)`;
     } else {
-      regexPattern = `^${regexPattern}$`;
+      regexPattern = `^${regexPattern}(?:$|/)`;
     }
 
     try {

@@ -79,9 +79,10 @@ export class CodeIndexer {
 
   /**
    * Détermine si un fichier doit être indexé
+   * Supporte TypeScript/JavaScript (projets par défaut) et Rust/Cargo (projets externes)
    */
   private shouldIndexFile(filename: string): boolean {
-    const extensions = ['.ts', '.tsx', '.js', '.jsx', '.json', '.md'];
+    const extensions = ['.ts', '.tsx', '.js', '.jsx', '.json', '.md', '.rs', '.toml', '.lock'];
     const ext = path.extname(filename).toLowerCase();
     return extensions.includes(ext) && !filename.endsWith('.d.ts');
   }
