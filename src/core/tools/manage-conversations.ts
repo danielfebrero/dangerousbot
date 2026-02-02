@@ -1,28 +1,38 @@
 /**
- * Tool: manage_conversations - Gère les conversations avec les IA consultantes
+ * Tool: manage_conversations - Gère les conversations avec les IA consultantes ET les threads
  * 
  * Permet de lister, récupérer et supprimer des conversations persistantes.
+ * Gère aussi les threads de conversation pour les conversations principales.
  */
 
 import { Tool, ToolResult, ToolInput } from '../types';
 import { ToolHandler, ToolContext } from './types';
+import { getThreadManager } from '../thread-manager.js';
 
 export const manageConversationsDefinition: Tool = {
   name: 'manage_conversations',
-  description: `Gère les conversations persistantes avec les IA consultantes (Mistral, Grok).
+  description: `Gère les conversations persistantes avec les IA consultantes (Mistral, Grok) et les threads.
 
 Actions disponibles:
 - list: Liste toutes les conversations avec leurs métadonnées
 - get: Récupère le détail complet d'une conversation par son ID
 - delete: Supprime une conversation spécifique
-- clear: Supprime TOUTES les conversations (irréversible)`,
+- clear: Supprime TOUTES les conversations (irréversible)
+
+Actions pour les threads (conversations principales):
+- list_threads: Liste tous les threads de conversation
+- get_thread: Récupère les détails d'un thread avec ses messages
+- switch_thread: Change le thread actif
+- create_thread: Crée un nouveau thread
+- delete_thread: Supprime un thread et son historique
+- rename_thread: Renomme un thread`,
   input_schema: {
     type: 'object',
     properties: {
       action: { 
         type: 'string', 
         enum: ['list', 'get', 'delete', 'clear'],
-        description: 'Action à effectuer sur les conversations' 
+        description: 'Action à effectuer sur les conversations AI (Mistral/Grok)' 
       },
       conversation_id: { 
         type: 'string', 
@@ -120,6 +130,8 @@ export const manageConversationsHandler: ToolHandler = {
             message: 'Toutes les conversations ont été supprimées',
           };
         }
+
+
 
         default:
           return {

@@ -21,6 +21,7 @@ import { switchProviderHandler, switchProviderDefinition } from './switch-provid
 import { consultMistralHandler, consultMistralDefinition } from './consult-mistral';
 import { consultAIHandler, consultAIDefinition } from './consult-ai';
 import { manageConversationsHandler, manageConversationsDefinition } from './manage-conversations';
+import { manageThreadsHandler, manageThreadsDefinition } from './manage-threads';
 import { searxngSearchHandler, searxngSearchDefinition } from './searxng-search';
 import { getKimiBalanceHandler, getKimiBalanceDefinition } from './get-kimi-balance';
 import { todoHandler, todoDefinition } from './todo';
@@ -57,6 +58,7 @@ export function registerAllTools(): void {
     consultMistralHandler,
     consultAIHandler,
     manageConversationsHandler,
+    manageThreadsHandler,
     searxngSearchHandler,
     getKimiBalanceHandler,
     todoHandler,
@@ -94,6 +96,7 @@ export function getToolDefinitions(): Tool[] {
     consultMistralDefinition,
     consultAIDefinition,
     manageConversationsDefinition,
+    manageThreadsDefinition,
     searxngSearchDefinition,
     getKimiBalanceDefinition,
     todoDefinition,

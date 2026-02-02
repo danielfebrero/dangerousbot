@@ -117,7 +117,7 @@ export interface ExecutionResult {
 // ============ WebSocket ============
 
 export interface WSMessage {
-  type: 'user_message' | 'bot_message' | 'bot_typing' | 'tool_use' | 'tool_result' | 'system' | 'error' | 'connected' | 'history' | 'usage' | 'stream_chunk' | 'provider_switch' | 'restart_signal';
+  type: 'user_message' | 'bot_message' | 'bot_typing' | 'tool_use' | 'tool_result' | 'system' | 'error' | 'connected' | 'history' | 'usage' | 'stream_chunk' | 'provider_switch' | 'restart_signal' | 'thread_switched' | 'thread_created' | 'thread_renamed' | 'thread_deleted' | 'thread_cleared' | 'threads_list';
   payload: unknown;
   timestamp?: string;
 }

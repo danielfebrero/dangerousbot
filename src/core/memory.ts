@@ -46,16 +46,35 @@ export class Memory {
   }
 
   private initSchema(): void {
-    // Table des conversations (schema de base sans les colonnes ajoutées par migration)
+    // Table des threads (conversations principales et sous-threads)
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS threads (
+        id TEXT PRIMARY KEY,
+        parent_thread_id TEXT,
+        title TEXT,
+        is_main BOOLEAN DEFAULT 1,
+        source TEXT CHECK(source IN ('webapp', 'telegram')),
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (parent_thread_id) REFERENCES threads(id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_threads_parent ON threads(parent_thread_id);
+      CREATE INDEX IF NOT EXISTS idx_threads_is_main ON threads(is_main);
+    `);
+
+    // Table des conversations (messages liés à un thread)
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS conversations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        thread_id TEXT NOT NULL,
         session_id TEXT NOT NULL,
         role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'system')),
         content TEXT NOT NULL,
         timestamp TEXT NOT NULL,
-        created_at TEXT DEFAULT (datetime('now'))
+        created_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (thread_id) REFERENCES threads(id) ON DELETE CASCADE
       );
+      CREATE INDEX IF NOT EXISTS idx_conversations_thread ON conversations(thread_id);
       CREATE INDEX IF NOT EXISTS idx_conversations_session ON conversations(session_id);
     `);
 
@@ -223,11 +242,22 @@ export class Memory {
       // Colonne existe déjà
     }
     
+    // Rétrocompatibilité: récupérer ou créer le main thread
+    let mainThread = this.db.prepare(`SELECT id FROM threads WHERE is_main = 1 ORDER BY created_at DESC LIMIT 1`).get() as { id: string } | undefined;
+    if (!mainThread) {
+      // Créer le main thread s'il n'existe pas
+      const mainThreadId = `thread_main_${Date.now()}`;
+      this.db.prepare(`INSERT INTO threads (id, title, is_main) VALUES (?, ?, ?)`).run(mainThreadId, 'Main Thread', 1);
+      mainThread = { id: mainThreadId };
+    }
+    const threadId = mainThread.id;
+    
     const stmt = this.db.prepare(`
-      INSERT INTO conversations (session_id, role, content, tool_calls, images, source, timestamp)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO conversations (thread_id, session_id, role, content, tool_calls, images, source, timestamp)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const result = stmt.run(
+      threadId,
       this.currentSessionId,
       role,
       content,

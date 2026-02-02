@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { useWebSocket } from './hooks/useWebSocket';
+import { useThreadedWebSocket, Thread } from './hooks/useThreadedWebSocket';
 import { Header } from './components/Header';
 import { MessageList } from './components/MessageList';
 import { MessageInput } from './components/MessageInput';
@@ -15,6 +15,11 @@ function App() {
   const [droppedImages, setDroppedImages] = useState<ContentPart[]>([]);
   const [showAllSources, setShowAllSources] = useState(true);
   const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
+  
+  // Thread management
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const [showThreadPanel, setShowThreadPanel] = useState(false);
+  const [currentThreadTitle, setCurrentThreadTitle] = useState('New Thread');
   const lastScrollY = useRef(0);
 
   // Load settings from backend on mount
@@ -40,14 +45,12 @@ function App() {
     }).catch(err => console.error('Failed to save settings:', err));
   }, []);
 
-  // Track tool execution IDs for matching results
+  // Track tool execution IDs
   const toolExecutionMapRef = useRef<Record<string, string>>({});
-  
-  // Track active tool executions for chat display
   const [activeToolExecutions, setActiveToolExecutions] = useState<ToolCallExecution[]>([]);
   const activeToolExecutionsRef = useRef<ToolCallExecution[]>([]);
 
-  // Header auto-hide on scroll
+  // Header auto-hide
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
@@ -66,18 +69,26 @@ function App() {
   // Streaming message ID
   const streamingMessageIdRef = useRef<string | null>(null);
 
+  // Thread callbacks
+  const handleThreadSwitched = useCallback((threadId: string, title: string) => {
+    setCurrentThreadTitle(title);
+    setMessages([]);
+    streamingMessageIdRef.current = null;
+  }, []);
+
+  const handleThreadsList = useCallback((newThreads: Thread[], activeThreadId: string) => {
+    setThreads(newThreads);
+    const activeThread = newThreads.find(t => t.id === activeThreadId);
+    if (activeThread) {
+      setCurrentThreadTitle(activeThread.title);
+    }
+  }, []);
+
   const handleMessage = useCallback((wsMessage: WSMessage) => {
     switch (wsMessage.type) {
       case 'history':
         const historyMessages = wsMessage.payload.messages || [];
-        const loadedMessages: Message[] = historyMessages.map((msg: {
-          role: string;
-          content: string;
-          timestamp: string;
-          tool_calls?: Array<{ name: string; input: unknown }>;
-          images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>;
-          source?: 'webapp' | 'telegram';
-        }) => {
+        const loadedMessages: Message[] = historyMessages.map((msg: any) => {
           const isProviderSwitch = msg.role === 'system' && (
             msg.content.includes('Provider changé') ||
             (msg.content.includes('Provider') && msg.content.includes('indisponible'))
@@ -91,23 +102,14 @@ function App() {
             ];
           }
 
-          // Parse provider switch details from content if it's a provider switch message
           let providerSwitch = undefined;
           if (isProviderSwitch) {
-            // Try to extract from format "Provider changé : X → Y" or similar
             const match = msg.content.match(/([A-Za-z]+)\s*→\s*([A-Za-z]+)/);
             if (match) {
               providerSwitch = {
                 from: match[1].toLowerCase(),
                 to: match[2].toLowerCase(),
-                reason: msg.content.includes('indisponible') ? 'Provider indisponible, bascule automatique' : 'Bascule manuelle'
-              };
-            } else {
-              // Fallback if no arrow pattern found
-              providerSwitch = {
-                from: 'unknown',
-                to: 'unknown',
-                reason: msg.content
+                reason: msg.content.includes('indisponible') ? 'Provider indisponible' : 'Bascule manuelle'
               };
             }
           }
@@ -125,6 +127,10 @@ function App() {
         });
         setMessages(loadedMessages);
         streamingMessageIdRef.current = null;
+        break;
+
+      case 'threads_list':
+        setThreads(wsMessage.payload.threads || []);
         break;
 
       case 'stream_chunk':
@@ -152,169 +158,61 @@ function App() {
         });
         break;
 
-      case 'bot_message':
-        // Don't create a new message if we already have a streaming message
-        if (streamingMessageIdRef.current) {
-          const streamId = streamingMessageIdRef.current;
-          setMessages(prev => {
-            const messageIndex = prev.findIndex(m => m.id === streamId);
-            if (messageIndex >= 0) {
-              // Streaming message exists, update it with final content if different
-              if (prev[messageIndex].content !== wsMessage.payload.text) {
-                const updatedMessages = [...prev];
-                updatedMessages[messageIndex] = {
-                  ...updatedMessages[messageIndex],
-                  content: wsMessage.payload.text
-                };
-                return updatedMessages;
-              }
-              return prev;
-            }
-            // No streaming message found, create new one
-            return [...prev, {
-              id: crypto.randomUUID(),
-              type: 'bot',
-              content: wsMessage.payload.text,
-              timestamp: new Date()
-            }];
-          });
-        } else {
-          setMessages(prev => [...prev, {
-            id: crypto.randomUUID(),
-            type: 'bot',
-            content: wsMessage.payload.text,
-            timestamp: new Date()
-          }]);
-        }
-        streamingMessageIdRef.current = null;
-        break;
-
       case 'bot_typing':
         setIsTyping(wsMessage.payload.isTyping);
         break;
 
+      case 'bot_message':
+        streamingMessageIdRef.current = null;
+        setMessages(prev => [...prev, {
+          id: crypto.randomUUID(),
+          type: 'bot',
+          content: wsMessage.payload.text,
+          timestamp: new Date()
+        }]);
+        break;
+
       case 'tool_use':
-        // Track in tool panel
-        const toolName = wsMessage.payload.tool;
-        const toolInput = wsMessage.payload.input;
-        const executionId = wsMessage.payload.executionId;
+        const executionId = crypto.randomUUID();
+        toolExecutionMapRef.current[wsMessage.payload.executionId || 'unknown'] = executionId;
         
-        // Check if this execution already exists using the ref to avoid stale closure
-        const existingExec = activeToolExecutionsRef.current.find(e => e.id === executionId);
-        if (existingExec) {
-          // Already exists, don't create a duplicate
-          break;
-        }
-        
-        // Create a new tool execution message in the chat
-        // Use executionId as the message ID for easy lookup on tool_result
         const newExecution: ToolCallExecution = {
-          id: executionId,  // Use server executionId
-          toolName: toolName,
-          input: toolInput,
+          id: executionId,
+          toolName: wsMessage.payload.tool,
+          input: wsMessage.payload.input,
           status: 'running',
           startTime: new Date()
         };
         
-        // Add to active executions
         activeToolExecutionsRef.current = [...activeToolExecutionsRef.current, newExecution];
         setActiveToolExecutions(activeToolExecutionsRef.current);
         
-        // Add as a separate message in the chat - use executionId as message ID
-        setMessages(prev => {
-          // Check again in the updater function to avoid race conditions
-          if (prev.find(m => m.id === executionId)) {
-            return prev;
-          }
-          return [...prev, {
-            id: executionId,  // Use server executionId for easy lookup
-            type: 'tool_execution',
-            content: '',
-            toolExecution: newExecution,
-            timestamp: new Date()
-          }];
-        });
+        setMessages(prev => [...prev, {
+          id: executionId,
+          type: 'tool_execution',
+          content: `Utilisation de ${wsMessage.payload.tool}...`,
+          toolExecution: newExecution,
+          timestamp: new Date()
+        }]);
         break;
 
       case 'tool_result':
-        // Update tool execution
-        const resultExecutionId = wsMessage.payload.executionId;
+        const mappedExecutionId = toolExecutionMapRef.current[wsMessage.payload.executionId || 'unknown'];
         
-        // Update the tool execution message in chat using executionId
-        setMessages(prev => {
-          return prev.map(msg => {
-            // Use message.id (which is executionId) for lookup
-            if (msg.type === 'tool_execution' && msg.id === resultExecutionId && msg.toolExecution) {
-              const result = wsMessage.payload.result;
-              const isError = result?.success === false || result?.error;
-              const isWarning = result?._status === 'warning';
+        if (mappedExecutionId) {
+          activeToolExecutionsRef.current = activeToolExecutionsRef.current.map(exec =>
+            exec.id === mappedExecutionId
+              ? { ...exec, status: 'completed', endTime: new Date(), output: wsMessage.payload.result }
+              : exec
+          );
+          setActiveToolExecutions(activeToolExecutionsRef.current);
 
-              // Determine status: error > warning > completed
-              let status: 'running' | 'completed' | 'warning' | 'error' = 'completed';
-              if (isError) status = 'error';
-              else if (isWarning) status = 'warning';
-
-              const updatedExecution: ToolCallExecution = {
-                ...msg.toolExecution,
-                status,
-                output: result,
-                error: isError ? (result.error || 'Unknown error') : undefined,
-                warning: isWarning ? result._warning : undefined,
-                endTime: new Date()
-              };
-
-              return {
-                ...msg,
-                toolExecution: updatedExecution
-              };
-            }
-            return msg;
-          });
-        });
-        
-        // Update active executions ref using executionId
-        activeToolExecutionsRef.current = activeToolExecutionsRef.current.map(exec => {
-          if (exec.id === resultExecutionId) {
-            const result = wsMessage.payload.result;
-            const isError = result?.success === false || result?.error;
-            const isWarning = result?._status === 'warning';
-
-            let status: 'running' | 'completed' | 'warning' | 'error' = 'completed';
-            if (isError) status = 'error';
-            else if (isWarning) status = 'warning';
-
-            return {
-              ...exec,
-              status,
-              output: result,
-              error: isError ? (result.error || 'Unknown error') : undefined,
-              warning: isWarning ? result._warning : undefined,
-              endTime: new Date()
-            };
-          }
-          return exec;
-        });
-        setActiveToolExecutions(activeToolExecutionsRef.current);
-        
-        delete toolExecutionMapRef.current[resultExecutionId];
-        break;
-
-      case 'system':
-        setMessages(prev => [...prev, {
-          id: crypto.randomUUID(),
-          type: 'system',
-          content: wsMessage.payload.message,
-          timestamp: new Date()
-        }]);
-        break;
-
-      case 'error':
-        setMessages(prev => [...prev, {
-          id: crypto.randomUUID(),
-          type: 'system',
-          content: `${wsMessage.payload.error}`,
-          timestamp: new Date()
-        }]);
+          setMessages(prev => prev.map(msg =>
+            msg.id === mappedExecutionId && msg.toolExecution
+              ? { ...msg, toolExecution: { ...msg.toolExecution, status: 'completed', output: wsMessage.payload.result } }
+              : msg
+          ));
+        }
         break;
 
       case 'usage':
@@ -323,123 +221,203 @@ function App() {
           output_tokens: wsMessage.payload.output_tokens,
           cost: wsMessage.payload.cost
         });
-        streamingMessageIdRef.current = null;
         break;
 
-      case 'provider_switch':
+      case 'error':
         setMessages(prev => [...prev, {
           id: crypto.randomUUID(),
-          type: 'provider_switch',
-          content: `${wsMessage.payload.from} → ${wsMessage.payload.to}`,
-          providerSwitch: {
-            from: wsMessage.payload.from,
-            to: wsMessage.payload.to,
-            reason: wsMessage.payload.reason
-          },
+          type: 'system',
+          content: `Erreur: ${wsMessage.payload.error}`,
           timestamp: new Date()
         }]);
         break;
+
+      case 'thread_switched':
+      case 'thread_created':
+      case 'thread_renamed':
+      case 'thread_deleted':
+        // Refresh threads list
+        listThreads();
+        break;
     }
   }, []);
 
-  const { status, sendMessage, sendStop } = useWebSocket({ onMessage: handleMessage });
+  const {
+    status,
+    currentThreadId,
+    sendMessage,
+    sendStop,
+    createThread,
+    switchThread,
+    renameThread,
+    deleteThread,
+    listThreads,
+    clearThread
+  } = useThreadedWebSocket({
+    onMessage: handleMessage,
+    onThreadSwitched: handleThreadSwitched,
+    onThreadsList: handleThreadsList
+  });
 
-  // Handle dropped files from drag overlay
-  const handleFilesDrop = useCallback((files: File[]) => {
-    // Convert files to ContentPart and send immediately
-    const processFiles = async () => {
-      const newImages: ContentPart[] = [];
+  // Load threads on mount
+  useEffect(() => {
+    if (status === 'connected') {
+      listThreads();
+    }
+  }, [status, listThreads]);
 
-      for (const file of files) {
-        const reader = new FileReader();
-        const base64Promise = new Promise<string>((resolve) => {
-          reader.onloadend = () => {
-            const base64 = reader.result as string;
-            resolve(base64.split(',')[1]);
-          };
-        });
-        reader.readAsDataURL(file);
-
-        const data = await base64Promise;
-        newImages.push({
-          type: 'image',
-          source: {
-            type: 'base64',
-            media_type: file.type,
-            data
-          }
-        });
-      }
-
-      // Store dropped images temporarily
-      setDroppedImages(newImages);
-    };
-
-    processFiles();
-  }, []);
-
-  const handleSend = useCallback((text: string, images?: ContentPart[]) => {
-    // Reset streaming message ID when user sends a new message
-    streamingMessageIdRef.current = null;
-
-    if (sendMessage(text, images)) {
-      let content = text;
-      let contentParts: ContentPart[] | undefined;
-
-      if (images && images.length > 0) {
-        contentParts = [
-          { type: 'text', text },
-          ...images
-        ];
-        if (!text.trim()) {
-          content = 'Image' + (images.length > 1 ? `s (${images.length})` : '');
-        }
-      }
-
+  const handleSendMessage = useCallback((text: string) => {
+    const success = sendMessage(text, droppedImages);
+    if (success) {
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         type: 'user',
-        content,
-        contentParts,
-        source: 'webapp',
+        content: text,
+        contentParts: droppedImages.length > 0 ? droppedImages : undefined,
         timestamp: new Date()
       }]);
+      setDroppedImages([]);
     }
-  }, [sendMessage]);
+  }, [sendMessage, droppedImages]);
 
-  // Filter messages based on showAllSources setting
-  const filteredMessages = showAllSources 
-    ? messages 
-    : messages.filter(m => !m.source || m.source === 'webapp');
+  const handleStop = useCallback(() => {
+    sendStop();
+  }, [sendStop]);
+
+  const handleNewThread = useCallback(() => {
+    createThread('New Thread');
+    setShowThreadPanel(false);
+  }, [createThread]);
+
+  const handleSwitchThread = useCallback((threadId: string) => {
+    switchThread(threadId);
+    setShowThreadPanel(false);
+  }, [switchThread]);
+
+  const handleRenameThread = useCallback((threadId: string, newTitle: string) => {
+    renameThread(threadId, newTitle);
+  }, [renameThread]);
+
+  const handleDeleteThread = useCallback((threadId: string) => {
+    if (confirm('Supprimer ce thread et tout son historique ?')) {
+      deleteThread(threadId);
+    }
+  }, [deleteThread]);
+
+  const handleClearThread = useCallback(() => {
+    if (confirm('Effacer tous les messages de ce thread ?')) {
+      clearThread();
+      setMessages([]);
+    }
+  }, [clearThread]);
+
+  const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault();
+      setIsDragging(true);
+    };
+    const handleDragLeave = (e: DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+    };
+    const handleDrop = (e: DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+      
+      if (e.dataTransfer?.files) {
+        const files = Array.from(e.dataTransfer.files);
+        files.forEach(file => {
+          if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              const data = (event.target?.result as string)?.split(',')[1];
+              if (data) {
+                setDroppedImages(prev => [...prev, {
+                  type: 'image',
+                  source: {
+                    type: 'base64',
+                    media_type: file.type,
+                    data
+                  }
+                }]);
+              }
+            };
+            reader.readAsDataURL(file);
+          }
+        });
+      }
+    };
+
+    window.addEventListener('dragover', handleDragOver);
+    window.addEventListener('dragleave', handleDragLeave);
+    window.addEventListener('drop', handleDrop);
+    return () => {
+      window.removeEventListener('dragover', handleDragOver);
+      window.removeEventListener('dragleave', handleDragLeave);
+      window.removeEventListener('drop', handleDrop);
+    };
+  }, []);
 
   return (
     <div className="app">
-      <Header
-        status={status}
-        visible={headerVisible}
-        tokenUsage={tokenUsage}
-        showAllSources={showAllSources}
-        onToggleSources={handleToggleSources}
-      />
+      <DragOverlay isDragging={isDragging} />
+      
+      {/* Thread Panel */}
+      {showThreadPanel && (
+        <div className="thread-panel-overlay" onClick={() => setShowThreadPanel(false)}>
+          <div className="thread-panel" onClick={e => e.stopPropagation()}>
+            <div className="thread-panel-header">
+              <h3>Conversations</h3>
+              <button className="new-thread-btn" onClick={handleNewThread}>
+                + Nouveau
+              </button>
+            </div>
+            <div className="thread-list">
+              {threads.map(thread => (
+                <div
+                  key={thread.id}
+                  className={`thread-item ${thread.id === currentThreadId ? 'active' : ''}`}
+                  onClick={() => handleSwitchThread(thread.id)}
+                >
+                  <span className="thread-title">{thread.title}</span>
+                  {thread.id === currentThreadId && <span className="thread-active-badge">●</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className={`header-container ${headerVisible ? 'visible' : 'hidden'}`}>
+        <Header 
+          connectionStatus={status}
+          tokenUsage={tokenUsage}
+          showAllSources={showAllSources}
+          onToggleSources={handleToggleSources}
+          isSettingsLoaded={isSettingsLoaded}
+          currentThreadTitle={currentThreadTitle}
+          onToggleThreadPanel={() => setShowThreadPanel(!showThreadPanel)}
+          onClearThread={handleClearThread}
+        />
+      </div>
 
       <main className="main-content">
-        <div className="chat-container">
-          <MessageList messages={filteredMessages} isTyping={isTyping} />
-        </div>
+        <MessageList 
+          messages={messages} 
+          showAllSources={showAllSources}
+          isTyping={isTyping}
+        />
       </main>
 
-      <MessageInput
-        onSend={handleSend}
-        onStop={sendStop}
-        isProcessing={isTyping}
-        disabled={status !== 'connected'}
+      <MessageInput 
+        onSend={handleSendMessage}
+        onStop={handleStop}
+        isConnected={status === 'connected'}
+        isTyping={isTyping}
         droppedImages={droppedImages}
-        onDroppedImagesClear={() => setDroppedImages([])}
-      />
-
-      <DragOverlay
-        onFilesDrop={handleFilesDrop}
-        disabled={status !== 'connected'}
+        setDroppedImages={setDroppedImages}
       />
     </div>
   );

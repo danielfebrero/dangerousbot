@@ -1632,6 +1632,133 @@ html, body {
 }
 
 /* ═══════════════════════════════════════
+   THREAD PANEL
+   ═══════════════════════════════════════ */
+
+.thread-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.thread-panel {
+  width: 280px;
+  height: 100%;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  animation: slideIn 0.2s ease;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+.thread-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.thread-panel-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.new-thread-btn {
+  padding: var(--space-2) var(--space-3);
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.new-thread-btn:hover {
+  opacity: 0.9;
+}
+
+.thread-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-2);
+}
+
+.thread-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-bottom: var(--space-1);
+}
+
+.thread-item:hover {
+  background: var(--bg-hover);
+}
+
+.thread-item.active {
+  background: var(--accent-muted);
+}
+
+.thread-title {
+  font-size: 0.9375rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.thread-active-badge {
+  color: var(--accent);
+  font-size: 0.75rem;
+}
+
+/* Thread button in header */
+.thread-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.thread-button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.thread-title-short {
+  font-size: 0.875rem;
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ═══════════════════════════════════════
    RESPONSIVE
    ═══════════════════════════════════════ */
 

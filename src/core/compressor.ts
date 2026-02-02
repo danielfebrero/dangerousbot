@@ -18,6 +18,7 @@ import { logger } from './logger';
 export interface CompressedMemory {
   id?: number;
   session_id: string;
+  thread_id: string;  // Thread associé à cette mémoire
   summary: string;
   message_ids: number[];  // IDs des messages compressés
   start_time: string;
@@ -123,6 +124,7 @@ Format: Un résumé structuré et factuel, sans fluff.`,
     // Créer l'objet mémoire compressée
     const compressed: CompressedMemory = {
       session_id: messages[0].session_id,
+      thread_id: messages[0].session_id, // Par défaut, utiliser session_id comme thread_id
       summary,
       message_ids: messages.map(m => m.id!).filter(Boolean),
       start_time: messages[0].timestamp,
@@ -196,6 +198,7 @@ Format: Un résumé structuré et factuel, sans fluff.`,
       return rows.map(row => ({
         id: row.id,
         session_id: row.session_id,
+        thread_id: row.thread_id || row.session_id,
         summary: row.summary,
         message_ids: JSON.parse(row.message_ids),
         start_time: row.start_time,
