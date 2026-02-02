@@ -266,6 +266,10 @@ function App() {
         break;
 
       case 'tool_use':
+        // Réinitialiser l'ID de streaming pour que le prochain texte streamé
+        // crée un nouveau message au lieu de concaténer au précédent
+        streamingMessageIdRef.current = null;
+
         const executionId = crypto.randomUUID();
         toolExecutionMapRef.current[wsMessage.payload.executionId || 'unknown'] = executionId;
         
@@ -364,6 +368,15 @@ function App() {
       listThreads();
     }
   }, [status, listThreads]);
+
+  // Update page title when thread changes
+  useEffect(() => {
+    if (currentThreadTitle) {
+      document.title = `${currentThreadTitle} - DangerousBot`;
+    } else {
+      document.title = 'DangerousBot';
+    }
+  }, [currentThreadTitle]);
 
   // Handler for loading more messages (called by MessageList on scroll to top)
   const handleLoadMore = useCallback(() => {
