@@ -196,6 +196,17 @@ export function useThreadedWebSocket(options: UseThreadedWebSocketOptions) {
     return false;
   }, []);
 
+  const loadMoreHistory = useCallback((offset: number, limit: number = 100) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'load_more_history',
+        payload: { offset, limit }
+      }));
+      return true;
+    }
+    return false;
+  }, []);
+
   return {
     status,
     currentThreadId,
@@ -208,5 +219,6 @@ export function useThreadedWebSocket(options: UseThreadedWebSocketOptions) {
     deleteThread,
     listThreads,
     clearThread,
+    loadMoreHistory,
   };
 }

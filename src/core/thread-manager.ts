@@ -269,16 +269,32 @@ export class ThreadManager {
   }
 
   /**
-   * Récupère les messages d'un thread
+   * Compte le nombre de messages dans un thread
    */
-  getThreadMessages(threadId: string, limit: number = 1000): ThreadMessage[] {
+  getThreadMessageCount(threadId: string): number {
+    const result = this.db.prepare(`
+      SELECT COUNT(*) as count FROM conversations WHERE thread_id = ?
+    `).get(threadId) as { count: number };
+    return result?.count || 0;
+  }
+
+  /**
+   * Récupère les messages d'un thread (les plus récents d'abord, puis inversés pour l'affichage)
+   * @param threadId ID du thread
+   * @param limit Nombre de messages à récupérer
+   * @param offset Décalage depuis les messages les plus récents
+   */
+  getThreadMessages(threadId: string, limit: number = 100, offset: number = 0): ThreadMessage[] {
+    // Récupère les N messages les plus récents avec offset, puis les inverse pour l'ordre chronologique
     const rows = this.db.prepare(`
-      SELECT c.id, c.thread_id, c.role, c.content, c.timestamp, c.tool_calls, c.images
-      FROM conversations c
-      WHERE c.thread_id = ?
-      ORDER BY c.id ASC
-      LIMIT ?
-    `).all(threadId, limit) as Array<{
+      SELECT * FROM (
+        SELECT c.id, c.thread_id, c.role, c.content, c.timestamp, c.tool_calls, c.images
+        FROM conversations c
+        WHERE c.thread_id = ?
+        ORDER BY c.id DESC
+        LIMIT ? OFFSET ?
+      ) ORDER BY id ASC
+    `).all(threadId, limit, offset) as Array<{
       id: number;
       thread_id: string;
       role: 'user' | 'assistant' | 'system';

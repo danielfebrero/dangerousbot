@@ -354,39 +354,11 @@ async function main(): Promise<void> {
     print('○ Token Telegram non configuré, bot désactivé', 'dim');
   }
 
-  // Setup WebSocket handlers
-  const wsManager = server.getWSManager();
-
-  // Configurer le handler de messages (avec support multi-modal et abort)
-  wsManager.setMessageHandler(async (text: string, images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>, abortSignal?: AbortSignal) => {
-    await server.processMessage(text, images, abortSignal);
-  });
-
-  // Configurer le handler de stop
-  wsManager.setStopHandler(() => {
-    console.log('[Main] Signal STOP reçu, annulation de la requête...');
-  });
-
-  // Configurer le provider d'historique (avec support images et source)
-  wsManager.setHistoryProvider(() => {
-    const history = memory.getMessages();
-    return history
-      // Filter out internal __TOOL_RESULT__ messages (used for persistence, not display)
-      .filter(msg => !(msg.role === 'user' && msg.content?.startsWith('__TOOL_RESULT__')))
-      .map(msg => ({
-        role: msg.role,
-        content: msg.content,
-        timestamp: msg.timestamp,
-        tool_calls: msg.tool_calls,
-        images: msg.images,
-        source: msg.source
-      }));
-  });
-
-  // Configurer le callback pour la première connexion (message de continuation après redémarrage)
-  wsManager.setOnFirstConnection(() => {
-    server.sendContinuationMessage();
-  });
+  // Note: Les handlers WebSocket sont configurés automatiquement dans le serveur threadé
+  // - Message handler: géré via setupWebSocketHandlers()
+  // - Stop handler: géré via setupWebSocketHandlers()
+  // - History: géré via ThreadManager.getThreadMessages()
+  // - First connection callback: géré via setupWebSocketHandlers()
 
   print('\n─────────────────────────────────────────────────────────────', 'dim');
   print(`Ouvrez http://${HOST}:${PORT} dans votre navigateur`, 'bright');

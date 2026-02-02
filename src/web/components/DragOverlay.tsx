@@ -1,86 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 
 interface DragOverlayProps {
-  onFilesDrop: (files: File[]) => void;
-  disabled?: boolean;
+  isDragging: boolean;
 }
 
-export function DragOverlay({ onFilesDrop, disabled }: DragOverlayProps) {
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragCounter, setDragCounter] = useState(0);
-
-  const handleDragEnter = useCallback((e: DragEvent) => {
-    if (disabled) return;
-    e.preventDefault();
-    e.stopPropagation();
-    
-    // Only handle if files are being dragged
-    if (e.dataTransfer?.types.includes('Files')) {
-      setDragCounter(prev => prev + 1);
-      setIsDragging(true);
-    }
-  }, [disabled]);
-
-  const handleDragLeave = useCallback((e: DragEvent) => {
-    if (disabled) return;
-    e.preventDefault();
-    e.stopPropagation();
-    
-    setDragCounter(prev => {
-      const newCount = prev - 1;
-      if (newCount <= 0) {
-        setIsDragging(false);
-        return 0;
-      }
-      return newCount;
-    });
-  }, [disabled]);
-
-  const handleDragOver = useCallback((e: DragEvent) => {
-    if (disabled) return;
-    e.preventDefault();
-    e.stopPropagation();
-    // Set drop effect to copy for visual feedback
-    if (e.dataTransfer) {
-      e.dataTransfer.dropEffect = 'copy';
-    }
-  }, [disabled]);
-
-  const handleDrop = useCallback((e: DragEvent) => {
-    if (disabled) return;
-    e.preventDefault();
-    e.stopPropagation();
-    
-    setIsDragging(false);
-    setDragCounter(0);
-    
-    const files = e.dataTransfer?.files;
-    if (files && files.length > 0) {
-      const imageFiles = Array.from(files).filter(file => 
-        file.type.startsWith('image/')
-      );
-      
-      if (imageFiles.length > 0) {
-        onFilesDrop(imageFiles);
-      }
-    }
-  }, [disabled, onFilesDrop]);
-
-  useEffect(() => {
-    // Add global event listeners
-    document.addEventListener('dragenter', handleDragEnter);
-    document.addEventListener('dragleave', handleDragLeave);
-    document.addEventListener('dragover', handleDragOver);
-    document.addEventListener('drop', handleDrop);
-
-    return () => {
-      document.removeEventListener('dragenter', handleDragEnter);
-      document.removeEventListener('dragleave', handleDragLeave);
-      document.removeEventListener('dragover', handleDragOver);
-      document.removeEventListener('drop', handleDrop);
-    };
-  }, [handleDragEnter, handleDragLeave, handleDragOver, handleDrop]);
-
+export function DragOverlay({ isDragging }: DragOverlayProps) {
   if (!isDragging) return null;
 
   return (

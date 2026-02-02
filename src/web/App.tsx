@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useThreadedWebSocket, Thread } from './hooks/useThreadedWebSocket';
 import { Header } from './components/Header';
 import { MessageList } from './components/MessageList';
@@ -12,15 +12,23 @@ function App() {
   const [isTyping, setIsTyping] = useState(false);
   const [tokenUsage, setTokenUsage] = useState<TokenUsage | null>(null);
   const [headerVisible, setHeaderVisible] = useState(true);
-  const [droppedImages, setDroppedImages] = useState<ContentPart[]>([]);
   const [showAllSources, setShowAllSources] = useState(true);
   const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [droppedImages, setDroppedImages] = useState<ContentPart[]>([]);
+  const dragCounterRef = useRef(0);
   
   // Thread management
   const [threads, setThreads] = useState<Thread[]>([]);
-  const [showThreadPanel, setShowThreadPanel] = useState(false);
+  const [showThreadPanel, setShowThreadPanel] = useState(true); // Visible by default
   const [currentThreadTitle, setCurrentThreadTitle] = useState('New Thread');
   const lastScrollY = useRef(0);
+
+  // Pagination state
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [currentOffset, setCurrentOffset] = useState(0);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [totalMessageCount, setTotalMessageCount] = useState(0);
 
   // Load settings from backend on mount
   useEffect(() => {
@@ -84,48 +92,70 @@ function App() {
     }
   }, []);
 
+  // Helper function to parse history messages
+  const parseHistoryMessages = useCallback((historyMessages: any[]): Message[] => {
+    return historyMessages.map((msg: any) => {
+      const isProviderSwitch = msg.role === 'system' && (
+        msg.content.includes('Provider changé') ||
+        (msg.content.includes('Provider') && msg.content.includes('indisponible'))
+      );
+
+      let contentParts: ContentPart[] | undefined;
+      if (msg.images && msg.images.length > 0) {
+        contentParts = [
+          { type: 'text', text: msg.content },
+          ...msg.images
+        ];
+      }
+
+      let providerSwitch = undefined;
+      if (isProviderSwitch) {
+        const match = msg.content.match(/([A-Za-z]+)\s*→\s*([A-Za-z]+)/);
+        if (match) {
+          providerSwitch = {
+            from: match[1].toLowerCase(),
+            to: match[2].toLowerCase(),
+            reason: msg.content.includes('indisponible') ? 'Provider indisponible' : 'Bascule manuelle'
+          };
+        }
+      }
+
+      return {
+        id: `msg_${msg.id || crypto.randomUUID()}`,
+        type: isProviderSwitch ? 'provider_switch' as const : (msg.role === 'user' ? 'user' as const : msg.role === 'assistant' ? 'bot' as const : 'system' as const),
+        content: msg.content,
+        contentParts,
+        toolCalls: msg.toolCalls,
+        providerSwitch,
+        source: msg.source,
+        timestamp: new Date(msg.timestamp)
+      };
+    });
+  }, []);
+
   const handleMessage = useCallback((wsMessage: WSMessage) => {
     switch (wsMessage.type) {
       case 'history':
         const historyMessages = wsMessage.payload.messages || [];
-        const loadedMessages: Message[] = historyMessages.map((msg: any) => {
-          const isProviderSwitch = msg.role === 'system' && (
-            msg.content.includes('Provider changé') ||
-            (msg.content.includes('Provider') && msg.content.includes('indisponible'))
-          );
+        const offset = wsMessage.payload.offset || 0;
+        const hasMore = wsMessage.payload.hasMore || false;
+        const totalCount = wsMessage.payload.totalCount || historyMessages.length;
 
-          let contentParts: ContentPart[] | undefined;
-          if (msg.images && msg.images.length > 0) {
-            contentParts = [
-              { type: 'text', text: msg.content },
-              ...msg.images
-            ];
-          }
+        const loadedMessages = parseHistoryMessages(historyMessages);
 
-          let providerSwitch = undefined;
-          if (isProviderSwitch) {
-            const match = msg.content.match(/([A-Za-z]+)\s*→\s*([A-Za-z]+)/);
-            if (match) {
-              providerSwitch = {
-                from: match[1].toLowerCase(),
-                to: match[2].toLowerCase(),
-                reason: msg.content.includes('indisponible') ? 'Provider indisponible' : 'Bascule manuelle'
-              };
-            }
-          }
+        if (offset === 0) {
+          // Initial load - replace messages
+          setMessages(loadedMessages);
+          setCurrentOffset(loadedMessages.length);
+        } else {
+          // Loading more - prepend older messages
+          setMessages(prev => [...loadedMessages, ...prev]);
+          setCurrentOffset(prev => prev + loadedMessages.length);
+        }
 
-          return {
-            id: crypto.randomUUID(),
-            type: isProviderSwitch ? 'provider_switch' as const : (msg.role === 'user' ? 'user' as const : msg.role === 'assistant' ? 'bot' as const : 'system' as const),
-            content: msg.content,
-            contentParts,
-            toolCalls: msg.tool_calls,
-            providerSwitch,
-            source: msg.source,
-            timestamp: new Date(msg.timestamp)
-          };
-        });
-        setMessages(loadedMessages);
+        setHasMoreMessages(hasMore);
+        setTotalMessageCount(totalCount);
+        setIsLoadingMore(false);
         streamingMessageIdRef.current = null;
         break;
 
@@ -252,7 +282,8 @@ function App() {
     renameThread,
     deleteThread,
     listThreads,
-    clearThread
+    clearThread,
+    loadMoreHistory
   } = useThreadedWebSocket({
     onMessage: handleMessage,
     onThreadSwitched: handleThreadSwitched,
@@ -266,19 +297,26 @@ function App() {
     }
   }, [status, listThreads]);
 
-  const handleSendMessage = useCallback((text: string) => {
-    const success = sendMessage(text, droppedImages);
+  // Handler for loading more messages (called by MessageList on scroll to top)
+  const handleLoadMore = useCallback(() => {
+    if (hasMoreMessages && !isLoadingMore) {
+      setIsLoadingMore(true);
+      loadMoreHistory(currentOffset);
+    }
+  }, [hasMoreMessages, isLoadingMore, currentOffset, loadMoreHistory]);
+
+  const handleSendMessage = useCallback((text: string, images?: ContentPart[]) => {
+    const success = sendMessage(text, images);
     if (success) {
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         type: 'user',
         content: text,
-        contentParts: droppedImages.length > 0 ? droppedImages : undefined,
+        contentParts: images && images.length > 0 ? images : undefined,
         timestamp: new Date()
       }]);
-      setDroppedImages([]);
     }
-  }, [sendMessage, droppedImages]);
+  }, [sendMessage]);
 
   const handleStop = useCallback(() => {
     sendStop();
@@ -286,12 +324,10 @@ function App() {
 
   const handleNewThread = useCallback(() => {
     createThread('New Thread');
-    setShowThreadPanel(false);
   }, [createThread]);
 
   const handleSwitchThread = useCallback((threadId: string) => {
     switchThread(threadId);
-    setShowThreadPanel(false);
   }, [switchThread]);
 
   const handleRenameThread = useCallback((threadId: string, newTitle: string) => {
@@ -311,114 +347,133 @@ function App() {
     }
   }, [clearThread]);
 
-  const [isDragging, setIsDragging] = useState(false);
-
-  useEffect(() => {
-    const handleDragOver = (e: DragEvent) => {
-      e.preventDefault();
+  // Drag & Drop handlers at app level
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.types.includes('Files')) {
       setIsDragging(true);
-    };
-    const handleDragLeave = (e: DragEvent) => {
-      e.preventDefault();
-      setIsDragging(false);
-    };
-    const handleDrop = (e: DragEvent) => {
-      e.preventDefault();
-      setIsDragging(false);
-      
-      if (e.dataTransfer?.files) {
-        const files = Array.from(e.dataTransfer.files);
-        files.forEach(file => {
-          if (file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-              const data = (event.target?.result as string)?.split(',')[1];
-              if (data) {
-                setDroppedImages(prev => [...prev, {
-                  type: 'image',
-                  source: {
-                    type: 'base64',
-                    media_type: file.type,
-                    data
-                  }
-                }]);
-              }
-            };
-            reader.readAsDataURL(file);
-          }
-        });
-      }
-    };
+    }
+  }, []);
 
-    window.addEventListener('dragover', handleDragOver);
-    window.addEventListener('dragleave', handleDragLeave);
-    window.addEventListener('drop', handleDrop);
-    return () => {
-      window.removeEventListener('dragover', handleDragOver);
-      window.removeEventListener('dragleave', handleDragLeave);
-      window.removeEventListener('drop', handleDrop);
-    };
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    const imageFiles = files.filter(file => file.type.startsWith('image/'));
+
+    if (imageFiles.length === 0) return;
+
+    for (const file of imageFiles) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const data = (event.target?.result as string)?.split(',')[1];
+        if (data) {
+          setDroppedImages(prev => [...prev, {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: file.type,
+              data
+            }
+          } as ContentPart]);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  }, []);
+
+  const handleClearDroppedImages = useCallback(() => {
+    setDroppedImages([]);
   }, []);
 
   return (
-    <div className="app">
+    <div
+      className={`app ${showThreadPanel ? 'with-sidebar' : ''}`}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       <DragOverlay isDragging={isDragging} />
-      
-      {/* Thread Panel */}
+
+      {/* Thread Panel - Fixed Sidebar */}
       {showThreadPanel && (
-        <div className="thread-panel-overlay" onClick={() => setShowThreadPanel(false)}>
-          <div className="thread-panel" onClick={e => e.stopPropagation()}>
-            <div className="thread-panel-header">
-              <h3>Conversations</h3>
-              <button className="new-thread-btn" onClick={handleNewThread}>
-                + Nouveau
-              </button>
-            </div>
-            <div className="thread-list">
-              {threads.map(thread => (
-                <div
-                  key={thread.id}
-                  className={`thread-item ${thread.id === currentThreadId ? 'active' : ''}`}
-                  onClick={() => handleSwitchThread(thread.id)}
-                >
-                  <span className="thread-title">{thread.title}</span>
-                  {thread.id === currentThreadId && <span className="thread-active-badge">●</span>}
-                </div>
-              ))}
-            </div>
+        <div className="thread-panel">
+          <div className="thread-panel-header">
+            <h3>Conversations</h3>
+            <button className="new-thread-btn" onClick={handleNewThread}>
+              + Nouveau
+            </button>
+          </div>
+          <div className="thread-list">
+            {threads.map(thread => (
+              <div
+                key={thread.id}
+                className={`thread-item ${thread.id === currentThreadId ? 'active' : ''}`}
+                onClick={() => handleSwitchThread(thread.id)}
+              >
+                <span className="thread-title">{thread.title}</span>
+                {thread.id === currentThreadId && <span className="thread-active-badge">●</span>}
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      <div className={`header-container ${headerVisible ? 'visible' : 'hidden'}`}>
-        <Header 
-          connectionStatus={status}
-          tokenUsage={tokenUsage}
-          showAllSources={showAllSources}
-          onToggleSources={handleToggleSources}
-          isSettingsLoaded={isSettingsLoaded}
-          currentThreadTitle={currentThreadTitle}
-          onToggleThreadPanel={() => setShowThreadPanel(!showThreadPanel)}
-          onClearThread={handleClearThread}
+      <div className="main-wrapper">
+        <div className={`header-container ${headerVisible ? 'visible' : 'hidden'}`}>
+          <Header
+            connectionStatus={status}
+            tokenUsage={tokenUsage}
+            showAllSources={showAllSources}
+            onToggleSources={handleToggleSources}
+            isSettingsLoaded={isSettingsLoaded}
+            currentThreadTitle={currentThreadTitle}
+            onToggleThreadPanel={() => setShowThreadPanel(!showThreadPanel)}
+            onClearThread={handleClearThread}
+            threadPanelVisible={showThreadPanel}
+          />
+        </div>
+
+        <main className="main-content">
+          <MessageList
+            messages={messages}
+            showAllSources={showAllSources}
+            isTyping={isTyping}
+            hasMore={hasMoreMessages}
+            isLoadingMore={isLoadingMore}
+            onLoadMore={handleLoadMore}
+          />
+        </main>
+
+        <MessageInput
+          onSend={handleSendMessage}
+          onStop={handleStop}
+          isProcessing={isTyping}
+          disabled={status !== 'connected'}
+          droppedImages={droppedImages}
+          onDroppedImagesClear={handleClearDroppedImages}
         />
       </div>
-
-      <main className="main-content">
-        <MessageList 
-          messages={messages} 
-          showAllSources={showAllSources}
-          isTyping={isTyping}
-        />
-      </main>
-
-      <MessageInput 
-        onSend={handleSendMessage}
-        onStop={handleStop}
-        isConnected={status === 'connected'}
-        isTyping={isTyping}
-        droppedImages={droppedImages}
-        setDroppedImages={setDroppedImages}
-      />
     </div>
   );
 }

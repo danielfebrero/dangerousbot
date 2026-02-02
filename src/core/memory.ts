@@ -62,11 +62,29 @@ export class Memory {
       CREATE INDEX IF NOT EXISTS idx_threads_is_main ON threads(is_main);
     `);
 
+    // Vérifier si la table conversations existe déjà (ancienne version sans thread_id)
+    const tableInfo = this.db.prepare(`PRAGMA table_info(conversations)`).all() as Array<{ name: string }>;
+    const hasThreadId = tableInfo.some(col => col.name === 'thread_id');
+
+    if (tableInfo.length > 0 && !hasThreadId) {
+      // Migration: ancienne table conversations vers nouvelle structure avec thread_id
+      // 1. Créer un main thread par défaut
+      const mainThreadId = `thread_main_${Date.now()}`;
+      this.db.prepare(`INSERT OR IGNORE INTO threads (id, title, is_main) VALUES (?, ?, ?)`).run(mainThreadId, 'Main Thread', 1);
+
+      // 2. Ajouter la colonne thread_id avec une valeur par défaut
+      this.db.exec(`ALTER TABLE conversations ADD COLUMN thread_id TEXT`);
+
+      // 3. Mettre à jour tous les messages existants pour utiliser le main thread
+      this.db.prepare(`UPDATE conversations SET thread_id = ? WHERE thread_id IS NULL`).run(mainThreadId);
+    }
+
     // Table des conversations (messages liés à un thread)
+    // Note: CREATE TABLE IF NOT EXISTS ne modifie pas une table existante
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS conversations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        thread_id TEXT NOT NULL,
+        thread_id TEXT,
         session_id TEXT NOT NULL,
         role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'system')),
         content TEXT NOT NULL,
@@ -74,9 +92,15 @@ export class Memory {
         created_at TEXT DEFAULT (datetime('now')),
         FOREIGN KEY (thread_id) REFERENCES threads(id) ON DELETE CASCADE
       );
-      CREATE INDEX IF NOT EXISTS idx_conversations_thread ON conversations(thread_id);
       CREATE INDEX IF NOT EXISTS idx_conversations_session ON conversations(session_id);
     `);
+
+    // Index pour thread_id (créé séparément car la colonne peut avoir été ajoutée par migration)
+    try {
+      this.db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_thread ON conversations(thread_id)`);
+    } catch (e) {
+      // Index existe déjà ou colonne n'existe pas encore
+    }
 
     // Migration: ajouter la colonne tool_calls si elle n'existe pas
     try {

@@ -1,121 +1,236 @@
 /**
- * WebSocket - Communication temps réel pour DangerousBot
+ * WebSocket Manager - Communication temps réel avec support des threads multiples
+ *
+ * Permet de gérer plusieurs onglets/conversations simultanées
+ * Chaque client a son propre thread actif
  */
 
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import { WSMessage } from '../core/types.js';
+import { getThreadManager, ThreadManager } from '../core/thread-manager.js';
 
-export type MessageHandler = (message: string, images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>, abortSignal?: AbortSignal) => Promise<void>;
-export type StopHandler = () => void;
-export type HistoryMessage = { 
-  role: string; 
-  content: string; 
-  timestamp: string; 
-  tool_calls?: Array<{ name: string; input: unknown }>; 
+// Types pour les handlers avec thread awareness
+export type ThreadMessageHandler = (
+  message: string,
+  threadId: string,
+  options: {
+    images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>;
+    abortSignal?: AbortSignal;
+    clientId: string;
+    ws: WebSocket;
+  }
+) => Promise<void>;
+
+export type ThreadStopHandler = (clientId: string) => void;
+
+export interface ThreadClient {
+  ws: WebSocket;
+  threadId: string;
+  clientId: string;
+  connectedAt: Date;
+}
+
+export interface ThreadedHistoryMessage {
+  role: string;
+  content: string;
+  timestamp: string;
+  tool_calls?: Array<{ name: string; input: unknown }>;
   images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>;
   source?: 'webapp' | 'telegram';
-};
-export type HistoryProvider = () => HistoryMessage[];
+}
 
 export class WebSocketManager {
   private wss: WebSocketServer;
-  private clients: Set<WebSocket> = new Set();
-  private messageHandler: MessageHandler | null = null;
-  private stopHandler: StopHandler | null = null;
-  private historyProvider: HistoryProvider | null = null;
+  private clients: Map<WebSocket, ThreadClient> = new Map();
+  private messageHandler: ThreadMessageHandler | null = null;
+  private stopHandler: ThreadStopHandler | null = null;
+  private threadManager: ThreadManager;
+  private abortControllers: Map<string, AbortController> = new Map();
 
   private onFirstConnection: (() => void) | null = null;
   private hasConnectedClient: boolean = false;
-  private abortController: AbortController | null = null;
 
   constructor(server: Server) {
+    this.threadManager = getThreadManager();
     this.wss = new WebSocketServer({ server });
     this.setupListeners();
   }
 
-  // Configurer un callback pour la première connexion
   setOnFirstConnection(callback: () => void): void {
     this.onFirstConnection = callback;
   }
 
-  // Configurer le handler de messages (appelé une seule fois depuis main.ts)
-  setMessageHandler(handler: MessageHandler): void {
+  setMessageHandler(handler: ThreadMessageHandler): void {
     this.messageHandler = handler;
   }
 
-  // Configurer le handler de stop
-  setStopHandler(handler: StopHandler): void {
+  setStopHandler(handler: ThreadStopHandler): void {
     this.stopHandler = handler;
   }
 
-  // Créer un nouvel AbortController pour chaque requête
-  createAbortController(): AbortController {
-    this.abortController = new AbortController();
-    return this.abortController;
-  }
-
-  // Annuler la requête en cours
-  abortRequest(): void {
-    if (this.abortController) {
-      this.abortController.abort();
-      this.abortController = null;
-    }
-  }
-
-  // Extraire les images d'un message reçu
-  private extractImages(payload: any): Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }> | undefined {
-    if (!payload || !payload.images || !Array.isArray(payload.images)) {
-      return undefined;
-    }
-    return payload.images as Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>;
-  }
-
-  // Configurer le provider d'historique
-  setHistoryProvider(provider: HistoryProvider): void {
-    this.historyProvider = provider;
-  }
-
   private setupListeners(): void {
-    this.wss.on('connection', (ws: WebSocket) => {
-      console.log('[WebSocket] Client connecté');
-      this.clients.add(ws);
+    this.wss.on('connection', (ws: WebSocket, req: any) => {
+      // Génère un client_id unique (mais stable pour ce socket)
+      const clientId = `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      
+      console.log(`[WebSocket] Client connecté: ${clientId}`);
 
-      // Appeler le callback pour la première connexion
+      // Récupère le thread_id depuis les headers/query params si fourni
+      const url = new URL(req.url || '/', 'http://localhost');
+      const requestedThreadId = url.searchParams.get('thread_id');
+
+      // Détermine le thread à utiliser - par défaut le main thread
+      let threadId: string;
+      if (requestedThreadId) {
+        const thread = this.threadManager.getThread(requestedThreadId);
+        threadId = thread ? thread.id : this.threadManager.getMainThread()?.id || this.threadManager.createThread('Main Conversation', null, true);
+      } else {
+        // Utilise le main thread par défaut (ou le crée s'il n'existe pas)
+        const mainThread = this.threadManager.getMainThread();
+        threadId = mainThread?.id || this.threadManager.createThread('Main Conversation', null, true);
+      }
+
+      // Enregistre le client
+      this.clients.set(ws, {
+        ws,
+        threadId,
+        clientId,
+        connectedAt: new Date(),
+      });
+
+      // Active ce thread pour ce client
+      this.threadManager.setActiveThread(clientId, threadId);
+
+      // Callback première connexion
       if (!this.hasConnectedClient && this.onFirstConnection) {
         this.hasConnectedClient = true;
         this.onFirstConnection();
       }
 
-      // Envoyer un message de bienvenue
+      // Envoie la confirmation de connexion avec thread_id
       this.sendTo(ws, {
         type: 'connected',
-        payload: { message: 'Connexion établie avec DangerousBot' }
+        payload: {
+          message: 'Connexion établie avec DangerousBot',
+          clientId,
+          threadId,
+        },
       });
 
-      // Envoyer l'historique si un provider est configuré
-      if (this.historyProvider) {
-        const history = this.historyProvider();
-        this.sendHistory(ws, history);
-        console.log(`[WebSocket] Historique envoyé: ${history.length} messages`);
-      }
+      // Envoie l'historique du thread
+      this.sendThreadHistory(ws, threadId);
 
-      // Handler de messages entrants
+      // Handler de messages
       ws.on('message', async (data: Buffer) => {
         try {
           const message = JSON.parse(data.toString());
+          const client = this.clients.get(ws);
+          if (!client) return;
 
-          if (message.type === 'user_message' && this.messageHandler) {
-            const text = message.payload?.text || '';
-            const images = message.payload?.images;
-            const abortController = this.createAbortController();
-            await this.messageHandler(text, images, abortController.signal);
-          } else if (message.type === 'stop') {
-            console.log('[WebSocket] Stop signal received');
-            this.abortRequest();
-            if (this.stopHandler) {
-              this.stopHandler();
+          switch (message.type) {
+            case 'user_message': {
+              if (this.messageHandler) {
+                const text = message.payload?.text || '';
+                const images = message.payload?.images;
+                const abortController = this.createAbortController(client.clientId);
+                
+                await this.messageHandler(text, client.threadId, {
+                  images,
+                  abortSignal: abortController.signal,
+                  clientId: client.clientId,
+                  ws,
+                });
+              }
+              break;
             }
+
+            case 'stop': {
+              console.log(`[WebSocket] Stop signal received from ${client.clientId}`);
+              this.abortRequest(client.clientId);
+              if (this.stopHandler) {
+                this.stopHandler(client.clientId);
+              }
+              break;
+            }
+
+            case 'switch_thread': {
+              const newThreadId = message.payload?.threadId;
+              if (newThreadId) {
+                await this.switchThread(ws, newThreadId);
+              }
+              break;
+            }
+
+            case 'create_thread': {
+              const title = message.payload?.title || 'New Thread';
+              const newThreadId = this.threadManager.createThread(title);
+              await this.switchThread(ws, newThreadId);
+              break;
+            }
+
+            case 'create_sub_thread': {
+              const parentId = message.payload?.parentThreadId;
+              const subTitle = message.payload?.title || 'Sub Thread';
+              if (parentId) {
+                const newThreadId = this.threadManager.createSubThread(parentId, subTitle);
+                await this.switchThread(ws, newThreadId);
+              }
+              break;
+            }
+
+            case 'rename_thread': {
+              const renameThreadId = message.payload?.threadId;
+              const newTitle = message.payload?.title;
+              if (renameThreadId && newTitle) {
+                this.threadManager.renameThread(renameThreadId, newTitle);
+                this.sendTo(ws, {
+                  type: 'thread_renamed',
+                  payload: { threadId: renameThreadId, title: newTitle },
+                });
+              }
+              break;
+            }
+
+            case 'delete_thread': {
+              const deleteThreadId = message.payload?.threadId;
+              if (deleteThreadId) {
+                this.threadManager.deleteThread(deleteThreadId);
+                this.sendTo(ws, {
+                  type: 'thread_deleted',
+                  payload: { threadId: deleteThreadId },
+                });
+              }
+              break;
+            }
+
+            case 'list_threads': {
+              const threads = this.threadManager.listThreads(true);
+              this.sendTo(ws, {
+                type: 'threads_list',
+                payload: { threads, activeThreadId: client.threadId },
+              });
+              break;
+            }
+
+            case 'clear_thread': {
+              this.threadManager.clearThreadMessages(client.threadId);
+              this.sendTo(ws, {
+                type: 'thread_cleared',
+                payload: { threadId: client.threadId },
+              });
+              break;
+            }
+
+            case 'load_more_history': {
+              const offset = message.payload?.offset || 0;
+              const limit = message.payload?.limit || 100;
+              this.sendThreadHistory(ws, client.threadId, limit, offset);
+              break;
+            }
+
+            default:
+              console.warn(`[WebSocket] Unknown message type: ${message.type}`);
           }
         } catch (error) {
           console.error('[WebSocket] Erreur de parsing message:', error);
@@ -123,135 +238,229 @@ export class WebSocketManager {
       });
 
       ws.on('close', () => {
-        console.log('[WebSocket] Client déconnecté');
+        const client = this.clients.get(ws);
+        if (client) {
+          console.log(`[WebSocket] Client déconnecté: ${client.clientId}`);
+          this.threadManager.releaseClient(client.clientId);
+          this.abortControllers.delete(client.clientId);
+        }
         this.clients.delete(ws);
       });
 
       ws.on('error', (error) => {
         console.error('[WebSocket] Erreur:', error);
+        const client = this.clients.get(ws);
+        if (client) {
+          this.threadManager.releaseClient(client.clientId);
+        }
         this.clients.delete(ws);
       });
     });
   }
 
+  private async switchThread(ws: WebSocket, newThreadId: string): Promise<void> {
+    const client = this.clients.get(ws);
+    if (!client) return;
+
+    const thread = this.threadManager.getThread(newThreadId);
+    if (!thread) {
+      this.sendTo(ws, {
+        type: 'error',
+        payload: { error: `Thread ${newThreadId} not found` },
+      });
+      return;
+    }
+
+    // Met à jour le thread du client
+    client.threadId = newThreadId;
+    this.threadManager.setActiveThread(client.clientId, newThreadId);
+
+    // Envoie la confirmation
+    this.sendTo(ws, {
+      type: 'thread_switched',
+      payload: {
+        threadId: newThreadId,
+        title: thread.title,
+      },
+    });
+
+    // Envoie l'historique du nouveau thread
+    this.sendThreadHistory(ws, newThreadId);
+  }
+
+  private sendThreadHistory(ws: WebSocket, threadId: string, limit: number = 100, offset: number = 0): void {
+    const messages = this.threadManager.getThreadMessages(threadId, limit, offset);
+    const totalCount = this.threadManager.getThreadMessageCount(threadId);
+    const hasMore = offset + messages.length < totalCount;
+
+    this.sendTo(ws, {
+      type: 'history',
+      payload: { messages, threadId, hasMore, totalCount, offset },
+    });
+    console.log(`[WebSocket] Historique envoyé pour thread ${threadId}: ${messages.length} messages (offset: ${offset}, total: ${totalCount})`);
+  }
+
+  private createAbortController(clientId: string): AbortController {
+    // Annule l'ancien s'il existe
+    this.abortRequest(clientId);
+    
+    const controller = new AbortController();
+    this.abortControllers.set(clientId, controller);
+    return controller;
+  }
+
+  private abortRequest(clientId: string): void {
+    const controller = this.abortControllers.get(clientId);
+    if (controller) {
+      controller.abort();
+      this.abortControllers.delete(clientId);
+    }
+  }
+
   // Envoyer à un client spécifique
-  sendTo(client: WebSocket, message: WSMessage): void {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify({
+  sendTo(ws: WebSocket, message: WSMessage): void {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
         ...message,
-        timestamp: message.timestamp || new Date().toISOString()
+        timestamp: message.timestamp || new Date().toISOString(),
       }));
     }
   }
 
-  // Broadcast à tous les clients
-  broadcast(message: WSMessage): void {
+  // Envoyer à un client spécifique par son ID
+  sendToClient(clientId: string, message: WSMessage): boolean {
+    for (const [ws, client] of this.clients.entries()) {
+      if (client.clientId === clientId) {
+        this.sendTo(ws, message);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Envoyer à tous les clients d'un thread spécifique
+  broadcastToThread(threadId: string, message: WSMessage): void {
     const payload = JSON.stringify({
       ...message,
-      timestamp: message.timestamp || new Date().toISOString()
+      timestamp: message.timestamp || new Date().toISOString(),
     });
 
-    for (const client of this.clients) {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(payload);
+    for (const [ws, client] of this.clients.entries()) {
+      if (client.threadId === threadId && ws.readyState === WebSocket.OPEN) {
+        ws.send(payload);
       }
     }
   }
 
-  // Envoyer un message du bot
-  sendBotMessage(text: string): void {
-    this.broadcast({
+  // Broadcast à tous les clients (tous threads)
+  broadcast(message: WSMessage): void {
+    const payload = JSON.stringify({
+      ...message,
+      timestamp: message.timestamp || new Date().toISOString(),
+    });
+
+    for (const ws of this.clients.keys()) {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(payload);
+      }
+    }
+  }
+
+  // Helpers pour envoyer des messages spécifiques
+  sendBotMessage(threadId: string, text: string): void {
+    this.broadcastToThread(threadId, {
       type: 'bot_message',
-      payload: { text }
+      payload: { text },
     });
   }
 
-  // Envoyer un chunk de streaming
-  sendStreamChunk(text: string): void {
-    this.broadcast({
+  sendStreamChunk(threadId: string, text: string): void {
+    this.broadcastToThread(threadId, {
       type: 'stream_chunk',
-      payload: { text }
+      payload: { text },
     });
   }
 
-  // Indiquer que le bot réfléchit
-  sendBotTyping(isTyping: boolean): void {
-    this.broadcast({
+  sendBotTyping(threadId: string, isTyping: boolean): void {
+    this.broadcastToThread(threadId, {
       type: 'bot_typing',
-      payload: { isTyping }
+      payload: { isTyping },
     });
   }
 
-  // Envoyer une notification d'utilisation d'outil
-  sendToolUse(toolName: string, input: unknown, executionId: string): void {
-    this.broadcast({
+  sendToolUse(threadId: string, toolName: string, input: unknown, executionId: string): void {
+    this.broadcastToThread(threadId, {
       type: 'tool_use',
-      payload: { tool: toolName, input, executionId }
+      payload: { tool: toolName, input, executionId },
     });
   }
 
-  // Envoyer le résultat d'un outil
-  sendToolResult(toolName: string, result: unknown, executionId: string): void {
-    this.broadcast({
+  sendToolResult(threadId: string, toolName: string, result: unknown, executionId: string): void {
+    this.broadcastToThread(threadId, {
       type: 'tool_result',
-      payload: { tool: toolName, result, executionId }
+      payload: { tool: toolName, result, executionId },
     });
   }
 
-  // Envoyer une notification de redémarrage du serveur
+  sendSystem(threadId: string | null, message: string): void {
+    if (threadId) {
+      this.broadcastToThread(threadId, {
+        type: 'system',
+        payload: { message },
+      });
+    } else {
+      this.broadcast({
+        type: 'system',
+        payload: { message },
+      });
+    }
+  }
+
+  sendError(ws: WebSocket, error: string): void {
+    this.sendTo(ws, {
+      type: 'error',
+      payload: { error },
+    });
+  }
+
+  sendUsage(threadId: string, inputTokens: number, outputTokens: number, cost?: { input_cost: number; output_cost: number; total_cost: number }): void {
+    this.broadcastToThread(threadId, {
+      type: 'usage',
+      payload: {
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
+        cost: cost || { input_cost: 0, output_cost: 0, total_cost: 0 },
+      },
+    });
+  }
+
+  sendProviderSwitch(threadId: string, from: string, to: string, reason: string): void {
+    this.broadcastToThread(threadId, {
+      type: 'provider_switch',
+      payload: { from, to, reason },
+    });
+  }
+
   sendRestartSignal(reason: string): void {
     this.broadcast({
       type: 'restart_signal',
-      payload: { reason, message: 'Le serveur va redémarrer. Rechargement automatique dans quelques secondes...' }
+      payload: {
+        reason,
+        message: 'Le serveur va redémarrer. Rechargement automatique dans quelques secondes...',
+      },
     });
   }
 
-  // Envoyer un message système
-  sendSystem(message: string): void {
-    this.broadcast({
-      type: 'system',
-      payload: { message }
-    });
+  // Récupère le thread_id actif d'un client
+  getClientThreadId(ws: WebSocket): string | null {
+    const client = this.clients.get(ws);
+    return client ? client.threadId : null;
   }
 
-  // Envoyer une erreur
-  sendError(error: string): void {
-    this.broadcast({
-      type: 'error',
-      payload: { error }
-    });
-  }
-
-  // Envoyer les stats d'usage des tokens et du coût
-  sendUsage(inputTokens: number, outputTokens: number, cost?: { input_cost: number; output_cost: number; total_cost: number }): void {
-    this.broadcast({
-      type: 'usage',
-      payload: { 
-        input_tokens: inputTokens, 
-        output_tokens: outputTokens,
-        cost: cost || {
-          input_cost: 0,
-          output_cost: 0,
-          total_cost: 0
-        }
-      }
-    });
-  }
-
-  // Envoyer une notification de changement de provider
-  sendProviderSwitch(from: string, to: string, reason: string): void {
-    this.broadcast({
-      type: 'provider_switch',
-      payload: { from, to, reason }
-    });
-  }
-
-  // Envoyer l'historique des messages à un client
-  sendHistory(client: WebSocket, messages: HistoryMessage[]): void {
-    this.sendTo(client, {
-      type: 'history',
-      payload: { messages }
-    });
+  // Récupère le client_id d'un socket
+  getClientId(ws: WebSocket): string | null {
+    const client = this.clients.get(ws);
+    return client ? client.clientId : null;
   }
 
   // Obtenir le nombre de clients connectés
@@ -259,11 +468,22 @@ export class WebSocketManager {
     return this.clients.size;
   }
 
+  // Obtenir le nombre de clients par thread
+  getThreadClientCount(threadId: string): number {
+    let count = 0;
+    for (const client of this.clients.values()) {
+      if (client.threadId === threadId) count++;
+    }
+    return count;
+  }
+
   // Fermer toutes les connexions
   close(): void {
-    for (const client of this.clients) {
-      client.close();
+    for (const [ws, client] of this.clients.entries()) {
+      this.threadManager.releaseClient(client.clientId);
+      ws.close();
     }
+    this.clients.clear();
     this.wss.close();
   }
 }
