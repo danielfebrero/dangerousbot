@@ -85,14 +85,31 @@ Exemple: retrieve_code({query: "fonction qui gère les embeddings"})`;
 
   /**
    * Met à jour l'identité avec le contexte pertinent pour le message
+   * @param userMessage Le message de l'utilisateur
+   * @param currentThreadId ID du thread actuel (optionnel)
+   * @param currentThreadTitle Titre du thread actuel (optionnel)
    */
-  async updateWithContext(userMessage: string): Promise<void> {
+  async updateWithContext(
+    userMessage: string,
+    currentThreadId?: string,
+    currentThreadTitle?: string
+  ): Promise<void> {
     if (!this.contextEnabled || !this.contextInjector) {
+      // Même sans contexte, on injecte les infos de thread si disponibles
+      if (currentThreadId) {
+        this.identity = this.baseIdentity + this.buildThreadSection(currentThreadId, currentThreadTitle);
+      } else {
+        this.identity = this.baseIdentity;
+      }
       return;
     }
 
     try {
-      const contextBlock = await this.contextInjector.injectContext(userMessage);
+      const contextBlock = await this.contextInjector.injectContext(
+        userMessage,
+        currentThreadId,
+        currentThreadTitle
+      );
       
       if (contextBlock) {
         this.identity = this.baseIdentity + '\n\n' + contextBlock;
@@ -100,10 +117,33 @@ Exemple: retrieve_code({query: "fonction qui gère les embeddings"})`;
       } else {
         this.identity = this.baseIdentity;
       }
+      
+      // Ajouter les infos du thread courant
+      if (currentThreadId) {
+        this.identity += this.buildThreadSection(currentThreadId, currentThreadTitle);
+      }
     } catch (error) {
       console.error('[PromptBuilder] Context injection failed:', error);
       this.identity = this.baseIdentity;
+      if (currentThreadId) {
+        this.identity += this.buildThreadSection(currentThreadId, currentThreadTitle);
+      }
     }
+  }
+
+  /**
+   * Construit la section Thread ID/Titre
+   */
+  private buildThreadSection(threadId?: string, threadTitle?: string): string {
+    if (!threadId) return '';
+    
+    let section = '\n\n## 🧵 Thread actuel\n\n';
+    section += `- **Thread ID**: ${threadId}\n`;
+    if (threadTitle) {
+      section += `- **Titre**: "${threadTitle}"\n`;
+    }
+    
+    return section;
   }
 
   /**

@@ -201,6 +201,10 @@ export class DangerousBotServer {
     try {
       const tools = getToolDefinitionsForProvider();
 
+      // Récupérer les infos du thread pour le contexte
+      const thread = threadManager.getThread(threadId);
+      const threadTitle = thread?.title || 'Unknown Thread';
+
       // Utiliser le streaming pour une meilleure UX
       let response = await this.brain.thinkStream(
         userMessage,
@@ -211,7 +215,10 @@ export class DangerousBotServer {
           if (chunk.type === 'text' && chunk.text) {
             this.wsManager.sendStreamChunk(threadId, chunk.text);
           }
-        }
+        },
+        'webapp',
+        threadId,
+        threadTitle
       );
 
       // Vérifier si un fallback de provider a eu lieu

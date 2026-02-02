@@ -34,13 +34,29 @@ export function useThreadedWebSocket(options: UseThreadedWebSocketOptions) {
   const attemptsRef = useRef(0);
   const wasDisconnectedRef = useRef(false);
 
+  // Helper pour mettre à jour l'URL avec le thread_id
+  const updateUrlWithThreadId = useCallback((threadId: string) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('thread_id', threadId);
+    window.history.replaceState({}, '', url.toString());
+  }, []);
+
+  // Helper pour lire le thread_id depuis l'URL
+  const getThreadIdFromUrl = useCallback((): string | undefined => {
+    const url = new URL(window.location.href);
+    return url.searchParams.get('thread_id') || undefined;
+  }, []);
+
   const connect = useCallback((threadId?: string) => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     let wsUrl = `${protocol}//${window.location.host}`;
     
-    // Ajouter le thread_id dans l'URL si fourni
-    if (threadId) {
-      wsUrl += `?thread_id=${threadId}`;
+    // Utiliser le thread_id fourni, ou celui de l'URL, ou laisser vide pour créer un nouveau
+    const finalThreadId = threadId || getThreadIdFromUrl();
+    
+    // Ajouter le thread_id dans l'URL WS si fourni
+    if (finalThreadId) {
+      wsUrl += `?thread_id=${finalThreadId}`;
     }
 
     const ws = new WebSocket(wsUrl);
@@ -83,10 +99,14 @@ export function useThreadedWebSocket(options: UseThreadedWebSocketOptions) {
           case 'connected':
             setCurrentThreadId(message.payload.threadId);
             setClientId(message.payload.clientId);
+            // Mettre à jour l'URL avec le thread_id reçu du serveur
+            updateUrlWithThreadId(message.payload.threadId);
             break;
             
           case 'thread_switched':
             setCurrentThreadId(message.payload.threadId);
+            // Mettre à jour l'URL quand on change de thread
+            updateUrlWithThreadId(message.payload.threadId);
             onThreadSwitched?.(message.payload.threadId, message.payload.title);
             break;
             

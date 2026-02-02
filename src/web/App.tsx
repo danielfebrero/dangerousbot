@@ -83,11 +83,24 @@ function App() {
   const { sendNotification } = useBrowserNotification();
   const lastUserMessageRef = useRef<string>('');
   const streamingEndedRef = useRef(false);
+  
+  // Ref pour toujours avoir le threadId actuel dans les callbacks
+  const currentThreadIdRef = useRef<string | null>(null);
+  
+  useEffect(() => {
+    currentThreadIdRef.current = currentThreadId;
+  }, [currentThreadId]);
 
   const handleThreadSwitched = useCallback((threadId: string, title: string) => {
     setCurrentThreadTitle(title);
     setMessages([]);
     streamingMessageIdRef.current = null;
+    // Annuler tout tool execution en cours
+    toolExecutionMapRef.current = {};
+    activeToolExecutionsRef.current = [];
+    setActiveToolExecutions([]);
+    // Réinitialiser l'état de streaming
+    streamingEndedRef.current = false;
   }, []);
 
   const handleThreadsList = useCallback((newThreads: Thread[], activeThreadId: string) => {
@@ -140,6 +153,20 @@ function App() {
   }, []);
 
   const handleMessage = useCallback((wsMessage: WSMessage) => {
+    // Ignorer les messages qui ne sont pas pour le thread actuel
+    // (sauf pour certains types globaux comme connected, threads_list, etc.)
+    const isGlobalMessage = ['connected', 'threads_list', 'thread_switched', 'thread_created', 'thread_renamed', 'thread_deleted', 'thread_cleared', 'restart_signal'].includes(wsMessage.type);
+    
+    // Utiliser le ref pour avoir toujours la valeur actuelle
+    const activeThreadId = currentThreadIdRef.current;
+    const messageThreadId = wsMessage.threadId;
+    
+    if (!isGlobalMessage && messageThreadId && messageThreadId !== activeThreadId) {
+      // Message pour un autre thread, l'ignorer
+      console.log(`[App] Ignoring message for thread ${messageThreadId}, current is ${activeThreadId}`);
+      return;
+    }
+    
     switch (wsMessage.type) {
       case 'history':
         const historyMessages = wsMessage.payload.messages || [];
@@ -196,9 +223,15 @@ function App() {
 
       case 'bot_typing':
         setIsTyping(wsMessage.payload.isTyping);
-        // If bot stops typing, mark streaming as ended
-        if (!wsMessage.payload.isTyping && streamingEndedRef.current) {
+        // When the bot starts typing, clear any previous streaming message id so
+        // that a new response will create a new message instead of appending
+        // to the previous one.
+        if (wsMessage.payload.isTyping) {
+          streamingMessageIdRef.current = null;
           streamingEndedRef.current = false;
+        } else {
+          // Bot stopped typing
+          streamingEndedRef.current = true;
         }
         break;
 

@@ -370,11 +370,12 @@ export class WebSocketManager {
     }
   }
 
-  // Helpers pour envoyer des messages spécifiques
+  // Helpers pour envoyer des messages spécifiques (avec threadId pour isolation)
   sendBotMessage(threadId: string, text: string): void {
     this.broadcastToThread(threadId, {
       type: 'bot_message',
       payload: { text },
+      threadId,
     });
   }
 
@@ -382,6 +383,7 @@ export class WebSocketManager {
     this.broadcastToThread(threadId, {
       type: 'stream_chunk',
       payload: { text },
+      threadId,
     });
   }
 
@@ -389,6 +391,7 @@ export class WebSocketManager {
     this.broadcastToThread(threadId, {
       type: 'bot_typing',
       payload: { isTyping },
+      threadId,
     });
   }
 
@@ -396,6 +399,7 @@ export class WebSocketManager {
     this.broadcastToThread(threadId, {
       type: 'tool_use',
       payload: { tool: toolName, input, executionId },
+      threadId,
     });
   }
 
@@ -403,6 +407,7 @@ export class WebSocketManager {
     this.broadcastToThread(threadId, {
       type: 'tool_result',
       payload: { tool: toolName, result, executionId },
+      threadId,
     });
   }
 
@@ -411,6 +416,7 @@ export class WebSocketManager {
       this.broadcastToThread(threadId, {
         type: 'system',
         payload: { message },
+        threadId,
       });
     } else {
       this.broadcast({
@@ -420,10 +426,11 @@ export class WebSocketManager {
     }
   }
 
-  sendError(ws: WebSocket, error: string): void {
+  sendError(ws: WebSocket, error: string, threadId?: string): void {
     this.sendTo(ws, {
       type: 'error',
       payload: { error },
+      threadId,
     });
   }
 
@@ -435,6 +442,7 @@ export class WebSocketManager {
         output_tokens: outputTokens,
         cost: cost || { input_cost: 0, output_cost: 0, total_cost: 0 },
       },
+      threadId,
     });
   }
 
@@ -442,6 +450,7 @@ export class WebSocketManager {
     this.broadcastToThread(threadId, {
       type: 'provider_switch',
       payload: { from, to, reason },
+      threadId,
     });
   }
 

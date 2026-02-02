@@ -94,13 +94,15 @@ export class Brain {
     images?: ImageContent[],
     abortSignal?: AbortSignal,
     onChunk?: StreamCallback,
-    source?: 'webapp' | 'telegram'
+    source?: 'webapp' | 'telegram',
+    threadId?: string,
+    threadTitle?: string
   ): Promise<BrainResponse> {
     // Ajouter le message à l'historique
     this.historyManager.addUserMessage(userMessage, images);
 
-    // Injecter le contexte pertinent
-    await this.promptBuilder.updateWithContext(userMessage);
+    // Injecter le contexte pertinent avec infos du thread
+    await this.promptBuilder.updateWithContext(userMessage, threadId, threadTitle);
 
     // Vérifier si compression nécessaire
     const messageCount = this.historyManager.getMessageCount();
