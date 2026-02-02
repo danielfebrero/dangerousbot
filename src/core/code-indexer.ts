@@ -8,6 +8,7 @@ import * as path from 'path';
 import { createHash } from 'crypto';
 import { Memory } from './memory';
 import { CodeEmbeddingService } from './code-embedding';
+import { createGitignoreParser, GitignoreParser } from './gitignore-parser';
 
 export interface IndexingResult {
   indexed: number;
@@ -22,43 +23,47 @@ export class CodeIndexer {
   private projectRoot: string;
   private projectName: string;
   private isIndexing: boolean = false;
+  private gitignoreParser: GitignoreParser;
 
   constructor(projectRoot: string, memory: Memory, embeddingService: CodeEmbeddingService, projectName: string = 'dangerousbot') {
     this.projectRoot = projectRoot;
     this.memory = memory;
     this.embeddingService = embeddingService;
     this.projectName = projectName;
+    this.gitignoreParser = createGitignoreParser(projectRoot);
   }
 
   /**
    * Liste tous les fichiers source du projet
    * Pour DangerousBot: scanne src/
-   * Pour projets externes: scanne la racine + tous les sous-dossiers pertinents
+   * Pour projets externes: scanne la racine complète
+   * RESPECTE le .gitignore du projet
    */
   private getSourceFiles(): string[] {
     const files: string[] = [];
     const srcDir = path.join(this.projectRoot, 'src');
     const hasSrcDir = fs.existsSync(srcDir) && fs.statSync(srcDir).isDirectory();
-    
+
     // Pour DangerousBot (projet par défaut), scanner uniquement src/
     // Pour les autres projets, scanner la racine complète
-    const rootsToScan = (this.projectName === 'dangerousbot' && hasSrcDir) 
-      ? [srcDir] 
+    const rootsToScan = (this.projectName === 'dangerousbot' && hasSrcDir)
+      ? [srcDir]
       : [this.projectRoot];
 
     const walk = (dir: string) => {
       if (!fs.existsSync(dir)) return;
-      
+
       const entries = fs.readdirSync(dir, { withFileTypes: true });
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
         const relativePath = path.relative(this.projectRoot, fullPath);
 
+        // Vérifier si le chemin est ignoré par .gitignore
+        if (this.gitignoreParser.isIgnored(relativePath, entry.isDirectory())) {
+          continue;
+        }
+
         if (entry.isDirectory()) {
-          // Ignorer node_modules et autres dossiers non pertinents
-          if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name === '.git' || entry.name === '.backups') {
-            continue;
-          }
           walk(fullPath);
         } else if (entry.isFile() && this.shouldIndexFile(entry.name)) {
           files.push(relativePath);
