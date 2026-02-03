@@ -72,11 +72,14 @@ export interface AIProviderConfig {
  * Callback pour le streaming de réponses
  */
 export type StreamCallback = (chunk: {
-  type: 'text' | 'tool_use' | 'thinking';
+  type: 'text' | 'tool_use' | 'thinking' | 'usage';
   text?: string;
   id?: string;
   name?: string;
   input?: unknown;
+  // Pour type 'usage'
+  inputTokens?: number;
+  outputTokens?: number;
 }) => void;
 
 /**

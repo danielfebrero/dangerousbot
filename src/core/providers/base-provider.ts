@@ -182,6 +182,12 @@ export abstract class BaseProvider implements AIProvider {
           case 'usage':
             inputTokens = chunk.inputTokens;
             outputTokens = chunk.outputTokens;
+            // Émettre aussi les updates de tokens pendant le streaming
+            options.onChunk({
+              type: 'usage',
+              inputTokens: chunk.inputTokens,
+              outputTokens: chunk.outputTokens
+            });
             break;
           
           case 'finish':

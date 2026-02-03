@@ -261,12 +261,32 @@ export class DangerousBotServer {
         (chunk) => {
           if (chunk.type === 'text' && chunk.text) {
             this.wsManager.sendStreamChunk(threadId, chunk.text);
+          } else if (chunk.type === 'usage' && chunk.inputTokens !== undefined) {
+            // Mise à jour temps réel pendant le streaming
+            const streamStats = tokenTracker.getStatsWithPending(
+              threadId,
+              chunk.inputTokens,
+              chunk.outputTokens || 0
+            );
+            this.wsManager.sendTokenUpdate(threadId, streamStats);
           }
         },
         'webapp',
         threadId,
         threadTitle
       );
+
+      // CRITICAL: Enregistrer l'usage de cet appel API (pas seulement le dernier!)
+      if (response.usage) {
+        tokenTracker.recordApiCall(
+          threadId,
+          response.usage.input_tokens,
+          response.usage.output_tokens,
+          response.cost
+        );
+        const postThinkStats = tokenTracker.getStats(threadId);
+        this.wsManager.sendTokenUpdate(threadId, postThinkStats);
+      }
 
       // Vérifier si un fallback de provider a eu lieu
       const providerSwitched = (global as any).__providerSwitched;
@@ -447,10 +467,30 @@ export class DangerousBotServer {
           (chunk) => {
             if (chunk.type === 'text' && chunk.text) {
               this.wsManager.sendStreamChunk(threadId, chunk.text);
+            } else if (chunk.type === 'usage' && chunk.inputTokens !== undefined) {
+              // Mise à jour temps réel pendant le streaming
+              const streamStats = tokenTracker.getStatsWithPending(
+                threadId,
+                chunk.inputTokens,
+                chunk.outputTokens || 0
+              );
+              this.wsManager.sendTokenUpdate(threadId, streamStats);
             }
           },
           threadId // Passer le threadId pour maintenir l'isolation
         );
+
+        // CRITICAL: Enregistrer l'usage de chaque appel continueAfterToolStream
+        if (response.usage) {
+          tokenTracker.recordApiCall(
+            threadId,
+            response.usage.input_tokens,
+            response.usage.output_tokens,
+            response.cost
+          );
+          const postToolStats = tokenTracker.getStats(threadId);
+          this.wsManager.sendTokenUpdate(threadId, postToolStats);
+        }
       }
 
       // Traiter la réponse finale
@@ -475,16 +515,8 @@ export class DangerousBotServer {
         }
       }
 
-      // Envoyer les stats d'usage et mettre à jour le token tracker
+      // Envoyer les stats d'usage finales (l'usage a déjà été recordé après chaque API call)
       if (response.usage) {
-        // Enregistrer dans le token tracker
-        tokenTracker.recordApiCall(
-          threadId,
-          response.usage.input_tokens,
-          response.usage.output_tokens,
-          response.cost
-        );
-
         // Envoyer l'ancien format usage (pour compatibilité)
         this.wsManager.sendUsage(
           threadId,
@@ -493,14 +525,13 @@ export class DangerousBotServer {
           response.cost
         );
 
-        // Envoyer le nouveau format token_update avec toutes les stats
+        // Envoyer le nouveau format token_update avec toutes les stats cumulées
         const finalStats = tokenTracker.getStats(threadId);
         this.wsManager.sendTokenUpdate(threadId, finalStats);
 
-        // Vérifier si compression automatique nécessaire (> 128K tokens)
-        const totalTokens = response.usage.input_tokens + response.usage.output_tokens;
-        if (totalTokens > MEMORY.TOKEN_LIMIT_FOR_COMPRESSION) {
-          logger.info('Server', `Token limit exceeded (${totalTokens} > ${MEMORY.TOKEN_LIMIT_FOR_COMPRESSION}), triggering auto-compression`);
+        // Vérifier si compression automatique nécessaire (basé sur contexte estimé)
+        if (finalStats.estimatedContextTokens > MEMORY.TOKEN_LIMIT_FOR_COMPRESSION) {
+          logger.info('Server', `Context limit exceeded (${finalStats.estimatedContextTokens} > ${MEMORY.TOKEN_LIMIT_FOR_COMPRESSION}), triggering auto-compression`);
           this.wsManager.sendSystem(threadId, '📦 Compression automatique du contexte en cours...');
 
           const compressor = getCompressor();

@@ -180,6 +180,47 @@ export class TokenTracker {
   }
 
   /**
+   * Récupère les stats avec des tokens "pending" en cours de streaming
+   * Permet d'afficher les updates en temps réel avant que l'appel API soit finalisé
+   */
+  getStatsWithPending(
+    threadId: string,
+    pendingInputTokens: number,
+    pendingOutputTokens: number
+  ): TokenStats {
+    const state = this.threadStats.get(threadId) || {
+      sessionInputTokens: 0,
+      sessionOutputTokens: 0,
+      sessionTotalCost: 0,
+      lastRequestInputTokens: 0,
+      lastRequestOutputTokens: 0,
+      lastRequestCost: 0
+    };
+
+    // Calculer le coût estimé des tokens en cours
+    const pendingCost =
+      (pendingInputTokens / 1_000_000) * this.inputCostPerMillion +
+      (pendingOutputTokens / 1_000_000) * this.outputCostPerMillion;
+
+    const estimatedContextTokens = this.estimateContextTokens(threadId);
+    const contextUsagePercent = Math.min(100, (estimatedContextTokens / this.contextLimit) * 100);
+
+    return {
+      estimatedContextTokens,
+      // Ajouter les tokens pending aux totaux de session
+      sessionInputTokens: state.sessionInputTokens + pendingInputTokens,
+      sessionOutputTokens: state.sessionOutputTokens + pendingOutputTokens,
+      sessionTotalCost: state.sessionTotalCost + pendingCost,
+      // Les tokens pending sont les "derniers" tokens en cours
+      lastRequestInputTokens: pendingInputTokens,
+      lastRequestOutputTokens: pendingOutputTokens,
+      lastRequestCost: pendingCost,
+      contextLimit: this.contextLimit,
+      contextUsagePercent
+    };
+  }
+
+  /**
    * Réinitialise les stats d'un thread (après compression par exemple)
    */
   resetContextEstimate(threadId: string): TokenStats {
