@@ -6,6 +6,7 @@ interface HeaderProps {
   connectionStatus: ConnectionStatus;
   tokenUsage: TokenUsage | null;
   tokenStats: TokenStats | null;
+  onStatsUpdate?: (stats: Partial<TokenStats>) => void;
   showAllSources: boolean;
   onToggleSources: (showAll: boolean) => void;
   isSettingsLoaded: boolean;

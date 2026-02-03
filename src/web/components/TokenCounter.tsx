@@ -4,10 +4,11 @@ import { TokenUsage } from '../types';
 interface TokenCounterProps {
   usage: TokenUsage | null;
   onSystemMessage?: (message: string) => void;
+  onStatsUpdate?: (stats: { estimatedTokens: number; messageCount: number }) => void;
   compact?: boolean;
 }
 
-export function TokenCounter({ usage, onSystemMessage, compact }: TokenCounterProps) {
+export function TokenCounter({ usage, onSystemMessage, onStatsUpdate, compact }: TokenCounterProps) {
   const [showPopup, setShowPopup] = useState(false);
   const [isCompressing, setIsCompressing] = useState(false);
 
@@ -36,7 +37,15 @@ export function TokenCounter({ usage, onSystemMessage, compact }: TokenCounterPr
       const data = await response.json();
       
       if (data.success) {
-        onSystemMessage?.(`✅ Compression réussie ! ${data.memoryCount} souvenirs créés. Contexte réduit de ${data.tokensBefore} à ${data.tokensAfter} tokens.`);
+        const msg = data.compressed 
+          ? `✅ Compression réussie ! Contexte réduit de ${data.tokensBefore?.toLocaleString() || '?'} à ${data.tokensAfter?.toLocaleString() || '?'} tokens.`
+          : `ℹ️ ${data.message || 'Rien à compresser'}`;
+        onSystemMessage?.(msg);
+        
+        // Update stats in parent component
+        if (data.contextStats && onStatsUpdate) {
+          onStatsUpdate(data.contextStats);
+        }
       } else {
         onSystemMessage?.(`❌ ${data.error || 'Échec de la compression'}`);
       }

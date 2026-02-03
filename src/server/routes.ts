@@ -129,12 +129,30 @@ export function createRoutes(): Router {
       
       if (compressor) {
         logger.info('Routes', 'Compressor trouvé, lancement compression...');
+        
+        // Get stats before compression from global memory
+        const memory = getMemory();
+        const messagesBefore = memory.getMessages();
+        // Estimate tokens: ~4 chars per token on average
+        const tokensBefore = Math.ceil(JSON.stringify(messagesBefore).length / 4);
+        
         const result = await compressor.compressIfNeeded(true); // force = true
         logger.info('Routes', `Compression terminée, compressed=${result}`);
+        
+        // Get stats after compression
+        const messagesAfter = memory.getMessages();
+        const tokensAfter = Math.ceil(JSON.stringify(messagesAfter).length / 4);
+        
         res.json({ 
           success: true, 
           compressed: result,
-          message: result ? 'Compression effectuée' : 'Rien à compresser (pas assez de messages)'
+          message: result ? 'Compression effectuée' : 'Rien à compresser (pas assez de messages)',
+          tokensBefore,
+          tokensAfter,
+          contextStats: {
+            estimatedTokens: tokensAfter,
+            messageCount: messagesAfter.length
+          }
         });
       } else {
         logger.error('Routes', 'Compressor est null après isCompressorInitialized=true');
