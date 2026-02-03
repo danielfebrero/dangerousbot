@@ -5,7 +5,12 @@
 
 import Database from 'better-sqlite3';
 import path from 'path';
+import os from 'os';
 import fs from 'fs';
+
+// Database path - use the main dangerousbot.db
+const DATA_DIR = path.join(os.homedir(), '.dangerousbot', 'data');
+const DB_PATH = path.join(DATA_DIR, 'dangerousbot.db');
 
 // Types
 export interface Project {
@@ -44,17 +49,15 @@ export type TodoAction =
 
 export class TodoManager {
   private db: Database.Database;
-  private dbPath: string;
 
-  constructor(dataDir: string = './data') {
-    this.dbPath = path.join(dataDir, 'todo.db');
-    
+  constructor() {
     // Ensure data directory exists
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
     }
-    
-    this.db = new Database(this.dbPath);
+
+    // Use the main dangerousbot.db database
+    this.db = new Database(DB_PATH);
     this.initTables();
   }
 

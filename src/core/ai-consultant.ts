@@ -11,8 +11,14 @@
  */
 
 import { config, TOKENS, MODELS, APIS, PATHS } from "../config.js";
-import * as fs from 'fs';
+import Database from 'better-sqlite3';
 import * as path from 'path';
+import * as os from 'os';
+import * as fs from 'fs';
+
+// Database path - use the main dangerousbot.db
+const DATA_DIR = path.join(os.homedir(), '.dangerousbot', 'data');
+const DB_PATH = path.join(DATA_DIR, 'dangerousbot.db');
 
 // ============================================================================
 // TYPES
@@ -350,45 +356,68 @@ Sois concis, direct et utile. Tu n'es pas le cerveau principal, tu es un conseil
 }
 
 // ============================================================================
-// CONVERSATION STORE
+// CONVERSATION STORE (SQLite-based)
 // ============================================================================
 
 class ConversationStore {
-  private conversationsDir: string;
+  private db: Database.Database;
   private maxConversations = 50;
   private maxMessagesPerConversation = 50;
 
   constructor() {
-    this.conversationsDir = path.join(PATHS.CONFIG_DIR, 'conversations');
-    this.ensureDirExists();
-  }
-
-  private ensureDirExists(): void {
-    if (!fs.existsSync(this.conversationsDir)) {
-      fs.mkdirSync(this.conversationsDir, { recursive: true });
+    // Ensure data directory exists
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
     }
+
+    this.db = new Database(DB_PATH);
+    this.initTables();
   }
 
-  private getConversationPath(id: string): string {
-    return path.join(this.conversationsDir, `${id}.json`);
+  private initTables(): void {
+    // Table for consultant conversations
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS consultant_conversations (
+        id TEXT PRIMARY KEY,
+        model TEXT NOT NULL,
+        metadata TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_consultant_conv_updated ON consultant_conversations(updated_at);
+    `);
+
+    // Table for consultant conversation messages
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS consultant_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        conversation_id TEXT NOT NULL,
+        role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'system')),
+        content TEXT NOT NULL,
+        model TEXT,
+        timestamp INTEGER NOT NULL,
+        FOREIGN KEY (conversation_id) REFERENCES consultant_conversations(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_consultant_msg_conv ON consultant_messages(conversation_id);
+    `);
   }
 
   private cleanupOldConversations(): void {
     try {
-      const files = fs.readdirSync(this.conversationsDir)
-        .filter(f => f.endsWith('.json'))
-        .map(f => ({
-          name: f,
-          path: path.join(this.conversationsDir, f),
-          stats: fs.statSync(path.join(this.conversationsDir, f))
-        }))
-        .sort((a, b) => b.stats.mtime.getTime() - a.stats.mtime.getTime());
+      // Count conversations
+      const countResult = this.db.prepare('SELECT COUNT(*) as count FROM consultant_conversations').get() as { count: number };
 
-      // Supprimer les conversations les plus anciennes si on dépasse le max
-      if (files.length > this.maxConversations) {
-        for (let i = this.maxConversations; i < files.length; i++) {
-          fs.unlinkSync(files[i].path);
-        }
+      if (countResult.count > this.maxConversations) {
+        // Delete oldest conversations beyond the limit
+        const toDelete = countResult.count - this.maxConversations;
+        this.db.prepare(`
+          DELETE FROM consultant_conversations
+          WHERE id IN (
+            SELECT id FROM consultant_conversations
+            ORDER BY updated_at ASC
+            LIMIT ?
+          )
+        `).run(toDelete);
       }
     } catch (e) {
       console.warn('[AIConsultant] Error cleaning up old conversations:', e);
@@ -407,19 +436,44 @@ class ConversationStore {
       metadata,
     };
 
-    this.save(conversation);
+    this.db.prepare(`
+      INSERT INTO consultant_conversations (id, model, metadata, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(
+      conversation.id,
+      conversation.model,
+      metadata ? JSON.stringify(metadata) : null,
+      conversation.createdAt,
+      conversation.updatedAt
+    );
+
     return conversation;
   }
 
   load(id: string): Conversation | null {
     try {
-      const filePath = this.getConversationPath(id);
-      if (!fs.existsSync(filePath)) {
-        return null;
-      }
+      const convRow = this.db.prepare(`
+        SELECT id, model, metadata, created_at, updated_at
+        FROM consultant_conversations WHERE id = ?
+      `).get(id) as { id: string; model: string; metadata: string | null; created_at: number; updated_at: number } | undefined;
 
-      const content = fs.readFileSync(filePath, 'utf-8');
-      return JSON.parse(content) as Conversation;
+      if (!convRow) return null;
+
+      const messages = this.db.prepare(`
+        SELECT role, content, model, timestamp
+        FROM consultant_messages
+        WHERE conversation_id = ?
+        ORDER BY timestamp ASC
+      `).all(id) as ConversationMessage[];
+
+      return {
+        id: convRow.id,
+        model: convRow.model as AIModel,
+        metadata: convRow.metadata ? JSON.parse(convRow.metadata) : undefined,
+        createdAt: convRow.created_at,
+        updatedAt: convRow.updated_at,
+        messages,
+      };
     } catch (e) {
       console.warn(`[AIConsultant] Error loading conversation ${id}:`, e);
       return null;
@@ -428,39 +482,72 @@ class ConversationStore {
 
   save(conversation: Conversation): void {
     try {
-      // Limiter le nombre de messages
+      // Limit messages
       if (conversation.messages.length > this.maxMessagesPerConversation) {
         conversation.messages = conversation.messages.slice(-this.maxMessagesPerConversation);
       }
 
       conversation.updatedAt = Date.now();
-      const filePath = this.getConversationPath(conversation.id);
-      fs.writeFileSync(filePath, JSON.stringify(conversation, null, 2));
+
+      // Update conversation metadata
+      this.db.prepare(`
+        UPDATE consultant_conversations
+        SET updated_at = ?, metadata = ?
+        WHERE id = ?
+      `).run(conversation.updatedAt, conversation.metadata ? JSON.stringify(conversation.metadata) : null, conversation.id);
+
+      // Delete existing messages and re-insert (simpler than tracking changes)
+      this.db.prepare('DELETE FROM consultant_messages WHERE conversation_id = ?').run(conversation.id);
+
+      const insertStmt = this.db.prepare(`
+        INSERT INTO consultant_messages (conversation_id, role, content, model, timestamp)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+
+      for (const msg of conversation.messages) {
+        insertStmt.run(conversation.id, msg.role, msg.content, msg.model || null, msg.timestamp);
+      }
     } catch (e) {
       console.warn(`[AIConsultant] Error saving conversation ${conversation.id}:`, e);
     }
   }
 
   addMessage(conversationId: string, message: Omit<ConversationMessage, 'timestamp'>): void {
-    const conversation = this.load(conversationId);
-    if (!conversation) return;
+    try {
+      const timestamp = Date.now();
 
-    conversation.messages.push({
-      ...message,
-      timestamp: Date.now(),
-    });
+      this.db.prepare(`
+        INSERT INTO consultant_messages (conversation_id, role, content, model, timestamp)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(conversationId, message.role, message.content, message.model || null, timestamp);
 
-    this.save(conversation);
+      // Update conversation updated_at
+      this.db.prepare('UPDATE consultant_conversations SET updated_at = ? WHERE id = ?').run(timestamp, conversationId);
+
+      // Limit messages per conversation
+      const countResult = this.db.prepare('SELECT COUNT(*) as count FROM consultant_messages WHERE conversation_id = ?').get(conversationId) as { count: number };
+
+      if (countResult.count > this.maxMessagesPerConversation) {
+        const toDelete = countResult.count - this.maxMessagesPerConversation;
+        this.db.prepare(`
+          DELETE FROM consultant_messages
+          WHERE id IN (
+            SELECT id FROM consultant_messages
+            WHERE conversation_id = ?
+            ORDER BY timestamp ASC
+            LIMIT ?
+          )
+        `).run(conversationId, toDelete);
+      }
+    } catch (e) {
+      console.warn(`[AIConsultant] Error adding message to ${conversationId}:`, e);
+    }
   }
 
   delete(id: string): boolean {
     try {
-      const filePath = this.getConversationPath(id);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-        return true;
-      }
-      return false;
+      const result = this.db.prepare('DELETE FROM consultant_conversations WHERE id = ?').run(id);
+      return result.changes > 0;
     } catch (e) {
       console.warn(`[AIConsultant] Error deleting conversation ${id}:`, e);
       return false;
@@ -469,11 +556,13 @@ class ConversationStore {
 
   list(): Conversation[] {
     try {
-      return fs.readdirSync(this.conversationsDir)
-        .filter(f => f.endsWith('.json'))
-        .map(f => this.load(f.replace('.json', '')))
-        .filter((c): c is Conversation => c !== null)
-        .sort((a, b) => b.updatedAt - a.updatedAt);
+      const convRows = this.db.prepare(`
+        SELECT id FROM consultant_conversations ORDER BY updated_at DESC
+      `).all() as { id: string }[];
+
+      return convRows
+        .map(row => this.load(row.id))
+        .filter((c): c is Conversation => c !== null);
     } catch (e) {
       console.warn('[AIConsultant] Error listing conversations:', e);
       return [];
@@ -482,12 +571,7 @@ class ConversationStore {
 
   clear(): void {
     try {
-      const files = fs.readdirSync(this.conversationsDir);
-      for (const file of files) {
-        if (file.endsWith('.json')) {
-          fs.unlinkSync(path.join(this.conversationsDir, file));
-        }
-      }
+      this.db.prepare('DELETE FROM consultant_conversations').run();
     } catch (e) {
       console.warn('[AIConsultant] Error clearing conversations:', e);
     }
