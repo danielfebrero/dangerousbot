@@ -536,7 +536,7 @@ export class DangerousBotServer {
 
           const compressor = getCompressor();
           if (compressor) {
-            compressor.compressSession()
+            compressor.compressSession(undefined, threadId)
               .then(result => {
                 if (result) {
                   this.wsManager.sendSystem(threadId, `✅ Contexte compressé: ${result.message_ids.length} messages → résumé`);
