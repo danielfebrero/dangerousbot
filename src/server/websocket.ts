@@ -147,6 +147,23 @@ export class WebSocketManager {
               if (this.messageHandler) {
                 const text = message.payload?.text || '';
                 const images = message.payload?.images;
+                
+                // Détecter le signal "stop" dans le message texte
+                if (text.trim().toLowerCase() === 'stop') {
+                  console.log(`[WebSocket] Stop signal detected in message from ${client.clientId}`);
+                  this.abortRequest(client.clientId);
+                  if (this.stopHandler) {
+                    this.stopHandler(client.clientId, client.threadId);
+                  }
+                  // Envoyer confirmation
+                  ws.send(JSON.stringify({
+                    type: 'stopped',
+                    threadId: client.threadId,
+                    timestamp: Date.now(),
+                  }));
+                  break;
+                }
+                
                 const abortController = this.createAbortController(client.clientId);
                 
                 await this.messageHandler(text, client.threadId, {

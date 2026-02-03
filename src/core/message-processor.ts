@@ -47,6 +47,9 @@ export interface ProcessOptions {
     telegramUserId?: number;
     bot?: any;
   };
+
+  /** Signal d'annulation pour arrêter le traitement */
+  abortSignal?: AbortSignal;
 }
 
 /**
@@ -73,7 +76,7 @@ export class MessageProcessor {
     message: IncomingMessage,
     options: ProcessOptions
   ): Promise<ProcessingResult> {
-    const { source, conversationId, threadId, callbacks, platformContext } = options;
+    const { source, conversationId, threadId, callbacks, platformContext, abortSignal } = options;
 
     try {
       // Notifier le début du traitement
@@ -113,14 +116,19 @@ export class MessageProcessor {
       let responseText = '';
       let hasMoreToolCalls = true;
       let iteration = 0;
-      const maxIterations = 10; // Limite de sécurité
       const allToolResults: Array<{ name: string; success: boolean; result?: unknown }> = [];
       
       // Copier les messages pour pouvoir les modifier pendant la boucle
       let messages = [...contextResult.messages];
 
-      while (hasMoreToolCalls && iteration < maxIterations) {
+      while (hasMoreToolCalls) {
         iteration++;
+        
+        // Vérifier si un signal d'arrêt a été demandé
+        if (abortSignal?.aborted) {
+          console.log('[MessageProcessor] Processing aborted by user request');
+          break;
+        }
         
         // Appeler le provider
         const response = await providerManager.chatWithFallback(messages, {

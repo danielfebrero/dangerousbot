@@ -75,6 +75,7 @@ export class TelegramBotService extends EventEmitter {
   private sessions: Map<number, string> = new Map();
   private userChatMap: Map<number, number> = new Map();
   private messageProcessor: MessageProcessor | null = null;
+  private abortControllers: Map<number, AbortController> = new Map();
 
   constructor(config: TelegramConfig) {
     super();
@@ -180,7 +181,24 @@ export class TelegramBotService extends EventEmitter {
         return;
       }
 
+      // Détecter le signal "stop"
+      if (text.trim().toLowerCase() === 'stop') {
+        console.log(`[Telegram] Stop signal detected from user ${userId}`);
+        const controller = this.abortControllers.get(userId);
+        if (controller) {
+          controller.abort();
+          this.abortControllers.delete(userId);
+          clearInterval(typingInterval);
+          await adapter.sendMessage('_Processing stopped._');
+          return;
+        }
+      }
+
       const { conversationId, threadId } = this.getOrCreateSession(userId);
+      
+      // Créer un AbortController pour cette requête
+      const abortController = new AbortController();
+      this.abortControllers.set(userId, abortController);
 
       // Traiter le message avec le thread dédié à cet utilisateur Telegram
       const result = await this.messageProcessor.process(
@@ -204,8 +222,12 @@ export class TelegramBotService extends EventEmitter {
             telegramUserId: userId,
             bot: this.bot,
           },
+          abortSignal: abortController.signal,
         }
       );
+      
+      // Nettoyer le AbortController après le traitement
+      this.abortControllers.delete(userId);
 
       // Arrêter l'indicateur typing
       clearInterval(typingInterval);
