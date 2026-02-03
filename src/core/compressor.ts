@@ -82,52 +82,189 @@ export class MemoryCompressor {
   }
 
   /**
+   * Estime le nombre de tokens d'un texte (approximation: 4 chars ≈ 1 token)
+   */
+  private estimateTokens(text: string): number {
+    return Math.ceil(text.length / 4);
+  }
+
+  /**
+   * Divise les messages en chunks selon une limite de tokens
+   */
+  private chunkMessages(messages: Message[], maxTokensPerChunk: number): Message[][] {
+    const chunks: Message[][] = [];
+    let currentChunk: Message[] = [];
+    let currentTokens = 0;
+
+    for (const message of messages) {
+      const messageText = this.formatMessageForChunking(message);
+      const messageTokens = this.estimateTokens(messageText);
+
+      // Si un seul message dépasse la limite, on le tronque (rare mais possible)
+      if (messageTokens > maxTokensPerChunk) {
+        if (currentChunk.length > 0) {
+          chunks.push(currentChunk);
+          currentChunk = [];
+          currentTokens = 0;
+        }
+        // On ajoute le message quand même, il sera tronqué lors du formatage
+        chunks.push([message]);
+        continue;
+      }
+
+      // Si ajouter ce message dépasse la limite, on ferme le chunk courant
+      if (currentTokens + messageTokens > maxTokensPerChunk && currentChunk.length > 0) {
+        chunks.push(currentChunk);
+        currentChunk = [message];
+        currentTokens = messageTokens;
+      } else {
+        currentChunk.push(message);
+        currentTokens += messageTokens;
+      }
+    }
+
+    // Ajouter le dernier chunk s'il reste des messages
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk);
+    }
+
+    return chunks;
+  }
+
+  /**
+   * Formate un message pour l'estimation de tokens (version légère)
+   */
+  private formatMessageForChunking(message: Message): string {
+    let content = message.content;
+    
+    // Tronquer les tool_results pour l'estimation
+    if (content.startsWith('__TOOL_RESULT__')) {
+      const match = content.match(/^__TOOL_RESULT__(.+?)__(.*)$/s);
+      if (match) {
+        const result = match[2].length > 500 ? match[2].substring(0, 500) + '...[tronqué]' : match[2];
+        content = `[Tool Result: ${result}]`;
+      }
+    }
+    
+    return `[${message.role.toUpperCase()}]: ${content}`;
+  }
+
+  /**
+   * Formate un message pour la compression finale
+   */
+  private formatMessageForCompression(message: Message): string {
+    let content = message.content;
+    
+    // Inclure les tool_calls si présents (message assistant avec appels d'outils)
+    if (message.tool_calls) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const parsed: any[] = typeof message.tool_calls === 'string'
+          ? JSON.parse(message.tool_calls)
+          : message.tool_calls;
+
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const tools = parsed.map((tc: any) => {
+            const name = tc.function?.name || tc.name || 'unknown';
+            const argsRaw = tc.function?.arguments || tc.input || {};
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const args: Record<string, any> = typeof argsRaw === 'string' ? JSON.parse(argsRaw) : argsRaw;
+            return `  - ${name}(${Object.entries(args).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ')})`;
+          }).join('\n');
+          content = content ? `${content}\n[Tools:\n${tools}]` : `[Tools:\n${tools}]`;
+        }
+      } catch {
+        // Ignorer l'erreur de parsing
+      }
+    }
+    
+    // Filtrer les tool_results pour ne garder que l'essentiel
+    if (content.startsWith('__TOOL_RESULT__')) {
+      const match = content.match(/^__TOOL_RESULT__(.+?)__(.*)$/s);
+      if (match) {
+        const result = match[2].length > 500 ? match[2].substring(0, 500) + '...[tronqué]' : match[2];
+        content = `[Tool Result: ${result}]`;
+      }
+    }
+    
+    return `[${message.role.toUpperCase()}]: ${content}`;
+  }
+
+  /**
    * Compresse un ensemble de messages en résumé via Kimi 2.5
+   * Supporte le chunking automatique si les messages dépassent la limite de tokens
    */
   private async compressMessages(messages: Message[], sessionId: string, threadId?: string): Promise<CompressedMemory> {
-    // Formater les messages pour le résumé
-    const conversation = messages.map(m => {
-      let content = m.content;
-      
-      // Inclure les tool_calls si présents (message assistant avec appels d'outils)
-      if (m.tool_calls) {
-        try {
-          // tool_calls peut être une string JSON (depuis DB) ou un tableau (depuis type)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const parsed: any[] = typeof m.tool_calls === 'string'
-            ? JSON.parse(m.tool_calls)
-            : m.tool_calls;
+    const MAX_TOKENS_PER_CHUNK = 50000; // Limite conservative pour Kimi 2.5 (262k max)
+    const totalEstimatedTokens = messages.reduce((sum, m) => sum + this.estimateTokens(this.formatMessageForChunking(m)), 0);
 
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const tools = parsed.map((tc: any) => {
-              // Format peut varier: { function: { name, arguments } } ou { name, input }
-              const name = tc.function?.name || tc.name || 'unknown';
-              const argsRaw = tc.function?.arguments || tc.input || {};
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const args: Record<string, any> = typeof argsRaw === 'string' ? JSON.parse(argsRaw) : argsRaw;
-              return `  - ${name}(${Object.entries(args).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ')})`;
-            }).join('\n');
-            content = content ? `${content}\n[Tools:\n${tools}]` : `[Tools:\n${tools}]`;
-          }
-        } catch {
-          // Ignorer l'erreur de parsing
-        }
-      }
-      
-      // Filtrer les tool_results pour ne garder que l'essentiel
-      if (content.startsWith('__TOOL_RESULT__')) {
-        const match = content.match(/^__TOOL_RESULT__(.+?)__(.*)$/s);
-        if (match) {
-          // Tronquer les résultats longs
-          const result = match[2].length > 500 ? match[2].substring(0, 500) + '...[tronqué]' : match[2];
-          content = `[Tool Result: ${result}]`;
-        }
-      }
-      return `[${m.role.toUpperCase()}]: ${content}`;
-    }).join('\n\n');
+    logger.debug('Compressor', `Total estimated tokens: ${totalEstimatedTokens}, messages: ${messages.length}`);
 
-    const systemPrompt = `Tu es un assistant qui résume des conversations de manière concise mais complète.
+    // Si la conversation est petite, compression directe
+    if (totalEstimatedTokens <= MAX_TOKENS_PER_CHUNK) {
+      return this.compressSingleChunk(messages, sessionId, threadId);
+    }
+
+    // Sinon, on fait du chunking hiérarchique
+    logger.info('Compressor', `Large conversation detected (${totalEstimatedTokens} tokens), using hierarchical chunking...`);
+    return this.compressWithChunking(messages, sessionId, threadId, MAX_TOKENS_PER_CHUNK);
+  }
+
+  /**
+   * Compression d'un seul chunk (conversation courte)
+   */
+  private async compressSingleChunk(messages: Message[], sessionId: string, threadId?: string): Promise<CompressedMemory> {
+    const conversation = messages.map(m => this.formatMessageForCompression(m)).join('\n\n');
+    const summary = await this.summarizeText(conversation);
+    return this.createAndSaveCompressedMemory(summary, messages, sessionId, threadId);
+  }
+
+  /**
+   * Compression hiérarchique avec chunking (conversation longue)
+   */
+  private async compressWithChunking(
+    messages: Message[], 
+    sessionId: string, 
+    threadId: string | undefined, 
+    maxTokensPerChunk: number
+  ): Promise<CompressedMemory> {
+    // Étape 1: Diviser en chunks
+    const chunks = this.chunkMessages(messages, maxTokensPerChunk);
+    logger.info('Compressor', `Split into ${chunks.length} chunks`);
+
+    // Étape 2: Résumer chaque chunk
+    const chunkSummaries: string[] = [];
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      logger.debug('Compressor', `Summarizing chunk ${i + 1}/${chunks.length} (${chunk.length} messages)`);
+      
+      const conversation = chunk.map(m => this.formatMessageForCompression(m)).join('\n\n');
+      const chunkSummary = await this.summarizeText(
+        conversation,
+        `Résume cette partie ${i + 1}/${chunks.length} de la conversation. Sois concis mais conserve les informations clés.`
+      );
+      chunkSummaries.push(`--- Partie ${i + 1}/${chunks.length} ---\n${chunkSummary}`);
+    }
+
+    // Étape 3: Fusionner les résumés en un résumé final
+    const mergedSummaries = chunkSummaries.join('\n\n');
+    const finalSummary = await this.summarizeText(
+      mergedSummaries,
+      `Tu as reçu plusieurs résumés de parties d'une conversation. Crée un résumé final cohérent qui:\n` +
+      `- Relie les parties entre elles\n` +
+      `- Élimine les redondances\n` +
+      `- Conserve l'essentiel: décisions, infos sur l'utilisateur, actions, contexte`
+    );
+
+    return this.createAndSaveCompressedMemory(finalSummary, messages, sessionId, threadId);
+  }
+
+  /**
+   * Résume un texte via Kimi 2.5
+   */
+  private async summarizeText(text: string, customPrompt?: string): Promise<string> {
+    const systemPrompt = customPrompt || `Tu es un assistant qui résume des conversations de manière concise mais complète.
 Extrais les informations clés:
 - Décisions prises
 - Informations apprises sur l'utilisateur
@@ -137,21 +274,31 @@ Extrais les informations clés:
 
 Format: Un résumé structuré et factuel, sans fluff. Utilise des bullet points pour la clarté.`;
 
-    // Appel à l'API Kimi via le provider (gère la température correctement)
     const response = await this.kimiProvider.chat(
-      [{ role: 'user', content: `Résume cette conversation:\n\n${conversation}` }],
+      [{ role: 'user', content: `Résume ceci:\n\n${text}` }],
       {
         system: systemPrompt,
         maxTokens: TOKENS.MAX_COMPRESSION_SUMMARY
       }
     );
 
-    // Extraire le texte du résumé
     const textBlock = response.content.find(block => block.type === 'text');
     const summary = textBlock?.type === 'text' ? textBlock.text : '';
 
     logger.debug('Compressor', `Kimi compression: ${response.usage?.input_tokens ?? 0} in, ${response.usage?.output_tokens ?? 0} out`);
 
+    return summary;
+  }
+
+  /**
+   * Crée et sauvegarde une mémoire compressée
+   */
+  private async createAndSaveCompressedMemory(
+    summary: string,
+    messages: Message[],
+    sessionId: string,
+    threadId?: string
+  ): Promise<CompressedMemory> {
     // Générer l'embedding du résumé (si disponible)
     let embeddingVector: number[] | undefined;
     if (this.embedding) {
