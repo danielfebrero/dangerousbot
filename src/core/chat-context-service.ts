@@ -345,7 +345,7 @@ L'utilisateur écrit depuis un appareil mobile (Telegram). Sauf indication contr
   private async maybeCompressAsync(messageCount: number): Promise<void> {
     if (!this.compressor) return;
     
-    if (messageCount % MEMORY.COMPRESSION_CHECK_INTERVAL === 0) {
+    if (messageCount % 10 === 0) {
       try {
         const compressed = await this.compressor.checkAndCompress();
         if (compressed) {

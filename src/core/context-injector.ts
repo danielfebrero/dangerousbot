@@ -274,7 +274,8 @@ ${sections.join('\n\n')}
    */
   async maybeCompress(threadId?: string): Promise<boolean> {
     if (!this.compressor) return false;
-    return this.compressor.checkAndCompress();
+    const result = await this.compressor.checkAndCompress();
+    return result !== null;
   }
 }
 

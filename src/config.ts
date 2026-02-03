@@ -25,8 +25,8 @@ export const MODELS = {
   /** Modèle principal pour le cerveau (Opus 4.5 = le plus intelligent) */
   BRAIN: 'claude-opus-4-5-20251101',
   
-  /** Modèle pour la compression/résumés (Sonnet 4.5 = rapide et efficace) */
-  COMPRESSOR: 'claude-sonnet-4-5-20250929',
+  /** Modèle pour la compression/résumés (Kimi = rapide et économique) */
+  COMPRESSOR: 'kimi-k2.5',
   
   /** Modèle pour les embeddings (via OpenRouter) */
   EMBEDDING: 'qwen/qwen3-embedding-8b',

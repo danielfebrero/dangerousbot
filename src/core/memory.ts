@@ -325,24 +325,36 @@ export class Memory {
   getMessages(
     sessionId?: string, 
     limit: number = 100, 
-    sourceFilter?: 'webapp' | 'telegram' | null
+    sourceFilter?: 'webapp' | 'telegram' | null,
+    threadId?: string
   ): (Message & { images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>; source?: 'webapp' | 'telegram' })[] {
     const sid = sessionId || this.currentSessionId;
     
     // Construire la requête avec filtre optionnel
     let query = `
-      SELECT id, session_id, role, content, tool_calls, images, source, timestamp
-      FROM conversations
-      WHERE session_id = ?
+      SELECT c.id, c.session_id, c.role, c.content, c.tool_calls, c.images, c.source, c.timestamp
+      FROM conversations c
+      WHERE c.session_id = ?
     `;
     const params: (string | number)[] = [sid];
     
+    // Si threadId est spécifié, joindre avec message_threads pour filtrer
+    if (threadId) {
+      query = `
+        SELECT c.id, c.session_id, c.role, c.content, c.tool_calls, c.images, c.source, c.timestamp
+        FROM conversations c
+        INNER JOIN message_threads mt ON c.id = mt.message_id
+        WHERE mt.thread_id = ?
+      `;
+      params[0] = threadId; // Remplace le sessionId
+    }
+    
     if (sourceFilter) {
-      query += ` AND (source = ? OR source IS NULL)`;
+      query += ` AND (c.source = ? OR c.source IS NULL)`;
       params.push(sourceFilter);
     }
     
-    query += ` ORDER BY id DESC LIMIT ?`;
+    query += ` ORDER BY c.id DESC LIMIT ?`;
     params.push(limit);
     
     const rows = this.db.prepare(query).all(...params) as Array<Message & { tool_calls?: string; images?: string; source?: 'webapp' | 'telegram' }>;

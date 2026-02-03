@@ -50,13 +50,14 @@ export class MemoryCompressor {
   }
 
   /**
-   * Compresse toute la conversation d'une session
+   * Compresse toute la conversation d'une session ou d'un thread
    * @param sessionId - Session à compresser (défaut: session courante)
+   * @param threadId - Thread à compresser (prioritaire sur sessionId si spécifié)
    * @returns Le résumé créé ou null si pas de messages
    */
-  async compressSession(sessionId?: string): Promise<CompressedMemory | null> {
+  async compressSession(sessionId?: string, threadId?: string): Promise<CompressedMemory | null> {
     const sid = sessionId || this.memory.getSessionId();
-    const messages = this.memory.getMessages(sid, 10000);
+    const messages = this.memory.getMessages(sid, 10000, undefined, threadId);
 
     if (messages.length === 0) {
       logger.info('Compressor', 'No messages to compress');
@@ -66,7 +67,7 @@ export class MemoryCompressor {
     logger.info('Compressor', `Compressing ${messages.length} messages from session ${sid} using Kimi 2.5...`);
 
     try {
-      const compressed = await this.compressMessages(messages, sid);
+      const compressed = await this.compressMessages(messages, sid, threadId);
       logger.info('Compressor', `Compression complete: ${messages.length} messages -> ${compressed.summary.length} chars`);
       return compressed;
     } catch (error) {
@@ -78,7 +79,7 @@ export class MemoryCompressor {
   /**
    * Compresse un ensemble de messages en résumé via Kimi 2.5
    */
-  private async compressMessages(messages: Message[], sessionId: string): Promise<CompressedMemory> {
+  private async compressMessages(messages: Message[], sessionId: string, threadId?: string): Promise<CompressedMemory> {
     // Formater les messages pour le résumé
     const conversation = messages.map(m => {
       // Filtrer les tool_results pour ne garder que l'essentiel
@@ -133,7 +134,7 @@ Format: Un résumé structuré et factuel, sans fluff. Utilise des bullet points
     // Créer l'objet mémoire compressée
     const compressed: CompressedMemory = {
       session_id: sessionId,
-      thread_id: sessionId,
+      thread_id: threadId || sessionId,
       summary,
       message_ids: messages.map(m => m.id!).filter(Boolean),
       start_time: messages[0].timestamp,
@@ -253,6 +254,52 @@ Format: Un résumé structuré et factuel, sans fluff. Utilise des bullet points
     return topResults.map(result =>
       withEmbeddings.find(m => m.id === result.id)!
     );
+  }
+
+  /**
+   * Vérifie si la compression est nécessaire et l'effectue le cas échéant
+   * Utile pour la compression automatique basée sur le nombre de messages
+   * @returns Le résumé si compression effectuée, null sinon
+   */
+  async checkAndCompress(): Promise<CompressedMemory | null> {
+    const sessionId = this.memory.getSessionId();
+    const messages = this.memory.getMessages(sessionId, 10000);
+
+    // Compression automatique si plus de 50 messages
+    if (messages.length < 50) {
+      return null;
+    }
+
+    logger.info('Compressor', `Auto-compression triggered: ${messages.length} messages`);
+    return this.compressSession(sessionId);
+  }
+
+  /**
+   * Vérifie si la compression est nécessaire et l'effectue
+   * @param force - Si true, compresse même si le seuil n'est pas atteint
+   * @returns true si compression effectuée, false sinon
+   */
+  async compressIfNeeded(force: boolean = false): Promise<boolean> {
+    const sessionId = this.memory.getSessionId();
+    const messages = this.memory.getMessages(sessionId, 10000);
+
+    // Ne pas compresser s'il y a trop peu de messages (sauf si forcé)
+    if (!force && messages.length < 20) {
+      return false;
+    }
+
+    // Pas de messages du tout
+    if (messages.length === 0) {
+      return false;
+    }
+
+    try {
+      const result = await this.compressSession(sessionId);
+      return result !== null;
+    } catch (error) {
+      logger.error('Compressor', `compressIfNeeded failed: ${error}`);
+      return false;
+    }
   }
 
   /**

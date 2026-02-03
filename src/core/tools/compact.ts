@@ -29,6 +29,10 @@ Les messages originaux sont conservés en DB mais remplacés par le résumé dan
       clear_originals: {
         type: 'boolean',
         description: 'Si true, supprime les messages originaux de la DB après compression (défaut: false)'
+      },
+      thread_id: {
+        type: 'string',
+        description: 'ID du thread à compresser (optionnel, défaut: thread courant)'
       }
     },
     required: []
@@ -51,8 +55,11 @@ export const compactHandler: ToolHandler = {
     }
 
     try {
-      // Compresser la session courante
-      const result = await compressor.compressSession();
+      // Utiliser thread_id de l'input si fourni, sinon celui du contexte
+      const targetThreadId = (input.thread_id as string | undefined) || context.threadId;
+
+      // Compresser le thread spécifié (sessionId = undefined pour utiliser la session courante)
+      const result = await compressor.compressSession(undefined, targetThreadId);
 
       if (!result) {
         return {
