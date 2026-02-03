@@ -525,12 +525,13 @@ Format: Un résumé structuré et factuel, sans fluff. Utilise des bullet points
   }
 
   /**
-   * Efface les messages compressés d'une session ou d'un thread
-   * (Garde les résumés mais supprime les messages originaux)
+   * Marque les messages compressés comme cachés du contexte LLM
+   * (Garde les résumés ET les messages originaux pour l'affichage UI)
+   * Les messages restent en base mais ne sont pas envoyés au LLM
    * @param sessionId Session ID (optionnel)
    * @param threadId Thread ID (prioritaire si spécifié)
    */
-  clearCompressedMessages(sessionId?: string, threadId?: string): number {
+  markMessagesAsCompressed(sessionId?: string, threadId?: string): number {
     const memories = this.getCompressedMemories(sessionId, threadId);
 
     if (memories.length === 0) {
@@ -544,14 +545,23 @@ Format: Un résumé structuré et factuel, sans fluff. Utilise des bullet points
       return 0;
     }
 
-    // Supprimer les messages de la DB
+    // Marquer les messages comme compressés (cachés du contexte LLM, mais gardés pour UI)
     const db = (this.memory as any).db;
     const placeholders = allMessageIds.map(() => '?').join(',');
-    db.prepare(`DELETE FROM conversations WHERE id IN (${placeholders})`).run(...allMessageIds);
+    db.prepare(`UPDATE conversations SET compressed = 1 WHERE id IN (${placeholders})`).run(...allMessageIds);
 
     const target = threadId ? `thread ${threadId}` : `session ${sessionId || 'current'}`;
-    logger.info('Compressor', `Cleared ${allMessageIds.length} compressed messages from ${target}`);
+    logger.info('Compressor', `Marked ${allMessageIds.length} messages as compressed (hidden from LLM context) in ${target}`);
     return allMessageIds.length;
+  }
+
+  /**
+   * @deprecated Utilisez markMessagesAsCompressed() à la place
+   * Cette méthode est conservée pour compatibilité mais ne supprime plus les messages
+   */
+  clearCompressedMessages(sessionId?: string, threadId?: string): number {
+    logger.warn('Compressor', 'clearCompressedMessages() is deprecated, using markMessagesAsCompressed() instead');
+    return this.markMessagesAsCompressed(sessionId, threadId);
   }
 }
 

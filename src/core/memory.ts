@@ -123,6 +123,16 @@ export class Memory {
       // Colonne existe déjà, ignorer
     }
 
+    // Migration: ajouter la colonne compressed si elle n'existe pas
+    // compressed = 0 (ou NULL) = message visible dans le contexte LLM
+    // compressed = 1 = message compressé (caché du contexte LLM, remplacé par résumé)
+    try {
+      this.db.exec(`ALTER TABLE conversations ADD COLUMN compressed INTEGER DEFAULT 0`);
+      this.db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_compressed ON conversations(compressed)`);
+    } catch (e) {
+      // Colonne existe déjà, ignorer
+    }
+
     // Index pour source (après la migration)
     try {
       this.db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_source ON conversations(source)`);
@@ -331,10 +341,13 @@ export class Memory {
     const sid = sessionId || this.currentSessionId;
 
     // Construire la requête avec filtre optionnel
+    // IMPORTANT: Ne récupérer que les messages NON compressés (compressed = 0 ou NULL)
+    // pour le contexte LLM. Les messages compressés restent visibles dans l'UI mais
+    // ne sont pas envoyés au modèle (remplacés par leur résumé).
     let query = `
       SELECT c.id, c.session_id, c.role, c.content, c.tool_calls, c.images, c.source, c.timestamp
       FROM conversations c
-      WHERE c.session_id = ?
+      WHERE c.session_id = ? AND (c.compressed = 0 OR c.compressed IS NULL)
     `;
     const params: (string | number)[] = [sid];
 
@@ -343,12 +356,12 @@ export class Memory {
       query = `
         SELECT c.id, c.session_id, c.role, c.content, c.tool_calls, c.images, c.source, c.timestamp
         FROM conversations c
-        WHERE c.thread_id = ?
+        WHERE c.thread_id = ? AND (c.compressed = 0 OR c.compressed IS NULL)
       `;
       params[0] = threadId;
-      console.log(`[Memory.getMessages] Filtering by thread_id=${threadId}`);
+      console.log(`[Memory.getMessages] Filtering by thread_id=${threadId} (non-compressed only)`);
     } else {
-      console.log(`[Memory.getMessages] Filtering by session_id=${sid}`);
+      console.log(`[Memory.getMessages] Filtering by session_id=${sid} (non-compressed only)`);
     }
 
     if (sourceFilter) {
@@ -361,7 +374,7 @@ export class Memory {
 
     const rows = this.db.prepare(query).all(...params) as Array<Message & { tool_calls?: string; images?: string; source?: 'webapp' | 'telegram' }>;
 
-    console.log(`[Memory.getMessages] Found ${rows.length} messages`);
+    console.log(`[Memory.getMessages] Found ${rows.length} non-compressed messages for LLM context`);
 
     // Inverser pour ordre chronologique + parser les JSON
     return rows.reverse().map(row => ({
@@ -372,26 +385,30 @@ export class Memory {
   }
 
   getRecentMessages(count: number = 20, sourceFilter?: 'webapp' | 'telegram' | null): Message[] {
+    // IMPORTANT: Cette méthode récupère TOUS les messages (compressés et non-compressés)
+    // pour l'affichage UI. Les messages compressés sont marqués avec compressed=1.
+    // Le contexte LLM utilise getMessagesForThread() qui filtre les compressés.
     let query = `
-      SELECT id, session_id, role, content, tool_calls, source, timestamp
+      SELECT id, session_id, role, content, tool_calls, source, timestamp, compressed
       FROM conversations
       WHERE session_id = ?
     `;
     const params: (string | number)[] = [this.currentSessionId];
-    
+
     if (sourceFilter) {
       query += ` AND (source = ? OR source IS NULL)`;
       params.push(sourceFilter);
     }
-    
+
     query += ` ORDER BY id DESC LIMIT ?`;
     params.push(count);
-    
-    const rows = this.db.prepare(query).all(...params) as Array<Message & { tool_calls?: string; source?: 'webapp' | 'telegram' }>;
-    
+
+    const rows = this.db.prepare(query).all(...params) as Array<Message & { tool_calls?: string; source?: 'webapp' | 'telegram'; compressed?: number }>;
+
     return rows.reverse().map(row => ({
       ...row,
-      tool_calls: row.tool_calls ? JSON.parse(row.tool_calls) : undefined
+      tool_calls: row.tool_calls ? JSON.parse(row.tool_calls) : undefined,
+      compressed: row.compressed === 1
     }));
   }
 

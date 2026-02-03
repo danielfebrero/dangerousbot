@@ -18,6 +18,7 @@ export interface Message {
   content: string;
   tool_calls?: ToolCall[];
   timestamp: string;
+  compressed?: boolean;  // true = caché du contexte LLM (remplacé par résumé), mais visible en UI
 }
 
 export interface Conversation {
