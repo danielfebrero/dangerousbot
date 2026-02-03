@@ -57,14 +57,19 @@ export class MemoryCompressor {
    */
   async compressSession(sessionId?: string, threadId?: string): Promise<CompressedMemory | null> {
     const sid = sessionId || this.memory.getSessionId();
+
+    // Debug: log les paramètres reçus
+    logger.debug('Compressor', `compressSession called with sessionId=${sessionId}, threadId=${threadId}`);
+
     const messages = this.memory.getMessages(sid, 10000, undefined, threadId);
 
     if (messages.length === 0) {
-      logger.info('Compressor', 'No messages to compress');
+      logger.info('Compressor', `No messages to compress (threadId=${threadId || 'none'}, sessionId=${sid})`);
       return null;
     }
 
-    logger.info('Compressor', `Compressing ${messages.length} messages from session ${sid} using Kimi 2.5...`);
+    const target = threadId ? `thread ${threadId}` : `session ${sid}`;
+    logger.info('Compressor', `Compressing ${messages.length} messages from ${target} using Kimi 2.5...`);
 
     try {
       const compressed = await this.compressMessages(messages, sid, threadId);

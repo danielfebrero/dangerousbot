@@ -323,13 +323,13 @@ export class Memory {
   }
 
   getMessages(
-    sessionId?: string, 
-    limit: number = 100, 
+    sessionId?: string,
+    limit: number = 100,
     sourceFilter?: 'webapp' | 'telegram' | null,
     threadId?: string
   ): (Message & { images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>; source?: 'webapp' | 'telegram' })[] {
     const sid = sessionId || this.currentSessionId;
-    
+
     // Construire la requête avec filtre optionnel
     let query = `
       SELECT c.id, c.session_id, c.role, c.content, c.tool_calls, c.images, c.source, c.timestamp
@@ -337,28 +337,32 @@ export class Memory {
       WHERE c.session_id = ?
     `;
     const params: (string | number)[] = [sid];
-    
-    // Si threadId est spécifié, joindre avec message_threads pour filtrer
+
+    // Si threadId est spécifié, filtrer par thread_id directement dans conversations
     if (threadId) {
       query = `
         SELECT c.id, c.session_id, c.role, c.content, c.tool_calls, c.images, c.source, c.timestamp
         FROM conversations c
-        INNER JOIN message_threads mt ON c.id = mt.message_id
-        WHERE mt.thread_id = ?
+        WHERE c.thread_id = ?
       `;
-      params[0] = threadId; // Remplace le sessionId
+      params[0] = threadId;
+      console.log(`[Memory.getMessages] Filtering by thread_id=${threadId}`);
+    } else {
+      console.log(`[Memory.getMessages] Filtering by session_id=${sid}`);
     }
-    
+
     if (sourceFilter) {
       query += ` AND (c.source = ? OR c.source IS NULL)`;
       params.push(sourceFilter);
     }
-    
+
     query += ` ORDER BY c.id DESC LIMIT ?`;
     params.push(limit);
-    
+
     const rows = this.db.prepare(query).all(...params) as Array<Message & { tool_calls?: string; images?: string; source?: 'webapp' | 'telegram' }>;
-    
+
+    console.log(`[Memory.getMessages] Found ${rows.length} messages`);
+
     // Inverser pour ordre chronologique + parser les JSON
     return rows.reverse().map(row => ({
       ...row,
