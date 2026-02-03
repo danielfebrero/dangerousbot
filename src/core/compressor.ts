@@ -233,19 +233,21 @@ export class MemoryCompressor {
     const chunks = this.chunkMessages(messages, maxTokensPerChunk);
     logger.info('Compressor', `Split into ${chunks.length} chunks`);
 
-    // Étape 2: Résumer chaque chunk
-    const chunkSummaries: string[] = [];
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      logger.debug('Compressor', `Summarizing chunk ${i + 1}/${chunks.length} (${chunk.length} messages)`);
-      
+    // Étape 2: Résumer chaque chunk EN PARALLÈLE pour accélérer
+    logger.info('Compressor', `Summarizing ${chunks.length} chunks in parallel...`);
+    const chunkPromises = chunks.map(async (chunk, i) => {
+      logger.debug('Compressor', `Starting chunk ${i + 1}/${chunks.length} (${chunk.length} messages)`);
       const conversation = chunk.map(m => this.formatMessageForCompression(m)).join('\n\n');
       const chunkSummary = await this.summarizeText(
         conversation,
         `Résume cette partie ${i + 1}/${chunks.length} de la conversation. Sois concis mais conserve les informations clés.`
       );
-      chunkSummaries.push(`--- Partie ${i + 1}/${chunks.length} ---\n${chunkSummary}`);
-    }
+      logger.debug('Compressor', `Finished chunk ${i + 1}/${chunks.length}`);
+      return `--- Partie ${i + 1}/${chunks.length} ---\n${chunkSummary}`;
+    });
+
+    const chunkSummaries = await Promise.all(chunkPromises);
+    logger.info('Compressor', `All ${chunks.length} chunks summarized`);
 
     // Étape 3: Fusionner les résumés en un résumé final
     const mergedSummaries = chunkSummaries.join('\n\n');
