@@ -122,18 +122,27 @@ export class Lifecycle {
   }
 
   // Marquer qu'un redémarrage a eu lieu
-  markRestarted(reason: string, threadId?: string): void {
+  markRestarted(reason: string, threadId?: string, source?: 'webapp' | 'telegram', telegramUserId?: number): void {
     this.ensureDir();
-    fs.writeFileSync(RESTART_SIGNAL, JSON.stringify({ 
-      timestamp: Date.now(), 
+    fs.writeFileSync(RESTART_SIGNAL, JSON.stringify({
+      timestamp: Date.now(),
       reason,
       version: process.version,
-      threadId  // Stocker le threadId d'origine
+      threadId,  // Stocker le threadId d'origine
+      source,    // Stocker la source (webapp/telegram)
+      telegramUserId  // Stocker le userId Telegram pour envoyer le message
     }), { mode: 0o600 });
   }
 
   // Vérifier si on vient de redémarrer
-  checkRestarted(): { restarted: boolean; reason?: string; timestamp?: number; threadId?: string } {
+  checkRestarted(): {
+    restarted: boolean;
+    reason?: string;
+    timestamp?: number;
+    threadId?: string;
+    source?: 'webapp' | 'telegram';
+    telegramUserId?: number;
+  } {
     if (!fs.existsSync(RESTART_SIGNAL)) {
       return { restarted: false };
     }
@@ -141,18 +150,20 @@ export class Lifecycle {
     try {
       const content = fs.readFileSync(RESTART_SIGNAL, 'utf-8');
       const data = JSON.parse(content);
-      
+
       // Si le redémarrage date de plus de 30 secondes, on considère que c'est un vieux signal
       if (Date.now() - data.timestamp > 30000) {
         fs.unlinkSync(RESTART_SIGNAL);
         return { restarted: false };
       }
-      
-      return { 
-        restarted: true, 
+
+      return {
+        restarted: true,
         reason: data.reason,
         timestamp: data.timestamp,
-        threadId: data.threadId  // Retourner le threadId stocké
+        threadId: data.threadId,
+        source: data.source,
+        telegramUserId: data.telegramUserId
       };
     } catch {
       return { restarted: false };

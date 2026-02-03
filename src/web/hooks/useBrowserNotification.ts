@@ -25,11 +25,6 @@ export function useBrowserNotification() {
   }, []);
 
   const sendNotification = useCallback((options: NotificationOptions) => {
-    // Don't notify if page is visible/focused
-    if (document.visibilityState === 'visible') {
-      return;
-    }
-
     // Check if notifications are supported and permitted
     if (!('Notification' in window)) {
       console.log('[Notifications] Not supported');

@@ -97,12 +97,14 @@ export const selfUpdateHandler: ToolHandler = {
       }
 
       // Programmer le redémarrage
-      // Utiliser lifecycle pour marquer le redémarrage avec le threadId
+      // Utiliser lifecycle pour marquer le redémarrage avec le threadId, source et telegramUserId
       const { Lifecycle } = await import('../lifecycle.js');
       const lifecycle = new Lifecycle(process.cwd());
       const threadId = context.threadId;
-      lifecycle.markRestarted(description, threadId);
-      (global as any).__pendingRestart = { reason: description, threadId };
+      const source = context.source;
+      const telegramUserId = context.telegramUserId;
+      lifecycle.markRestarted(description, threadId, source, telegramUserId);
+      (global as any).__pendingRestart = { reason: description, threadId, source, telegramUserId };
 
       return {
         success: true,
@@ -128,8 +130,10 @@ export const selfUpdateHandler: ToolHandler = {
       const { Lifecycle } = await import('../lifecycle.js');
       const lifecycle = new Lifecycle(process.cwd());
       const threadId = context.threadId;
-      lifecycle.markRestarted(description, threadId);
-      (global as any).__pendingRestart = { reason: description, threadId };
+      const source = context.source;
+      const telegramUserId = context.telegramUserId;
+      lifecycle.markRestarted(description, threadId, source, telegramUserId);
+      (global as any).__pendingRestart = { reason: description, threadId, source, telegramUserId };
 
       return {
         success: true,

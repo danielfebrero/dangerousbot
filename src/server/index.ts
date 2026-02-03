@@ -43,6 +43,8 @@ export class DangerousBotServer {
   private processingClients: Set<string> = new Set();
   private pendingContinuationMessage: string | null = null;
   private pendingContinuationThreadId: string | null = null;
+  private pendingContinuationSource: 'webapp' | 'telegram' | null = null;
+  private pendingContinuationTelegramUserId: number | null = null;
   private config: ServerConfig;
 
   constructor(config: ServerConfig, projectRoot: string) {
@@ -561,7 +563,8 @@ export class DangerousBotServer {
       if (pendingRestart) {
         delete (global as any).__pendingRestart;
         logger.info('Server', `Restart programmé: ${pendingRestart.reason}`);
-        this.wsManager.sendSystem(threadId, `Redémarrage dans 2 secondes: ${pendingRestart.reason}`);
+        // Utiliser sendRestartSignal pour que le frontend affiche le message correctement
+        this.wsManager.sendRestartSignal(pendingRestart.reason);
 
         setTimeout(() => {
           this.lifecycle.restart(pendingRestart.reason);
@@ -604,7 +607,14 @@ export class DangerousBotServer {
     if (restartInfo.restarted) {
       this.pendingContinuationMessage = `🔄 Redémarrage effectué ! Je suis de retour et prêt à continuer.\n\n_(Provider actif: **${this.brain?.getCurrentProvider().name || 'inconnu'}**)_`;
       this.pendingContinuationThreadId = restartInfo.threadId || null;
-      logger.info('Server', `Message de continuation en attente (redémarrage détecté, thread: ${this.pendingContinuationThreadId || 'main'})`);
+      this.pendingContinuationSource = restartInfo.source || null;
+      this.pendingContinuationTelegramUserId = restartInfo.telegramUserId || null;
+      logger.info('Server', `Message de continuation en attente (redémarrage détecté, thread: ${this.pendingContinuationThreadId || 'main'}, source: ${this.pendingContinuationSource || 'webapp'})`);
+
+      // Si c'est Telegram, envoyer le message immédiatement après le démarrage
+      if (this.pendingContinuationSource === 'telegram') {
+        this.sendTelegramContinuationMessage();
+      }
     }
 
     return new Promise((resolve) => {
@@ -645,6 +655,54 @@ export class DangerousBotServer {
         this.lifecycle.clearRestarted();
       }, 500);
     }
+  }
+
+  // Envoyer le message de continuation à Telegram après redémarrage
+  private async sendTelegramContinuationMessage(): Promise<void> {
+    if (!this.pendingContinuationMessage || !this.pendingContinuationTelegramUserId) {
+      return;
+    }
+
+    // Attendre que le bot Telegram soit initialisé
+    setTimeout(async () => {
+      try {
+        const { getTelegramBot } = await import('../telegram/bot.js');
+        const telegramBot = getTelegramBot();
+
+        const threadManager = getThreadManager();
+        const memory = getMemory();
+
+        // Utiliser le threadId d'origine s'il existe et est valide
+        const targetThreadId = this.pendingContinuationThreadId;
+        const targetThread = targetThreadId ? threadManager.getThread(targetThreadId) : null;
+
+        if (targetThread) {
+          // Ajouter le message dans le bon thread
+          threadManager.addMessage(targetThread.id, 'assistant', this.pendingContinuationMessage!);
+
+          // S'assurer que le thread actif de l'utilisateur Telegram est bien défini
+          memory.setTelegramActiveThread(this.pendingContinuationTelegramUserId!, targetThread.id);
+
+          logger.info('Server', `Message de continuation Telegram préparé pour thread ${targetThread.id}`);
+        }
+
+        // Envoyer via Telegram
+        const sent = await telegramBot.sendMessageToMaster(this.pendingContinuationMessage!);
+        if (sent) {
+          logger.info('Server', 'Message de continuation envoyé via Telegram');
+        } else {
+          logger.warn('Server', 'Impossible d\'envoyer le message de continuation via Telegram (pas de session active)');
+        }
+
+        this.pendingContinuationMessage = null;
+        this.pendingContinuationThreadId = null;
+        this.pendingContinuationSource = null;
+        this.pendingContinuationTelegramUserId = null;
+        this.lifecycle.clearRestarted();
+      } catch (error) {
+        logger.error('Server', `Erreur envoi message Telegram: ${error}`);
+      }
+    }, 2000); // Attendre 2 secondes pour que le bot Telegram soit prêt
   }
 
   // Envoyer un signal de redémarrage à tous les clients

@@ -356,6 +356,16 @@ function App() {
         }]);
         break;
 
+      case 'system':
+        // Messages système génériques (compression, génération arrêtée, etc.)
+        setMessages(prev => [...prev, {
+          id: crypto.randomUUID(),
+          type: 'system',
+          content: wsMessage.payload.message,
+          timestamp: new Date()
+        }]);
+        break;
+
       case 'restart_signal':
         setMessages(prev => [...prev, {
           id: crypto.randomUUID(),
