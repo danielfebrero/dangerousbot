@@ -5,13 +5,14 @@ import { Header } from './components/Header';
 import { MessageList } from './components/MessageList';
 import { MessageInput } from './components/MessageInput';
 import { DragOverlay } from './components/DragOverlay';
-import { Message, WSMessage, TokenUsage, ContentPart, ToolCallExecution } from './types';
+import { Message, WSMessage, TokenUsage, TokenStats, ContentPart, ToolCallExecution } from './types';
 import './styles/global.css';
 
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [tokenUsage, setTokenUsage] = useState<TokenUsage | null>(null);
+  const [tokenStats, setTokenStats] = useState<TokenStats | null>(null);
   const [headerVisible, setHeaderVisible] = useState(true);
   const [showAllSources, setShowAllSources] = useState(true);
   const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
@@ -336,6 +337,16 @@ function App() {
         });
         break;
 
+      case 'token_update':
+        setTokenStats(wsMessage.payload);
+        // Aussi mettre à jour tokenUsage pour compatibilité avec l'ancien affichage
+        setTokenUsage({
+          input_tokens: wsMessage.payload.sessionInputTokens,
+          output_tokens: wsMessage.payload.sessionOutputTokens,
+          cost: { input_cost: 0, output_cost: 0, total_cost: wsMessage.payload.sessionTotalCost }
+        });
+        break;
+
       case 'error':
         setMessages(prev => [...prev, {
           id: crypto.randomUUID(),
@@ -583,6 +594,7 @@ function App() {
           <Header
             connectionStatus={status}
             tokenUsage={tokenUsage}
+            tokenStats={tokenStats}
             showAllSources={showAllSources}
             onToggleSources={handleToggleSources}
             isSettingsLoaded={isSettingsLoaded}

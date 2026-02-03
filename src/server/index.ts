@@ -25,6 +25,7 @@ import { logger } from '../core/logger.js';
 import { getToolResultStore, ToolExecution } from '../core/tool-result-store.js';
 import { getMessageEmbedder, initMessageEmbedder } from '../core/message-embedder.js';
 import { getCompressor } from '../core/compressor.js';
+import { getTokenTracker, initTokenTracker } from '../core/token-tracker.js';
 import { MEMORY } from '../config.js';
 import * as os from 'os';
 
@@ -156,6 +157,10 @@ export class DangerousBotServer {
     this.brain = new Brain(apiKey);
     logger.info('Server', 'Brain initialisé');
 
+    // Initialiser le token tracker
+    initTokenTracker(MEMORY.TOKEN_LIMIT_FOR_COMPRESSION);
+    logger.info('Server', 'Token tracker initialisé');
+
     if (openRouterApiKey) {
       this.brain.initContextSystem(openRouterApiKey, apiKey);
       logger.info('Server', 'Système de contexte (embeddings) initialisé');
@@ -234,6 +239,11 @@ export class DangerousBotServer {
     } catch (e) {
       // Embedder non initialisé, ignorer
     }
+
+    // Envoyer l'estimation initiale des tokens (contexte actuel)
+    const tokenTracker = getTokenTracker();
+    const initialStats = tokenTracker.getStats(threadId);
+    this.wsManager.sendTokenUpdate(threadId, initialStats);
 
     try {
       const tools = getToolDefinitionsForProvider();
@@ -354,6 +364,10 @@ export class DangerousBotServer {
 
             this.wsManager.sendToolResult(threadId, block.name, result, executionId);
 
+            // Envoyer une mise à jour des tokens après chaque tool call
+            const toolStats = tokenTracker.getStats(threadId);
+            this.wsManager.sendTokenUpdate(threadId, toolStats);
+
             // Déterminer le status de l'exécution
             const executionStatus: 'success' | 'error' = result.success === false || result.error ? 'error' : 'success';
             const timestamp = new Date().toISOString();
@@ -461,14 +475,27 @@ export class DangerousBotServer {
         }
       }
 
-      // Envoyer les stats d'usage
+      // Envoyer les stats d'usage et mettre à jour le token tracker
       if (response.usage) {
+        // Enregistrer dans le token tracker
+        tokenTracker.recordApiCall(
+          threadId,
+          response.usage.input_tokens,
+          response.usage.output_tokens,
+          response.cost
+        );
+
+        // Envoyer l'ancien format usage (pour compatibilité)
         this.wsManager.sendUsage(
           threadId,
           response.usage.input_tokens,
           response.usage.output_tokens,
           response.cost
         );
+
+        // Envoyer le nouveau format token_update avec toutes les stats
+        const finalStats = tokenTracker.getStats(threadId);
+        this.wsManager.sendTokenUpdate(threadId, finalStats);
 
         // Vérifier si compression automatique nécessaire (> 128K tokens)
         const totalTokens = response.usage.input_tokens + response.usage.output_tokens;
@@ -482,6 +509,9 @@ export class DangerousBotServer {
               .then(result => {
                 if (result) {
                   this.wsManager.sendSystem(threadId, `✅ Contexte compressé: ${result.message_ids.length} messages → résumé`);
+                  // Envoyer les stats mises à jour après compression
+                  const postCompressStats = tokenTracker.getStats(threadId);
+                  this.wsManager.sendTokenUpdate(threadId, postCompressStats);
                 }
               })
               .catch(err => {

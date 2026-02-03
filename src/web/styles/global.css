@@ -221,6 +221,108 @@ html, body {
   color: var(--border);
 }
 
+/* Context Usage Bar */
+.context-bar {
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--bg-hover);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.context-bar-fill {
+  height: 100%;
+  transition: width var(--duration-normal) var(--ease-out),
+              background-color var(--duration-normal);
+  border-radius: 2px;
+}
+
+/* Token Details Popup */
+.token-details-popup {
+  position: absolute;
+  top: calc(100% + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  min-width: 220px;
+  z-index: 1000;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+  animation: token-popup-enter var(--duration-fast) var(--ease-out);
+}
+
+.token-details-popup::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 8px solid var(--bg-elevated);
+}
+
+@keyframes token-popup-enter {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.token-details-header {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.token-details-section {
+  margin-bottom: var(--space-3);
+}
+
+.token-details-section:last-child {
+  margin-bottom: 0;
+}
+
+.token-details-title {
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-2);
+}
+
+.token-details-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-1) 0;
+  font-size: 0.8rem;
+}
+
+.token-details-row span:first-child {
+  color: var(--text-secondary);
+}
+
+.token-details-row span:last-child {
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
 /* Settings Button */
 .settings-button {
   display: flex;

@@ -470,6 +470,30 @@ export class WebSocketManager {
     });
   }
 
+  /**
+   * Envoie une mise à jour des tokens en temps réel
+   */
+  sendTokenUpdate(
+    threadId: string,
+    stats: {
+      estimatedContextTokens: number;
+      sessionInputTokens: number;
+      sessionOutputTokens: number;
+      sessionTotalCost: number;
+      lastRequestInputTokens: number;
+      lastRequestOutputTokens: number;
+      lastRequestCost: number;
+      contextLimit: number;
+      contextUsagePercent: number;
+    }
+  ): void {
+    this.broadcastToThread(threadId, {
+      type: 'token_update',
+      payload: stats,
+      threadId,
+    });
+  }
+
   sendProviderSwitch(threadId: string, from: string, to: string, reason: string): void {
     this.broadcastToThread(threadId, {
       type: 'provider_switch',

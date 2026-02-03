@@ -50,9 +50,10 @@ export interface Message {
 }
 
 export interface WSMessage {
-  type: 'user_message' | 'bot_message' | 'bot_typing' | 'tool_use' | 'tool_result' | 'system' | 'error' | 'connected' | 'history' | 'usage' | 'provider_switch' | 'stream_chunk' | 'threads_list' | 'thread_switched' | 'thread_created' | 'thread_renamed' | 'thread_deleted' | 'thread_cleared' | 'restart_signal' | 'force_restart_prompt';
+  type: 'user_message' | 'bot_message' | 'bot_typing' | 'tool_use' | 'tool_result' | 'system' | 'error' | 'connected' | 'history' | 'usage' | 'token_update' | 'provider_switch' | 'stream_chunk' | 'threads_list' | 'thread_switched' | 'thread_created' | 'thread_renamed' | 'thread_deleted' | 'thread_cleared' | 'restart_signal' | 'force_restart_prompt';
   payload: any;
   timestamp?: string;
+  threadId?: string;
 }
 
 export interface TokenUsage {
@@ -63,6 +64,22 @@ export interface TokenUsage {
     output_cost: number;
     total_cost: number;
   };
+}
+
+export interface TokenStats {
+  // Contexte actuel estimé
+  estimatedContextTokens: number;
+  // Cumulatif pour cette session
+  sessionInputTokens: number;
+  sessionOutputTokens: number;
+  sessionTotalCost: number;
+  // Dernier appel API
+  lastRequestInputTokens: number;
+  lastRequestOutputTokens: number;
+  lastRequestCost: number;
+  // Limite de contexte
+  contextLimit: number;
+  contextUsagePercent: number;
 }
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
