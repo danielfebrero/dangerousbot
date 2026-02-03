@@ -104,6 +104,14 @@ export class TodoManager {
       `);
     }
 
+    // Migration: add updated_at column to projects if it doesn't exist
+    const projectTableInfo = this.db.prepare(`PRAGMA table_info(projects)`).all() as { name: string }[];
+    const hasUpdatedAtColumn = projectTableInfo.some(col => col.name === 'updated_at');
+    
+    if (!hasUpdatedAtColumn) {
+      this.db.exec(`ALTER TABLE projects ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP`);
+    }
+
     // Indexes for performance
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id)`);
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)`);
