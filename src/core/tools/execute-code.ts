@@ -25,12 +25,26 @@ export const executeCodeHandler: ToolHandler = {
   async execute(input: ToolInput, context: ToolContext): Promise<ToolResult> {
     const code = input.code as string;
     const inMemory = input.in_memory !== false;
+    const signal = context.abortSignal;
 
     if (inMemory) {
+      // L'exécution en mémoire (vm.runInNewContext) ne supporte pas AbortSignal
+      // car elle s'exécute dans le même processus
       return await context.executor.executeInMemory(code);
     } else {
       const filename = (input.filename as string) || 'temp.js';
-      return await context.executor.executeFile(code, filename);
+      const result = await context.executor.executeFile(code, filename, 'node', { signal });
+
+      // Détecter si c'est une annulation
+      if (!result.success && result.error?.includes('annulée')) {
+        return {
+          success: false,
+          cancelled: true,
+          error: 'Exécution du code annulée par l\'utilisateur'
+        };
+      }
+
+      return result;
     }
   }
 };

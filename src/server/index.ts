@@ -126,9 +126,18 @@ export class DangerousBotServer {
     });
 
     // Handler de stop par client
-    this.wsManager.setStopHandler((clientId) => {
+    this.wsManager.setStopHandler(async (clientId, threadId) => {
       this.processingClients.delete(clientId);
-      logger.info('Server', `Stop signal received for client ${clientId}`);
+      logger.info('Server', `Stop signal received for client ${clientId}, thread ${threadId}`);
+      
+      // Annuler l'exécution des tools en cours sur ce thread
+      if (threadId) {
+        const { cancelThreadExecution } = await import('../core/tool-cancellation.js');
+        const cancelled = cancelThreadExecution(threadId, 'user_cancelled');
+        if (cancelled) {
+          logger.info('Server', `Cancelled active tool execution on thread ${threadId}`);
+        }
+      }
     });
 
     // Callback pour la première connexion (message de continuation après redémarrage)

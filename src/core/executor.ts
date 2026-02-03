@@ -2,7 +2,7 @@
  * Executor - Exécution de code et commandes pour DangerousBot
  */
 
-import { spawn, exec } from 'child_process';
+import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -72,12 +72,12 @@ export class Executor {
     }
   }
 
-  // Exécution via fichier temporaire
+  // Exécution via fichier temporaire avec support de l'annulation
   async executeFile(
     code: string,
     filename: string = 'temp.js',
     interpreter: string = 'node',
-    options: { timeout?: number } = {}
+    options: { timeout?: number; signal?: AbortSignal } = {}
   ): Promise<ExecutionResult> {
     const timeout = options.timeout ?? 60000;
     const tempDir = os.tmpdir();
@@ -103,6 +103,14 @@ export class Executor {
 
       let stdout = '';
       let stderr = '';
+      let isResolved = false;
+
+      const resolveOnce = (result: ExecutionResult) => {
+        if (!isResolved) {
+          isResolved = true;
+          resolve(result);
+        }
+      };
 
       child.stdout.on('data', (data: Buffer) => {
         stdout += data.toString();
@@ -112,9 +120,19 @@ export class Executor {
         stderr += data.toString();
       });
 
-      child.on('close', (exitCode: number | null) => {
+      child.on('close', (exitCode: number | null, signal: string | null) => {
         cleanup();
-        resolve({
+        if (signal) {
+          resolveOnce({
+            success: false,
+            exitCode: undefined,
+            stdout,
+            stderr,
+            error: `Exécution annulée (signal: ${signal})`
+          });
+          return;
+        }
+        resolveOnce({
           success: exitCode === 0,
           exitCode: exitCode ?? -1,
           stdout,
@@ -124,46 +142,184 @@ export class Executor {
 
       child.on('error', (error: Error) => {
         cleanup();
-        resolve({
+        resolveOnce({
           success: false,
           error: error.message
         });
       });
 
       // Timeout
-      setTimeout(() => {
-        child.kill();
+      const timeoutId = setTimeout(() => {
+        child.kill('SIGTERM');
+        setTimeout(() => {
+          if (!child.killed) {
+            child.kill('SIGKILL');
+          }
+        }, 5000);
         cleanup();
-        resolve({
+        resolveOnce({
           success: false,
           error: `Execution timeout (${timeout / 1000}s)`
         });
       }, timeout);
+
+      // Gestion du signal d'annulation (AbortSignal)
+      if (options.signal) {
+        const onAbort = () => {
+          clearTimeout(timeoutId);
+          child.kill('SIGTERM');
+          setTimeout(() => {
+            if (!child.killed) {
+              child.kill('SIGKILL');
+            }
+          }, 2000);
+          resolveOnce({
+            success: false,
+            stdout,
+            stderr,
+            error: 'Exécution annulée par l\'utilisateur'
+          });
+        };
+
+        if (options.signal.aborted) {
+          onAbort();
+        } else {
+          options.signal.addEventListener('abort', onAbort, { once: true });
+        }
+
+        // Cleanup listener quand le processus termine
+        child.on('close', () => {
+          options.signal?.removeEventListener('abort', onAbort);
+          clearTimeout(timeoutId);
+          cleanup();
+        });
+      } else {
+        child.on('close', () => {
+          clearTimeout(timeoutId);
+          cleanup();
+        });
+      }
     });
   }
 
-  // Exécution de commande shell
+  // Exécution de commande shell avec support de l'annulation
   async shell(
     command: string,
-    options: { cwd?: string; timeout?: number } = {}
+    options: { cwd?: string; timeout?: number; signal?: AbortSignal } = {}
   ): Promise<ExecutionResult> {
     const cwd = options.cwd ? this.resolvePath(options.cwd) : this.projectRoot;
+    const timeout = options.timeout || 60000;
 
     return new Promise((resolve) => {
-      exec(command, {
+      // Utiliser spawn au lieu de exec pour supporter l'annulation
+      // exec utilise un buffer limité, spawn permet le streaming
+      const child = spawn('sh', ['-c', command], {
         cwd,
         env: process.env,
-        timeout: options.timeout || 60000,
-        maxBuffer: 10 * 1024 * 1024
-      }, (error, stdout, stderr) => {
-        resolve({
-          success: !error,
+        shell: false // On utilise explicitement sh -c
+      });
+
+      let stdout = '';
+      let stderr = '';
+      let isResolved = false;
+
+      const resolveOnce = (result: ExecutionResult) => {
+        if (!isResolved) {
+          isResolved = true;
+          resolve(result);
+        }
+      };
+
+      child.stdout.on('data', (data: Buffer) => {
+        stdout += data.toString();
+      });
+
+      child.stderr.on('data', (data: Buffer) => {
+        stderr += data.toString();
+      });
+
+      child.on('close', (exitCode: number | null, signal: string | null) => {
+        // Si terminé par un signal (comme SIGTERM), c'est une annulation
+        if (signal) {
+          resolveOnce({
+            success: false,
+            stdout,
+            stderr,
+            error: `Commande annulée (signal: ${signal})`,
+            exitCode: undefined
+          });
+          return;
+        }
+        resolveOnce({
+          success: exitCode === 0,
           stdout,
           stderr,
-          error: error?.message,
-          exitCode: error?.code as number | undefined
+          error: exitCode !== 0 ? `Exit code: ${exitCode}` : undefined,
+          exitCode: exitCode ?? -1
         });
       });
+
+      child.on('error', (error: Error) => {
+        resolveOnce({
+          success: false,
+          stdout,
+          stderr,
+          error: error.message
+        });
+      });
+
+      // Gestion du timeout
+      const timeoutId = setTimeout(() => {
+        child.kill('SIGTERM');
+        setTimeout(() => {
+          if (!child.killed) {
+            child.kill('SIGKILL');
+          }
+        }, 5000);
+        resolveOnce({
+          success: false,
+          stdout,
+          stderr,
+          error: `Execution timeout (${timeout / 1000}s)`
+        });
+      }, timeout);
+
+      // Gestion du signal d'annulation (AbortSignal)
+      if (options.signal) {
+        const onAbort = () => {
+          clearTimeout(timeoutId);
+          child.kill('SIGTERM');
+          // Force kill après 2s si pas terminé
+          setTimeout(() => {
+            if (!child.killed) {
+              child.kill('SIGKILL');
+            }
+          }, 2000);
+          resolveOnce({
+            success: false,
+            stdout,
+            stderr,
+            error: 'Commande annulée par l\'utilisateur',
+            exitCode: undefined
+          });
+        };
+
+        if (options.signal.aborted) {
+          onAbort();
+        } else {
+          options.signal.addEventListener('abort', onAbort, { once: true });
+        }
+
+        // Cleanup listener quand le processus termine
+        child.on('close', () => {
+          options.signal?.removeEventListener('abort', onAbort);
+          clearTimeout(timeoutId);
+        });
+      } else {
+        child.on('close', () => {
+          clearTimeout(timeoutId);
+        });
+      }
     });
   }
 

@@ -22,7 +22,7 @@ export type ThreadMessageHandler = (
   }
 ) => Promise<void>;
 
-export type ThreadStopHandler = (clientId: string) => void;
+export type ThreadStopHandler = (clientId: string, threadId?: string) => void | Promise<void>;
 
 export interface ThreadClient {
   ws: WebSocket;
@@ -149,7 +149,7 @@ export class WebSocketManager {
               console.log(`[WebSocket] Stop signal received from ${client.clientId}`);
               this.abortRequest(client.clientId);
               if (this.stopHandler) {
-                this.stopHandler(client.clientId);
+                this.stopHandler(client.clientId, client.threadId);
               }
               break;
             }

@@ -24,6 +24,19 @@ export const shellHandler: ToolHandler = {
   async execute(input: ToolInput, context: ToolContext): Promise<ToolResult> {
     const command = input.command as string;
     const cwd = input.cwd as string | undefined;
-    return await context.executor.shell(command, { cwd });
+    const signal = context.abortSignal;
+
+    const result = await context.executor.shell(command, { cwd, signal });
+
+    // Détecter si c'est une annulation
+    if (!result.success && result.error?.includes('annulée')) {
+      return {
+        success: false,
+        cancelled: true,
+        error: 'Commande shell annulée par l\'utilisateur'
+      };
+    }
+
+    return result;
   }
 };
