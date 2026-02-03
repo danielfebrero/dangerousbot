@@ -89,6 +89,21 @@ export class TodoManager {
       )
     `);
 
+    // Migration: add status column if it doesn't exist (old schema used 'completed' INTEGER)
+    const tableInfo = this.db.prepare(`PRAGMA table_info(tasks)`).all() as { name: string }[];
+    const hasStatusColumn = tableInfo.some(col => col.name === 'status');
+    const hasCompletedColumn = tableInfo.some(col => col.name === 'completed');
+    
+    if (!hasStatusColumn && hasCompletedColumn) {
+      // Migrate from old schema (completed INTEGER) to new schema (status TEXT)
+      this.db.exec(`
+        ALTER TABLE tasks ADD COLUMN status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'completed'))
+      `);
+      this.db.exec(`
+        UPDATE tasks SET status = CASE WHEN completed = 1 THEN 'completed' ELSE 'pending' END
+      `);
+    }
+
     // Indexes for performance
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id)`);
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)`);
