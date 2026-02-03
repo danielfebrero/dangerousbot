@@ -122,17 +122,18 @@ export class Lifecycle {
   }
 
   // Marquer qu'un redémarrage a eu lieu
-  markRestarted(reason: string): void {
+  markRestarted(reason: string, threadId?: string): void {
     this.ensureDir();
     fs.writeFileSync(RESTART_SIGNAL, JSON.stringify({ 
       timestamp: Date.now(), 
       reason,
-      version: process.version 
+      version: process.version,
+      threadId  // Stocker le threadId d'origine
     }), { mode: 0o600 });
   }
 
   // Vérifier si on vient de redémarrer
-  checkRestarted(): { restarted: boolean; reason?: string; timestamp?: number } {
+  checkRestarted(): { restarted: boolean; reason?: string; timestamp?: number; threadId?: string } {
     if (!fs.existsSync(RESTART_SIGNAL)) {
       return { restarted: false };
     }
@@ -150,7 +151,8 @@ export class Lifecycle {
       return { 
         restarted: true, 
         reason: data.reason,
-        timestamp: data.timestamp 
+        timestamp: data.timestamp,
+        threadId: data.threadId  // Retourner le threadId stocké
       };
     } catch {
       return { restarted: false };

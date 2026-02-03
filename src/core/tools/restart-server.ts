@@ -22,18 +22,15 @@ export const restartServerHandler: ToolHandler = {
   definition: restartServerDefinition,
   async execute(input: ToolInput, context: ToolContext): Promise<ToolResult> {
     const reason = (input.reason as string) || 'Demandé par le bot';
-    const fs = await import('fs');
-    const path = await import('path');
-
-    // Créer le fichier .restart que start.sh surveille
-    const restartFile = path.join(process.cwd(), '.restart');
-    fs.writeFileSync(restartFile, JSON.stringify({
-      reason,
-      timestamp: new Date().toISOString()
-    }));
+    
+    // Marquer le redémarrage dans le système de lifecycle avec le threadId
+    const { Lifecycle } = await import('../lifecycle.js');
+    const lifecycle = new Lifecycle(process.cwd());
+    const threadId = context.threadId;
+    lifecycle.markRestarted(reason, threadId);
 
     // Stocker le flag pour que le serveur gère le timing
-    (global as any).__pendingRestart = { reason };
+    (global as any).__pendingRestart = { reason, threadId };
 
     return {
       success: true,

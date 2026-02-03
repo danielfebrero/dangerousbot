@@ -24,4 +24,5 @@ export interface ToolContext {
   telegramChatId?: string; // Chat ID pour Telegram
   bot?: any; // Instance TelegramBot
   abortSignal?: AbortSignal; // Signal d'annulation pour les tool calls longs
+  threadId?: string; // Thread ID pour tracer le contexte d'exécution
 }

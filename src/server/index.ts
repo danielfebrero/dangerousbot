@@ -38,6 +38,7 @@ export class DangerousBotServer {
   private lifecycle: Lifecycle;
   private processingClients: Set<string> = new Set();
   private pendingContinuationMessage: string | null = null;
+  private pendingContinuationThreadId: string | null = null;
   private config: ServerConfig;
 
   constructor(config: ServerConfig, projectRoot: string) {
@@ -488,7 +489,8 @@ export class DangerousBotServer {
     const restartInfo = this.lifecycle.checkRestarted();
     if (restartInfo.restarted) {
       this.pendingContinuationMessage = `🔄 Redémarrage effectué ! Je suis de retour et prêt à continuer.\n\n_(Provider actif: **${this.brain?.getCurrentProvider().name || 'inconnu'}**)_`;
-      logger.info('Server', 'Message de continuation en attente (redémarrage détecté)');
+      this.pendingContinuationThreadId = restartInfo.threadId || null;
+      logger.info('Server', `Message de continuation en attente (redémarrage détecté, thread: ${this.pendingContinuationThreadId || 'main'})`);
     }
 
     return new Promise((resolve) => {
@@ -503,17 +505,30 @@ export class DangerousBotServer {
   sendContinuationMessage(): void {
     if (this.pendingContinuationMessage) {
       setTimeout(() => {
-        // Sauvegarder le message de continuation dans le main thread
         const threadManager = getThreadManager();
-        const mainThread = threadManager.getMainThread();
-        if (mainThread) {
-          threadManager.addMessage(mainThread.id, 'assistant', this.pendingContinuationMessage!);
-          this.wsManager.sendBotMessage(mainThread.id, this.pendingContinuationMessage!);
+        
+        // Utiliser le threadId d'origine s'il existe et est valide
+        const targetThread = this.pendingContinuationThreadId 
+          ? threadManager.getThread(this.pendingContinuationThreadId)
+          : threadManager.getMainThread();
+          
+        if (targetThread) {
+          threadManager.addMessage(targetThread.id, 'assistant', this.pendingContinuationMessage!);
+          this.wsManager.sendBotMessage(targetThread.id, this.pendingContinuationMessage!);
+          logger.info('Server', `Message de continuation envoyé dans thread ${targetThread.id}`);
+        } else {
+          // Fallback sur le main thread si le thread d'origine n'existe plus
+          const mainThread = threadManager.getMainThread();
+          if (mainThread) {
+            threadManager.addMessage(mainThread.id, 'assistant', this.pendingContinuationMessage!);
+            this.wsManager.sendBotMessage(mainThread.id, this.pendingContinuationMessage!);
+            logger.info('Server', 'Message de continuation envoyé dans main thread (fallback)');
+          }
         }
 
         this.pendingContinuationMessage = null;
+        this.pendingContinuationThreadId = null;
         this.lifecycle.clearRestarted();
-        logger.info('Server', 'Message de continuation envoyé et sauvegardé');
       }, 500);
     }
   }

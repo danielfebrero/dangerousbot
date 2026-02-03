@@ -97,14 +97,12 @@ export const selfUpdateHandler: ToolHandler = {
       }
 
       // Programmer le redémarrage
-      const fs = await import('fs');
-      const path = await import('path');
-      const restartFile = path.join(process.cwd(), '.restart');
-      fs.writeFileSync(restartFile, JSON.stringify({
-        reason: description,
-        timestamp: new Date().toISOString()
-      }));
-      (global as any).__pendingRestart = { reason: description };
+      // Utiliser lifecycle pour marquer le redémarrage avec le threadId
+      const { Lifecycle } = await import('../lifecycle.js');
+      const lifecycle = new Lifecycle(process.cwd());
+      const threadId = context.threadId;
+      lifecycle.markRestarted(description, threadId);
+      (global as any).__pendingRestart = { reason: description, threadId };
 
       return {
         success: true,
@@ -127,14 +125,11 @@ export const selfUpdateHandler: ToolHandler = {
         return { success: false, error: `Build OK mais erreur de versioning: ${versionResult.error}` };
       }
 
-      const fs = await import('fs');
-      const path = await import('path');
-      const restartFile = path.join(process.cwd(), '.restart');
-      fs.writeFileSync(restartFile, JSON.stringify({
-        reason: description,
-        timestamp: new Date().toISOString()
-      }));
-      (global as any).__pendingRestart = { reason: description };
+      const { Lifecycle } = await import('../lifecycle.js');
+      const lifecycle = new Lifecycle(process.cwd());
+      const threadId = context.threadId;
+      lifecycle.markRestarted(description, threadId);
+      (global as any).__pendingRestart = { reason: description, threadId };
 
       return {
         success: true,

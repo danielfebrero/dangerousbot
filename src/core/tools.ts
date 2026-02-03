@@ -58,7 +58,7 @@ export class ToolExecutor {
     toolName: string,
     input: any,
     abortSignal?: AbortSignal,
-    platformContext?: { telegramChatId?: string; bot?: any }
+    platformContext?: { telegramChatId?: string; bot?: any; threadId?: string }
   ): Promise<any> {
     const memory = getMemory();
     const rollbackManager = getRollbackManager();
@@ -74,7 +74,8 @@ export class ToolExecutor {
       rollbackManager,
       telegramChatId: platformContext?.telegramChatId,
       bot: platformContext?.bot,
-      abortSignal
+      abortSignal,
+      threadId: platformContext?.threadId
     };
 
     return await executeTool(toolName, input, context);
