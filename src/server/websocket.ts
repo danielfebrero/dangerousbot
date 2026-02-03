@@ -9,6 +9,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import { WSMessage } from '../core/types.js';
 import { getThreadManager, ThreadManager } from '../core/thread-manager.js';
+import { getTokenTracker } from '../core/token-tracker.js';
 
 // Types pour les handlers avec thread awareness
 export type ThreadMessageHandler = (
@@ -120,6 +121,19 @@ export class WebSocketManager {
 
       // Envoie l'historique du thread
       this.sendThreadHistory(ws, threadId);
+
+      // Envoie les stats de tokens initiales (pour afficher le compteur dès la connexion)
+      try {
+        const tokenTracker = getTokenTracker();
+        const initialStats = tokenTracker.getStats(threadId);
+        this.sendTo(ws, {
+          type: 'token_update',
+          payload: initialStats,
+          threadId,
+        });
+      } catch (e) {
+        // Token tracker pas encore initialisé, ignorer
+      }
 
       // Handler de messages
       ws.on('message', async (data: Buffer) => {
@@ -310,6 +324,19 @@ export class WebSocketManager {
 
     // Envoie l'historique du nouveau thread
     this.sendThreadHistory(ws, newThreadId);
+
+    // Envoie les stats de tokens du nouveau thread
+    try {
+      const tokenTracker = getTokenTracker();
+      const stats = tokenTracker.getStats(newThreadId);
+      this.sendTo(ws, {
+        type: 'token_update',
+        payload: stats,
+        threadId: newThreadId,
+      });
+    } catch (e) {
+      // Token tracker pas encore initialisé, ignorer
+    }
   }
 
   private sendThreadHistory(ws: WebSocket, threadId: string, limit: number = 100, offset: number = 0): void {
