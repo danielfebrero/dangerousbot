@@ -32,6 +32,7 @@ import { telegramHandler, telegramDefinition } from './telegram';
 import { configHandler, configDefinition } from './config';
 import { downloadFileHandler, downloadFileDefinition } from './download-file';
 import { sendFileHandler, sendFileDefinition } from './send-file';
+import { recallToolResultHandler, recallToolResultDefinition } from './recall-tool-result';
 
 import { PROVIDER } from '../../config';
 
@@ -70,7 +71,8 @@ export function registerAllTools(): void {
     telegramHandler,
     configHandler,
     downloadFileHandler,
-    sendFileHandler
+    sendFileHandler,
+    recallToolResultHandler
   ];
   
   for (const handler of handlers) {
@@ -108,7 +110,8 @@ export function getToolDefinitions(): Tool[] {
     telegramDefinition,
     configDefinition,
     downloadFileDefinition,
-    sendFileDefinition
+    sendFileDefinition,
+    recallToolResultDefinition
   ];
 }
 
@@ -187,5 +190,6 @@ export {
   codeIndexHandler,
   logHandler,
   setLogLevelHandler,
-  clearLogsHandler
+  clearLogsHandler,
+  recallToolResultHandler
 };

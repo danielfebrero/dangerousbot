@@ -250,10 +250,11 @@ export class Brain {
   /**
    * Ajoute un résultat d'outil à l'historique en mémoire
    * IMPORTANT: Doit être appelé par le serveur après chaque exécution de tool
+   * @param executionId - ID d'exécution pour le remplacement par résumé aux tours suivants
    */
-  addToolResult(toolUseId: string, result: string, threadId?: string): void {
+  addToolResult(toolUseId: string, result: string, threadId?: string, executionId?: string): void {
     const historyManager = this.getHistoryManager(threadId);
-    historyManager.addToolResult(toolUseId, result);
+    historyManager.addToolResult(toolUseId, result, executionId);
   }
 
   /**

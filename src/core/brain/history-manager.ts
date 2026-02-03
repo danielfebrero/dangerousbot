@@ -61,16 +61,19 @@ export class HistoryManager {
 
   /**
    * Ajoute un résultat d'outil
+   * @param executionId - ID d'exécution pour récupérer le résumé (optionnel)
    */
-  addToolResult(toolUseId: string, result: string): void {
+  addToolResult(toolUseId: string, result: string, executionId?: string): void {
     const timestamp = new Date().toISOString();
     this.conversationHistory.push({
       role: 'user',
       content: [{
         type: 'tool_result',
         tool_use_id: toolUseId,
-        content: result
-      }],
+        content: result,
+        // Stocker l'executionId pour permettre le remplacement par résumé
+        execution_id: executionId
+      } as any],
       timestamp
     });
   }

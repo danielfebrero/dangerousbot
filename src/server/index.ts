@@ -22,6 +22,7 @@ import { getThreadManager } from '../core/thread-manager.js';
 import { ServerConfig, ToolInput } from '../core/types.js';
 import { Lifecycle } from '../core/lifecycle.js';
 import { logger } from '../core/logger.js';
+import { getToolResultStore, ToolExecution } from '../core/tool-result-store.js';
 import * as os from 'os';
 
 // Signal pour le message de continuation après redémarrage
@@ -296,8 +297,9 @@ export class DangerousBotServer {
             const { createExecutionContext, releaseExecutionContext } = await import('../core/tool-cancellation.js');
             const { signal } = createExecutionContext(block.name, threadId);
 
-            // Exécuter l'outil avec gestion des erreurs
+            // Exécuter l'outil avec gestion des erreurs et mesure du temps
             let result: any;
+            const startTime = performance.now();
             try {
               result = await this.toolExecutor.execute(
                 block.name,
@@ -320,6 +322,7 @@ export class DangerousBotServer {
             } finally {
               releaseExecutionContext(threadId);
             }
+            const executionTimeMs = Math.round(performance.now() - startTime);
 
             // Ajouter un avertissement si le parsing était partiel
             if (isPartialParse && result && !result.error) {
@@ -328,6 +331,31 @@ export class DangerousBotServer {
             }
 
             this.wsManager.sendToolResult(threadId, block.name, result, executionId);
+
+            // Déterminer le status de l'exécution
+            const executionStatus: 'success' | 'error' = result.success === false || result.error ? 'error' : 'success';
+            const timestamp = new Date().toISOString();
+
+            // Sauvegarder l'exécution complète dans tool_executions
+            const toolResultStore = getToolResultStore();
+            const toolExecution: ToolExecution = {
+              toolCallId: executionId,
+              toolName: block.name,
+              timestamp,
+              status: executionStatus,
+              input: toolInput as Record<string, unknown>,
+              output: result,
+              error: result.error || undefined,
+              metadata: {
+                executionTimeMs,
+                threadId,
+                messageId: undefined
+              }
+            };
+            toolResultStore.saveToolExecution(toolExecution);
+
+            // Générer le résumé pour le contexte LLM
+            const toolSummary = toolResultStore.formatToolSummary(toolExecution);
 
             // Vérifier si le résultat contient une image
             if (result.type === 'image' && result.source) {
@@ -338,18 +366,13 @@ export class DangerousBotServer {
               }]);
               // Ajouter aussi à l'historique mémoire du Brain
               this.brain.addToolResult(block.id, JSON.stringify({ type: 'image_loaded' }), threadId);
-            } else if (result._webSearchPassthrough) {
-              const toolResultStr = JSON.stringify(result.arguments);
-              // Persister en DB
-              threadManager.addToolResult(threadId, block.id, toolResultStr);
-              // CRITICAL: Ajouter à l'historique mémoire du Brain pour continueAfterToolStream
-              this.brain.addToolResult(block.id, toolResultStr, threadId);
             } else {
               const toolResultStr = JSON.stringify(result);
-              // Persister en DB
-              threadManager.addToolResult(threadId, block.id, toolResultStr);
-              // CRITICAL: Ajouter à l'historique mémoire du Brain pour continueAfterToolStream
-              this.brain.addToolResult(block.id, toolResultStr, threadId);
+              // Persister le RÉSUMÉ en DB (pour après redémarrage et tours suivants)
+              threadManager.addToolResult(threadId, block.id, toolSummary);
+              // CRITICAL: Ajouter le résultat COMPLET à l'historique mémoire pour continueAfterToolStream
+              // L'executionId permet le remplacement par résumé aux tours suivants
+              this.brain.addToolResult(block.id, toolResultStr, threadId, executionId);
             }
 
             // Vérifier si un redémarrage est nécessaire

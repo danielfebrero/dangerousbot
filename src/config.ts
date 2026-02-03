@@ -100,18 +100,36 @@ export const SERVER = {
 export const ROLLBACK = {
   /** Nombre maximum de backups à conserver */
   MAX_BACKUPS: 10,
-  
+
   /** Dossier de stockage des backups */
   BACKUP_DIR: '.backups',
-  
+
   /** Timeout pour le build (ms) */
   BUILD_TIMEOUT: 120000,
-  
+
   /** Nombre de tentatives pour le health check */
   HEALTH_CHECK_RETRIES: 5,
-  
+
   /** Intervalle entre les health checks (ms) */
   HEALTH_CHECK_INTERVAL: 2000,
+} as const;
+
+// ============================================================================
+// TOOL RESULTS PERSISTENCE
+// ============================================================================
+
+export const TOOL_RESULTS = {
+  /** Nombre de jours de rétention des résultats */
+  RETENTION_DAYS: 30,
+
+  /** Nombre maximum d'exécutions par thread (rotation FIFO) */
+  MAX_EXECUTIONS_PER_THREAD: 10000,
+
+  /** Taille maximum d'un résultat (10 MB) */
+  MAX_OUTPUT_SIZE_BYTES: 10 * 1024 * 1024,
+
+  /** Longueur maximum de l'aperçu dans le résumé */
+  SUMMARY_PREVIEW_LENGTH: 200,
 } as const;
 
 // ============================================================================
@@ -280,6 +298,7 @@ export const config = {
   PATHS,
   APIS,
   ROLLBACK,
+  TOOL_RESULTS,
 };
 
 export const CONFIG = config;
