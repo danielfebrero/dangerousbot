@@ -23,6 +23,9 @@ import { ServerConfig, ToolInput } from '../core/types.js';
 import { Lifecycle } from '../core/lifecycle.js';
 import { logger } from '../core/logger.js';
 import { getToolResultStore, ToolExecution } from '../core/tool-result-store.js';
+import { getMessageEmbedder, initMessageEmbedder } from '../core/message-embedder.js';
+import { getCompressor } from '../core/compressor.js';
+import { MEMORY } from '../config.js';
 import * as os from 'os';
 
 // Signal pour le message de continuation après redémarrage
@@ -156,6 +159,16 @@ export class DangerousBotServer {
     if (openRouterApiKey) {
       this.brain.initContextSystem(openRouterApiKey, apiKey);
       logger.info('Server', 'Système de contexte (embeddings) initialisé');
+
+      // Initialiser le message embedder et réparer les embeddings manquants
+      const embedder = initMessageEmbedder();
+      embedder.repairMissingEmbeddings()
+        .then(result => {
+          if (result.repaired > 0 || result.failed > 0) {
+            logger.info('Server', `Message embeddings repair: ${result.repaired} repaired, ${result.failed} failed`);
+          }
+        })
+        .catch(err => logger.error('Server', 'Message embeddings repair failed:', err));
     }
   }
 
@@ -212,7 +225,15 @@ export class DangerousBotServer {
 
     // Sauvegarder le message utilisateur dans le thread
     const threadManager = getThreadManager();
-    threadManager.addMessage(threadId, 'user', userMessage, undefined, options.images);
+    const userMsgId = threadManager.addMessage(threadId, 'user', userMessage, undefined, options.images);
+
+    // Embedder le message utilisateur en background
+    try {
+      const embedder = getMessageEmbedder();
+      embedder.embedMessageAsync(userMsgId, userMessage);
+    } catch (e) {
+      // Embedder non initialisé, ignorer
+    }
 
     try {
       const tools = getToolDefinitionsForProvider();
@@ -429,7 +450,15 @@ export class DangerousBotServer {
       // CRITICAL: Sauvegarder le message assistant final en DB
       // (HistoryManager ne persiste plus en DB, c'est le serveur qui gère)
       if (finalText.trim()) {
-        threadManager.addMessage(threadId, 'assistant', finalText);
+        const assistantMsgId = threadManager.addMessage(threadId, 'assistant', finalText);
+
+        // Embedder le message assistant en background
+        try {
+          const embedder = getMessageEmbedder();
+          embedder.embedMessageAsync(assistantMsgId, finalText);
+        } catch (e) {
+          // Embedder non initialisé, ignorer
+        }
       }
 
       // Envoyer les stats d'usage
@@ -440,6 +469,26 @@ export class DangerousBotServer {
           response.usage.output_tokens,
           response.cost
         );
+
+        // Vérifier si compression automatique nécessaire (> 128K tokens)
+        const totalTokens = response.usage.input_tokens + response.usage.output_tokens;
+        if (totalTokens > MEMORY.TOKEN_LIMIT_FOR_COMPRESSION) {
+          logger.info('Server', `Token limit exceeded (${totalTokens} > ${MEMORY.TOKEN_LIMIT_FOR_COMPRESSION}), triggering auto-compression`);
+          this.wsManager.sendSystem(threadId, '📦 Compression automatique du contexte en cours...');
+
+          const compressor = getCompressor();
+          if (compressor) {
+            compressor.compressSession()
+              .then(result => {
+                if (result) {
+                  this.wsManager.sendSystem(threadId, `✅ Contexte compressé: ${result.message_ids.length} messages → résumé`);
+                }
+              })
+              .catch(err => {
+                logger.error('Server', 'Auto-compression failed:', err);
+              });
+          }
+        }
       }
 
       // Vérifier si un restart est en attente

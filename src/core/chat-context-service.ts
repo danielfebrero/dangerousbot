@@ -33,8 +33,31 @@ export interface ContextBuildResult {
 }
 
 export class ChatContextService {
-  private contextInjector = getContextInjector();
-  private compressor: MemoryCompressor | null = getCompressor();
+  private _contextInjector: any = null;
+  private _compressor: MemoryCompressor | null = null;
+  private _initialized = false;
+
+  private ensureInitialized(): void {
+    if (this._initialized) return;
+    try {
+      this._contextInjector = getContextInjector();
+      this._compressor = getCompressor();
+      this._initialized = true;
+    } catch (error) {
+      console.warn('[ChatContextService] Failed to initialize context system:', error);
+      this._initialized = true; // Don't retry
+    }
+  }
+
+  private get contextInjector() {
+    this.ensureInitialized();
+    return this._contextInjector;
+  }
+
+  private get compressor() {
+    this.ensureInitialized();
+    return this._compressor;
+  }
 
   /**
    * Charge l'historique complet depuis la base de données
@@ -245,10 +268,11 @@ export class ChatContextService {
    * Construit le system prompt avec injection de contexte
    */
   async buildSystemPrompt(userMessage: string, source: ChatSource): Promise<string> {
-    // Injecter le contexte pertinent
-    const contextBlock = await this.contextInjector.injectContext(userMessage);
-    
-    let prompt = contextBlock;
+    // Injecter le contexte pertinent (si disponible)
+    let prompt = '';
+    if (this.contextInjector) {
+      prompt = await this.contextInjector.injectContext(userMessage);
+    }
 
     prompt += `\n\n## Source du message\nL'utilisateur écrit depuis: ${source}`;
 

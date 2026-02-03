@@ -1,11 +1,10 @@
 /**
  * MemoryCompressor - Compresse l'historique de conversation
- * 
- * Stratégie:
- * 1. Surveille la taille de l'historique
- * 2. Quand le seuil est atteint, compresse les anciens messages en résumé
- * 3. Stocke le résumé avec son embedding pour recherche future
- * 4. Garde les N derniers messages intacts pour le contexte immédiat
+ *
+ * Stratégie simplifiée:
+ * - Appelé manuellement via le tool `compact` ou automatiquement si > 128K tokens
+ * - Compresse TOUS les messages de la session en un résumé
+ * - Stocke le résumé avec son embedding pour recherche future
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -18,9 +17,9 @@ import { logger } from './logger';
 export interface CompressedMemory {
   id?: number;
   session_id: string;
-  thread_id: string;  // Thread associé à cette mémoire
+  thread_id: string;
   summary: string;
-  message_ids: number[];  // IDs des messages compressés
+  message_ids: number[];
   start_time: string;
   end_time: string;
   embedding?: number[];
@@ -30,49 +29,40 @@ export interface CompressedMemory {
 export class MemoryCompressor {
   private anthropic: Anthropic;
   private memory: Memory;
-  private embedding: EmbeddingService;
+  private embedding: EmbeddingService | null;
 
   constructor(anthropicApiKey: string) {
     this.anthropic = new Anthropic({ apiKey: anthropicApiKey });
     this.memory = getMemory();
-    this.embedding = getEmbeddingService();
+
+    try {
+      this.embedding = getEmbeddingService();
+    } catch (error) {
+      logger.warn('Compressor', 'EmbeddingService not available, summaries will not have embeddings');
+      this.embedding = null;
+    }
   }
 
   /**
-   * Vérifie si une compression est nécessaire et l'exécute
-   * @param force - Si true, force la compression même si le seuil n'est pas atteint
+   * Compresse toute la conversation d'une session
+   * @param sessionId - Session à compresser (défaut: session courante)
+   * @returns Le résumé créé ou null si pas de messages
    */
-  async checkAndCompress(force: boolean = false): Promise<boolean> {
-    logger.info('Compressor', `checkAndCompress called, force=${force}`);
-    
-    const messages = this.memory.getMessages(undefined, 1000);
-    logger.info('Compressor', `Found ${messages.length} messages, threshold=${MEMORY.COMPRESSION_THRESHOLD}`);
-    
-    if (!force && messages.length < MEMORY.COMPRESSION_THRESHOLD) {
-      logger.info('Compressor', 'Below threshold, skipping');
-      return false;
+  async compressSession(sessionId?: string): Promise<CompressedMemory | null> {
+    const sid = sessionId || this.memory.getSessionId();
+    const messages = this.memory.getMessages(sid, 10000);
+
+    if (messages.length === 0) {
+      logger.info('Compressor', 'No messages to compress');
+      return null;
     }
 
-    // Messages à compresser (tous sauf les N derniers)
-    const toCompress = messages.slice(0, messages.length - MEMORY.KEEP_RECENT_MESSAGES);
-    logger.info('Compressor', `Messages to compress: ${toCompress.length} (keeping ${MEMORY.KEEP_RECENT_MESSAGES} recent)`);
-    
-    if (!force && toCompress.length < MEMORY.MIN_MESSAGES_TO_COMPRESS) {
-      logger.info('Compressor', `Not enough to compress (min=${MEMORY.MIN_MESSAGES_TO_COMPRESS})`);
-      return false;  // Pas assez pour justifier une compression
-    }
+    logger.info('Compressor', `Compressing ${messages.length} messages from session ${sid}...`);
 
-    if (toCompress.length === 0) {
-      logger.info('Compressor', 'No messages to compress (0 after keeping recent)');
-      return false;
-    }
-
-    logger.info('Compressor', `Compressing ${toCompress.length} messages...`);
-    
     try {
-      await this.compressMessages(toCompress);
-      logger.info('Compressor', 'Compression successful');
-      return true;
+      const compressed = await this.compressMessages(messages, sid);
+      logger.info('Compressor', `Compression complete: ${messages.length} messages -> ${compressed.summary.length} chars`);
+      return compressed;
     } catch (error) {
       logger.error('Compressor', `Compression failed: ${(error as Error).stack || String(error)}`);
       throw error;
@@ -80,20 +70,23 @@ export class MemoryCompressor {
   }
 
   /**
-   * Alias pour checkAndCompress avec support du paramètre force
-   */
-  async compressIfNeeded(force: boolean = false): Promise<boolean> {
-    return this.checkAndCompress(force);
-  }
-
-  /**
    * Compresse un ensemble de messages en résumé
    */
-  private async compressMessages(messages: Message[]): Promise<CompressedMemory> {
+  private async compressMessages(messages: Message[], sessionId: string): Promise<CompressedMemory> {
     // Formater les messages pour le résumé
-    const conversation = messages.map(m => 
-      `[${m.role.toUpperCase()}]: ${m.content}`
-    ).join('\n\n');
+    const conversation = messages.map(m => {
+      // Filtrer les tool_results pour ne garder que l'essentiel
+      let content = m.content;
+      if (content.startsWith('__TOOL_RESULT__')) {
+        const match = content.match(/^__TOOL_RESULT__(.+?)__(.*)$/s);
+        if (match) {
+          // Tronquer les résultats longs
+          const result = match[2].length > 500 ? match[2].substring(0, 500) + '...[tronqué]' : match[2];
+          content = `[Tool Result: ${result}]`;
+        }
+      }
+      return `[${m.role.toUpperCase()}]: ${content}`;
+    }).join('\n\n');
 
     // Générer le résumé via Claude
     const response = await this.anthropic.messages.create({
@@ -103,10 +96,11 @@ export class MemoryCompressor {
 Extrais les informations clés:
 - Décisions prises
 - Informations apprises sur l'utilisateur
-- Actions effectuées
+- Actions effectuées et leurs résultats
 - Contexte important pour la suite
+- Erreurs rencontrées et solutions trouvées
 
-Format: Un résumé structuré et factuel, sans fluff.`,
+Format: Un résumé structuré et factuel, sans fluff. Utilise des bullet points pour la clarté.`,
       messages: [{
         role: 'user',
         content: `Résume cette conversation:\n\n${conversation}`
@@ -118,27 +112,30 @@ Format: Un résumé structuré et factuel, sans fluff.`,
       .map(block => block.text)
       .join('\n');
 
-    // Générer l'embedding du résumé
-    const embeddingResult = await this.embedding.embed(summary);
+    // Générer l'embedding du résumé (si disponible)
+    let embeddingVector: number[] | undefined;
+    if (this.embedding) {
+      try {
+        const embeddingResult = await this.embedding.embed(summary);
+        embeddingVector = embeddingResult.vector;
+      } catch (error) {
+        logger.warn('Compressor', 'Failed to generate embedding for summary:', error);
+      }
+    }
 
     // Créer l'objet mémoire compressée
     const compressed: CompressedMemory = {
-      session_id: messages[0].session_id,
-      thread_id: messages[0].session_id, // Par défaut, utiliser session_id comme thread_id
+      session_id: sessionId,
+      thread_id: sessionId,
       summary,
       message_ids: messages.map(m => m.id!).filter(Boolean),
       start_time: messages[0].timestamp,
       end_time: messages[messages.length - 1].timestamp,
-      embedding: embeddingResult.vector
+      embedding: embeddingVector
     };
 
     // Sauvegarder dans la DB
     this.saveCompressedMemory(compressed);
-
-    // Supprimer les messages originaux (optionnel - pour l'instant on garde)
-    // this.deleteCompressedMessages(compressed.message_ids);
-
-    logger.info('Compressor', `Created summary (${summary.length} chars)`);
 
     return compressed;
   }
@@ -148,7 +145,7 @@ Format: Un résumé structuré et factuel, sans fluff.`,
    */
   private saveCompressedMemory(compressed: CompressedMemory): number {
     const db = (this.memory as any).db;
-    
+
     // Créer la table si elle n'existe pas
     db.exec(`
       CREATE TABLE IF NOT EXISTS compressed_memories (
@@ -207,7 +204,7 @@ Format: Un résumé structuré et factuel, sans fluff.`,
         created_at: row.created_at
       }));
     } catch {
-      return [];  // Table n'existe pas encore
+      return [];
     }
   }
 
@@ -216,22 +213,29 @@ Format: Un résumé structuré et factuel, sans fluff.`,
    */
   async searchRelevantMemories(query: string, topK: number = MEMORY.RELEVANT_MEMORIES_TOP_K): Promise<CompressedMemory[]> {
     const allMemories = this.getCompressedMemories();
-    
+
     if (allMemories.length === 0) {
       return [];
     }
 
-    // Générer l'embedding de la query
-    const queryEmbedding = await this.embedding.embed(query);
+    if (!this.embedding) {
+      return allMemories.slice(0, topK);
+    }
 
-    // Filtrer les mémoires avec embeddings
+    let queryEmbedding;
+    try {
+      queryEmbedding = await this.embedding.embed(query);
+    } catch (error) {
+      logger.warn('Compressor', 'Failed to generate query embedding, returning recent memories:', error);
+      return allMemories.slice(0, topK);
+    }
+
     const withEmbeddings = allMemories.filter(m => m.embedding && m.embedding.length > 0);
 
     if (withEmbeddings.length === 0) {
-      return allMemories.slice(0, topK);  // Fallback: retourner les plus récentes
+      return allMemories.slice(0, topK);
     }
 
-    // Calculer les similarités
     const candidates = withEmbeddings.map(m => ({
       id: m.id!,
       vector: m.embedding!
@@ -239,10 +243,37 @@ Format: Un résumé structuré et factuel, sans fluff.`,
 
     const topResults = EmbeddingService.findTopK(queryEmbedding.vector, candidates, topK);
 
-    // Récupérer les mémoires correspondantes
-    return topResults.map(result => 
+    return topResults.map(result =>
       withEmbeddings.find(m => m.id === result.id)!
     );
+  }
+
+  /**
+   * Efface les messages compressés de la session courante
+   * (Garde les résumés mais supprime les messages originaux)
+   */
+  clearCompressedMessages(sessionId?: string): number {
+    const sid = sessionId || this.memory.getSessionId();
+    const memories = this.getCompressedMemories(sid);
+
+    if (memories.length === 0) {
+      return 0;
+    }
+
+    // Collecter tous les IDs de messages compressés
+    const allMessageIds = memories.flatMap(m => m.message_ids);
+
+    if (allMessageIds.length === 0) {
+      return 0;
+    }
+
+    // Supprimer les messages de la DB
+    const db = (this.memory as any).db;
+    const placeholders = allMessageIds.map(() => '?').join(',');
+    db.prepare(`DELETE FROM conversations WHERE id IN (${placeholders})`).run(...allMessageIds);
+
+    logger.info('Compressor', `Cleared ${allMessageIds.length} compressed messages`);
+    return allMessageIds.length;
   }
 }
 
@@ -250,8 +281,6 @@ Format: Un résumé structuré et factuel, sans fluff.`,
 let compressorInstance: MemoryCompressor | null = null;
 
 export function getCompressor(): MemoryCompressor | null {
-  // Retourne le singleton existant ou null (pas d'erreur)
-  // Le compressor doit être initialisé via initCompressor() depuis le serveur
   return compressorInstance;
 }
 

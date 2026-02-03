@@ -33,6 +33,7 @@ import { configHandler, configDefinition } from './config';
 import { downloadFileHandler, downloadFileDefinition } from './download-file';
 import { sendFileHandler, sendFileDefinition } from './send-file';
 import { recallToolResultHandler, recallToolResultDefinition } from './recall-tool-result';
+import { compactHandler, compactDefinition } from './compact';
 
 import { PROVIDER } from '../../config';
 
@@ -72,9 +73,10 @@ export function registerAllTools(): void {
     configHandler,
     downloadFileHandler,
     sendFileHandler,
-    recallToolResultHandler
+    recallToolResultHandler,
+    compactHandler
   ];
-  
+
   for (const handler of handlers) {
     toolRegistry.set(handler.name, handler);
   }
@@ -111,7 +113,8 @@ export function getToolDefinitions(): Tool[] {
     configDefinition,
     downloadFileDefinition,
     sendFileDefinition,
-    recallToolResultDefinition
+    recallToolResultDefinition,
+    compactDefinition
   ];
 }
 
@@ -191,5 +194,6 @@ export {
   logHandler,
   setLogLevelHandler,
   clearLogsHandler,
-  recallToolResultHandler
+  recallToolResultHandler,
+  compactHandler
 };

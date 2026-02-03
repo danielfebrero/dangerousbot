@@ -9,7 +9,6 @@ import { ProviderManager } from './provider-manager.js';
 import { HistoryManager } from './history-manager.js';
 import { initEmbeddingService } from '../embedding.js';
 import { initCompressor } from '../compressor.js';
-import { MEMORY } from '../../config.js';
 import { StreamCallback } from '../providers/index.js';
 
 export class Brain {
@@ -132,12 +131,6 @@ export class Brain {
     // Injecter le contexte pertinent avec infos du thread
     await this.promptBuilder.updateWithContext(userMessage, threadId, threadTitle);
 
-    // Vérifier si compression nécessaire
-    const messageCount = historyManager.getMessageCount();
-    if (this.contextEnabled && messageCount % MEMORY.COMPRESSION_CHECK_INTERVAL === 0) {
-      this.triggerCompressionAsync(threadId);
-    }
-
     // Préparer les données (avec horodatages pour l'API)
     const apiHistory = historyManager.getHistoryForAPI();
     const aiTools = this.formatTools(tools);
@@ -173,11 +166,6 @@ export class Brain {
     historyManager.addUserMessage(userMessage, images);
 
     await this.promptBuilder.updateWithContext(userMessage, threadId);
-
-    const messageCount = historyManager.getMessageCount();
-    if (this.contextEnabled && messageCount % MEMORY.COMPRESSION_CHECK_INTERVAL === 0) {
-      this.triggerCompressionAsync(threadId);
-    }
 
     const apiHistory = historyManager.getHistoryForAPI();
     const aiTools = this.formatTools(tools);
@@ -338,19 +326,6 @@ export class Brain {
       usage: response.usage,
       cost: response.cost
     };
-  }
-
-  /**
-   * Déclenche la compression en arrière-plan pour un thread spécifique
-   */
-  private triggerCompressionAsync(threadId?: string): void {
-    this.promptBuilder.maybeCompress(threadId)
-      .then(compressed => {
-        if (compressed) {
-          console.log(`[Brain] Conversation history compressed for thread ${threadId || 'global'}`);
-        }
-      })
-      .catch(err => console.error('[Brain] Compression error:', err));
   }
 }
 

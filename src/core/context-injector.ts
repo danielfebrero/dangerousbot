@@ -31,14 +31,21 @@ export interface InjectedContext {
 export class ContextInjector {
   private memory: Memory;
   private compressor: MemoryCompressor | null;
-  private embedding: EmbeddingService;
+  private embedding: EmbeddingService | null;
   private threadManager: ThreadManager;
 
   constructor() {
     this.memory = getMemory();
     this.compressor = getCompressor();
-    this.embedding = getEmbeddingService();
     this.threadManager = getThreadManager();
+
+    // Embedding service is optional - may not be initialized yet
+    try {
+      this.embedding = getEmbeddingService();
+    } catch (error) {
+      logger.warn('ContextInjector', 'EmbeddingService not available, context injection will be limited');
+      this.embedding = null;
+    }
   }
 
   /**
@@ -56,7 +63,7 @@ export class ContextInjector {
 
     // 1. Récupérer les mémoires compressées pertinentes de TOUS les threads
     try {
-      if (this.compressor) {
+      if (this.compressor && this.embedding) {
         const allThreads = this.threadManager.listThreads(true);
         const memoriesFromAllThreads: Array<{
           content: string;
@@ -67,7 +74,7 @@ export class ContextInjector {
 
         for (const thread of allThreads) {
           const threadMemories = this.compressor.getCompressedMemories(thread.id);
-          
+
           if (threadMemories.length === 0) continue;
 
           // Générer l'embedding de la query

@@ -65,18 +65,9 @@ export const TOKENS = {
 // ============================================================================
 
 export const MEMORY = {
-  /** Nombre de messages avant de déclencher la compression */
-  COMPRESSION_THRESHOLD: 30,
-  
-  /** Nombre de messages récents à garder intacts lors de la compression */
-  KEEP_RECENT_MESSAGES: 10,
-  
-  /** Vérifier la compression tous les N messages */
-  COMPRESSION_CHECK_INTERVAL: 20,
-  
-  /** Nombre minimum de messages pour justifier une compression */
-  MIN_MESSAGES_TO_COMPRESS: 10,
-  
+  /** Limite de tokens (in+out) avant compression automatique */
+  TOKEN_LIMIT_FOR_COMPRESSION: 128000,
+
   /** Nombre de mémoires pertinentes à récupérer par recherche sémantique */
   RELEVANT_MEMORIES_TOP_K: 3,
 } as const;

@@ -134,11 +134,7 @@ let embeddingInstance: EmbeddingService | null = null;
 
 export function getEmbeddingService(): EmbeddingService {
   if (!embeddingInstance) {
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) {
-      throw new Error('OPENROUTER_API_KEY not set');
-    }
-    embeddingInstance = new EmbeddingService(apiKey);
+    throw new Error('EmbeddingService not initialized. Call initEmbeddingService() first.');
   }
   return embeddingInstance;
 }

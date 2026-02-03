@@ -130,6 +130,13 @@ export class Memory {
       // Index existe déjà, ignorer
     }
 
+    // Migration: ajouter la colonne embedding aux conversations
+    try {
+      this.db.exec(`ALTER TABLE conversations ADD COLUMN embedding BLOB`);
+    } catch (e) {
+      // Colonne existe déjà, ignorer
+    }
+
     // Migration: ajouter la colonne project_name à code_embeddings si elle n'existe pas
     try {
       this.db.exec(`ALTER TABLE code_embeddings ADD COLUMN project_name TEXT DEFAULT 'dangerousbot'`);
@@ -410,7 +417,7 @@ export class Memory {
     return row?.value || null;
   }
 
-  // ============ Embeddings (préparé pour le futur) ============
+  // ============ Embeddings ============
 
   addEmbedding(conversationId: number, vector: Buffer, metadata: Record<string, unknown>): number {
     const stmt = this.db.prepare(`
@@ -419,6 +426,46 @@ export class Memory {
     `);
     const result = stmt.run(conversationId, vector, JSON.stringify(metadata));
     return result.lastInsertRowid as number;
+  }
+
+  /**
+   * Met à jour l'embedding d'un message de conversation
+   */
+  updateMessageEmbedding(messageId: number, embedding: number[]): void {
+    const buffer = Buffer.from(new Float32Array(embedding).buffer);
+    this.db.prepare(`UPDATE conversations SET embedding = ? WHERE id = ?`).run(buffer, messageId);
+  }
+
+  /**
+   * Récupère les messages sans embedding (pour repair au démarrage)
+   */
+  getMessagesWithoutEmbedding(limit: number = 100): Array<{ id: number; content: string; role: string }> {
+    return this.db.prepare(`
+      SELECT id, content, role FROM conversations
+      WHERE embedding IS NULL AND content IS NOT NULL AND content != ''
+      ORDER BY id ASC
+      LIMIT ?
+    `).all(limit) as Array<{ id: number; content: string; role: string }>;
+  }
+
+  /**
+   * Récupère tous les messages avec leurs embeddings pour la recherche sémantique
+   */
+  getMessagesWithEmbeddings(sessionId?: string): Array<{ id: number; content: string; role: string; embedding: number[]; timestamp: string }> {
+    const sid = sessionId || this.currentSessionId;
+    const rows = this.db.prepare(`
+      SELECT id, content, role, embedding, timestamp FROM conversations
+      WHERE session_id = ? AND embedding IS NOT NULL
+      ORDER BY id ASC
+    `).all(sid) as Array<{ id: number; content: string; role: string; embedding: Buffer; timestamp: string }>;
+
+    return rows.map(row => ({
+      id: row.id,
+      content: row.content,
+      role: row.role,
+      timestamp: row.timestamp,
+      embedding: Array.from(new Float32Array(row.embedding.buffer, row.embedding.byteOffset, row.embedding.byteLength / 4))
+    }));
   }
 
   // ============ Stats ============
