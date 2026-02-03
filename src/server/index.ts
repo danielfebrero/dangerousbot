@@ -356,7 +356,8 @@ export class DangerousBotServer {
               result = await this.toolExecutor.execute(
                 block.name,
                 toolInput as ToolInput,
-                signal
+                signal,
+                { threadId }  // Passer le threadId au contexte des tools
               );
             } catch (toolError) {
               const errorMessage = (toolError as Error).message || 'Tool execution failed';
@@ -539,10 +540,13 @@ export class DangerousBotServer {
             compressor.compressSession(undefined, threadId)
               .then(result => {
                 if (result) {
-                  this.wsManager.sendSystem(threadId, `✅ Contexte compressé: ${result.message_ids.length} messages → résumé`);
-                  // Envoyer les stats mises à jour après compression
+                  // Supprimer les messages originaux pour libérer le contexte
+                  const clearedCount = compressor.clearCompressedMessages(undefined, threadId);
+                  this.wsManager.sendSystem(threadId, `✅ Contexte compressé: ${result.message_ids.length} messages → résumé (${clearedCount} messages effacés)`);
+                  // Envoyer les stats mises à jour après compression et nettoyage
                   const postCompressStats = tokenTracker.getStats(threadId);
                   this.wsManager.sendTokenUpdate(threadId, postCompressStats);
+                  logger.info('Server', `Auto-compression complete: ${result.message_ids.length} messages compressed, ${clearedCount} cleared`);
                 }
               })
               .catch(err => {

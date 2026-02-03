@@ -159,11 +159,12 @@ Format: Un résumé structuré et factuel, sans fluff. Utilise des bullet points
   private saveCompressedMemory(compressed: CompressedMemory): number {
     const db = (this.memory as any).db;
 
-    // Créer la table si elle n'existe pas
+    // Créer la table si elle n'existe pas (avec thread_id)
     db.exec(`
       CREATE TABLE IF NOT EXISTS compressed_memories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         session_id TEXT NOT NULL,
+        thread_id TEXT,
         summary TEXT NOT NULL,
         message_ids TEXT NOT NULL,
         start_time TEXT NOT NULL,
@@ -172,15 +173,24 @@ Format: Un résumé structuré et factuel, sans fluff. Utilise des bullet points
         created_at TEXT DEFAULT (datetime('now'))
       );
       CREATE INDEX IF NOT EXISTS idx_compressed_session ON compressed_memories(session_id);
+      CREATE INDEX IF NOT EXISTS idx_compressed_thread ON compressed_memories(thread_id);
     `);
 
+    // Migration: ajouter thread_id si la colonne n'existe pas
+    try {
+      db.exec(`ALTER TABLE compressed_memories ADD COLUMN thread_id TEXT`);
+    } catch {
+      // Colonne existe déjà, ignorer l'erreur
+    }
+
     const stmt = db.prepare(`
-      INSERT INTO compressed_memories (session_id, summary, message_ids, start_time, end_time, embedding)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO compressed_memories (session_id, thread_id, summary, message_ids, start_time, end_time, embedding)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
       compressed.session_id,
+      compressed.thread_id,
       compressed.summary,
       JSON.stringify(compressed.message_ids),
       compressed.start_time,
@@ -192,18 +202,37 @@ Format: Un résumé structuré et factuel, sans fluff. Utilise des bullet points
   }
 
   /**
-   * Récupère toutes les mémoires compressées pour une session
+   * Récupère toutes les mémoires compressées pour une session ou un thread
+   * @param sessionId Session ID (optionnel)
+   * @param threadId Thread ID (prioritaire si spécifié)
    */
-  getCompressedMemories(sessionId?: string): CompressedMemory[] {
+  getCompressedMemories(sessionId?: string, threadId?: string): CompressedMemory[] {
     const db = (this.memory as any).db;
-    const sid = sessionId || this.memory.getSessionId();
 
     try {
-      const rows = db.prepare(`
-        SELECT * FROM compressed_memories
-        WHERE session_id = ?
-        ORDER BY created_at ASC
-      `).all(sid) as any[];
+      let query: string;
+      let param: string;
+
+      if (threadId) {
+        // Filtrer par thread_id
+        query = `
+          SELECT * FROM compressed_memories
+          WHERE thread_id = ?
+          ORDER BY created_at ASC
+        `;
+        param = threadId;
+      } else {
+        // Filtrer par session_id
+        const sid = sessionId || this.memory.getSessionId();
+        query = `
+          SELECT * FROM compressed_memories
+          WHERE session_id = ?
+          ORDER BY created_at ASC
+        `;
+        param = sid;
+      }
+
+      const rows = db.prepare(query).all(param) as any[];
 
       return rows.map(row => ({
         id: row.id,
@@ -308,12 +337,13 @@ Format: Un résumé structuré et factuel, sans fluff. Utilise des bullet points
   }
 
   /**
-   * Efface les messages compressés de la session courante
+   * Efface les messages compressés d'une session ou d'un thread
    * (Garde les résumés mais supprime les messages originaux)
+   * @param sessionId Session ID (optionnel)
+   * @param threadId Thread ID (prioritaire si spécifié)
    */
-  clearCompressedMessages(sessionId?: string): number {
-    const sid = sessionId || this.memory.getSessionId();
-    const memories = this.getCompressedMemories(sid);
+  clearCompressedMessages(sessionId?: string, threadId?: string): number {
+    const memories = this.getCompressedMemories(sessionId, threadId);
 
     if (memories.length === 0) {
       return 0;
@@ -331,7 +361,8 @@ Format: Un résumé structuré et factuel, sans fluff. Utilise des bullet points
     const placeholders = allMessageIds.map(() => '?').join(',');
     db.prepare(`DELETE FROM conversations WHERE id IN (${placeholders})`).run(...allMessageIds);
 
-    logger.info('Compressor', `Cleared ${allMessageIds.length} compressed messages`);
+    const target = threadId ? `thread ${threadId}` : `session ${sessionId || 'current'}`;
+    logger.info('Compressor', `Cleared ${allMessageIds.length} compressed messages from ${target}`);
     return allMessageIds.length;
   }
 }

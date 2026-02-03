@@ -11,14 +11,14 @@ import { getCompressor } from '../compressor';
 
 export const compactDefinition: Tool = {
   name: 'compact',
-  description: `Compresse toute la conversation en un résumé concis.
+  description: `Compresse toute la conversation en un résumé concis et libère le contexte.
 Utilise cet outil quand:
 - Le contexte devient trop long (proche de 128K tokens)
 - L'utilisateur demande explicitement de résumer/compresser
 - Tu veux libérer de l'espace contexte pour une nouvelle tâche
 
 Le résumé conserve les décisions prises, informations clés et contexte important.
-Les messages originaux sont conservés en DB mais remplacés par le résumé dans le contexte.`,
+Par défaut, les messages originaux sont supprimés pour libérer le contexte (utilise clear_originals=false pour les conserver).`,
   input_schema: {
     type: 'object',
     properties: {
@@ -28,7 +28,7 @@ Les messages originaux sont conservés en DB mais remplacés par le résumé dan
       },
       clear_originals: {
         type: 'boolean',
-        description: 'Si true, supprime les messages originaux de la DB après compression (défaut: false)'
+        description: 'Si false, conserve les messages originaux après compression (défaut: true - supprime les originaux pour libérer le contexte)'
       },
       thread_id: {
         type: 'string',
@@ -68,9 +68,12 @@ export const compactHandler: ToolHandler = {
         };
       }
 
+      // Par défaut, supprimer les messages originaux pour libérer le contexte
+      // Sauf si explicitement demandé de les garder (clearOriginals === false)
+      const shouldClear = clearOriginals !== false;
       let clearedCount = 0;
-      if (clearOriginals) {
-        clearedCount = compressor.clearCompressedMessages();
+      if (shouldClear) {
+        clearedCount = compressor.clearCompressedMessages(undefined, targetThreadId);
       }
 
       return {
@@ -80,7 +83,7 @@ export const compactHandler: ToolHandler = {
           messagesCompressed: result.message_ids.length,
           summaryLength: result.summary.length,
           timeRange: `${result.start_time} → ${result.end_time}`,
-          messagesCleared: clearOriginals ? clearedCount : 0,
+          messagesCleared: clearedCount,
           reason: reason || 'non spécifiée'
         },
         summary: result.summary.substring(0, 500) + (result.summary.length > 500 ? '...' : '')
