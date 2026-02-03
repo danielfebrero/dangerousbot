@@ -16,6 +16,7 @@ import { getMemory } from '../core/memory.js';
 import { PROVIDER } from '../config.js';
 import { ChatAdapter, ChatSource, ChatImage } from '../core/chat-adapter.js';
 import { MessageProcessor, initMessageProcessor } from '../core/message-processor.js';
+import { getThreadManager } from '../core/thread-manager.js';
 
 /**
  * Adaptateur Telegram implémentant ChatAdapter
@@ -179,14 +180,15 @@ export class TelegramBotService extends EventEmitter {
         return;
       }
 
-      const conversationId = this.getOrCreateSession(userId);
+      const { conversationId, threadId } = this.getOrCreateSession(userId);
 
-      // Traiter le message
+      // Traiter le message avec le thread dédié à cet utilisateur Telegram
       const result = await this.messageProcessor.process(
         { text, images },
         {
           source: 'telegram',
           conversationId,
+          threadId,
           historyLimit: 20,
           callbacks: {
             onToolsExecuted: async (tools) => {
@@ -199,6 +201,7 @@ export class TelegramBotService extends EventEmitter {
           },
           platformContext: {
             telegramChatId: String(chatId),
+            telegramUserId: userId,
             bot: this.bot,
           },
         }
@@ -312,15 +315,59 @@ export class TelegramBotService extends EventEmitter {
     return `data:image/jpeg;base64,${Buffer.from(buffer).toString('base64')}`;
   }
 
-  private getOrCreateSession(userId: number): string {
-    let conversationId = this.sessions.get(userId);
-    if (!conversationId) {
-      // Utiliser un ID déterministe basé sur le userId pour persister la session
-      // entre les redémarrages
-      conversationId = `telegram-${userId}`;
+  /**
+   * Récupère ou crée une session (thread) pour un utilisateur Telegram
+   * Utilise le thread persisté en DB si disponible, sinon le main thread
+   * Retourne à la fois le conversationId et le threadId
+   */
+  private getOrCreateSession(userId: number): { conversationId: string; threadId: string } {
+    // Utiliser un ID déterministe basé sur le userId pour persister la session
+    const conversationId = `telegram-${userId}`;
+
+    const memory = getMemory();
+    const threadManager = getThreadManager();
+
+    // 1. Vérifier si un thread actif est sauvegardé pour cet utilisateur
+    const savedThreadId = memory.getTelegramActiveThread(userId);
+    if (savedThreadId) {
+      // Vérifier que le thread existe toujours
+      const savedThread = threadManager.getThread(savedThreadId);
+      if (savedThread) {
+        console.log(`[Telegram] Using persisted thread for user ${userId}: ${savedThreadId}`);
+        return { conversationId, threadId: savedThreadId };
+      }
+      // Thread supprimé, on va créer/utiliser le main thread
+      console.log(`[Telegram] Persisted thread ${savedThreadId} not found, using main thread`);
+    }
+
+    // 2. Récupérer ou créer un thread main dédié pour cet utilisateur Telegram
+    const thread = threadManager.getOrCreateMainThread('telegram', String(userId));
+
+    // 3. Sauvegarder ce thread comme thread actif
+    memory.setTelegramActiveThread(userId, thread.id);
+
+    // Stocker l'association si pas déjà fait
+    if (!this.sessions.has(userId)) {
       this.sessions.set(userId, conversationId);
     }
-    return conversationId;
+
+    return { conversationId, threadId: thread.id };
+  }
+
+  /**
+   * Change le thread actif pour un utilisateur Telegram et le persiste
+   */
+  setActiveThread(userId: number, threadId: string): boolean {
+    const threadManager = getThreadManager();
+    const thread = threadManager.getThread(threadId);
+    if (!thread) {
+      return false;
+    }
+
+    const memory = getMemory();
+    memory.setTelegramActiveThread(userId, threadId);
+    console.log(`[Telegram] Thread actif changé pour user ${userId}: ${threadId}`);
+    return true;
   }
 
   getTelegramConversationId(userId: number): string | undefined {

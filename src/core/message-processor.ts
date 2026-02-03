@@ -32,6 +32,9 @@ export interface ProcessOptions {
   /** ID de conversation (optionnel) */
   conversationId?: string;
 
+  /** ID de thread (optionnel, pour le support multi-thread) */
+  threadId?: string;
+
   /** Historique à inclure (nombre de messages) */
   historyLimit?: number;
 
@@ -41,6 +44,7 @@ export interface ProcessOptions {
   /** Contexte spécifique à la plateforme (Telegram, etc.) */
   platformContext?: {
     telegramChatId?: string;
+    telegramUserId?: number;
     bot?: any;
   };
 }
@@ -69,7 +73,7 @@ export class MessageProcessor {
     message: IncomingMessage,
     options: ProcessOptions
   ): Promise<ProcessingResult> {
-    const { source, conversationId, callbacks, platformContext } = options;
+    const { source, conversationId, threadId, callbacks, platformContext } = options;
 
     try {
       // Notifier le début du traitement
@@ -91,7 +95,8 @@ export class MessageProcessor {
         message.text,
         source,
         conversationId,
-        imagesForContext
+        imagesForContext,
+        threadId
       );
 
       // Créer le provider manager
@@ -163,14 +168,21 @@ export class MessageProcessor {
         }
 
         // Exécuter TOUS les tools de cette itération avec le contexte de la plateforme
+        // Enrichir le contexte avec source et threadId pour la persistance
+        const enrichedPlatformContext = {
+          ...platformContext,
+          source,
+          threadId,
+        };
+
         const iterationResults: Array<{ name: string; success: boolean; result?: unknown; id: string }> = [];
         for (const tc of toolCalls) {
           try {
             const result = await this.toolExecutor.execute(
-              tc.name, 
+              tc.name,
               tc.input,
               undefined,
-              platformContext
+              enrichedPlatformContext
             );
             iterationResults.push({
               name: tc.name,
@@ -215,18 +227,20 @@ export class MessageProcessor {
         // Continuer la boucle pour potentiellement d'autres tool calls
       }
 
-      // Sauvegarder dans la mémoire avec la source et les images
-      if (conversationId) {
+      // Sauvegarder dans la mémoire avec la source, les images et le threadId
+      if (conversationId || threadId) {
         this.contextService.saveUserMessage(
           message.text,
           imagesForContext,
           source,
-          conversationId
+          conversationId,
+          threadId
         );
         this.contextService.saveAssistantMessage(
           responseText,
           source,
-          conversationId
+          conversationId,
+          threadId
         );
       }
 

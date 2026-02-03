@@ -58,7 +58,13 @@ export class ToolExecutor {
     toolName: string,
     input: any,
     abortSignal?: AbortSignal,
-    platformContext?: { telegramChatId?: string; bot?: any; threadId?: string }
+    platformContext?: {
+      telegramChatId?: string;
+      telegramUserId?: number;
+      bot?: any;
+      threadId?: string;
+      source?: 'webapp' | 'telegram';
+    }
   ): Promise<any> {
     const memory = getMemory();
     const rollbackManager = getRollbackManager();
@@ -73,9 +79,11 @@ export class ToolExecutor {
       aiConsultant: this.aiConsultant,
       rollbackManager,
       telegramChatId: platformContext?.telegramChatId,
+      telegramUserId: platformContext?.telegramUserId,
       bot: platformContext?.bot,
       abortSignal,
-      threadId: platformContext?.threadId
+      threadId: platformContext?.threadId,
+      source: platformContext?.source
     };
 
     return await executeTool(toolName, input, context);

@@ -380,6 +380,73 @@ export class ThreadManager {
   }
 
   /**
+   * Récupère ou crée le thread principal pour une source donnée
+   * @param source Source de la conversation (webapp/telegram)
+   * @param identifier Identifiant unique (ex: telegram userId)
+   * @returns Le thread principal existant ou nouvellement créé
+   */
+  getOrCreateMainThread(source: 'webapp' | 'telegram', identifier?: string): Thread {
+    // Pour telegram, on utilise un ID déterministe basé sur le userId
+    const threadIdPrefix = source === 'telegram' && identifier
+      ? `thread_telegram_${identifier}`
+      : null;
+
+    // Cherche un thread main existant pour cette source/identifier
+    let query = `
+      SELECT id, parent_thread_id, title, is_main, source, created_at, updated_at
+      FROM threads WHERE is_main = 1 AND source = ?
+    `;
+    const params: any[] = [source];
+
+    if (threadIdPrefix) {
+      query += ` AND id LIKE ?`;
+      params.push(`${threadIdPrefix}%`);
+    }
+
+    query += ` ORDER BY created_at DESC LIMIT 1`;
+
+    const row = this.db.prepare(query).get(...params) as {
+      id: string;
+      parent_thread_id: string | null;
+      title: string;
+      is_main: number;
+      source: 'webapp' | 'telegram' | null;
+      created_at: string;
+      updated_at: string;
+    } | undefined;
+
+    if (row) {
+      return {
+        id: row.id,
+        parentThreadId: row.parent_thread_id,
+        title: row.title,
+        isMain: row.is_main === 1,
+        source: row.source,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      };
+    }
+
+    // Crée un nouveau thread main avec un ID déterministe pour telegram
+    const id = threadIdPrefix
+      ? `${threadIdPrefix}_${Date.now()}`
+      : `thread_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+    const title = source === 'telegram'
+      ? `Telegram ${identifier || 'Main'}`
+      : 'Main Conversation';
+
+    this.db.prepare(`
+      INSERT INTO threads (id, parent_thread_id, title, is_main, source)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(id, null, title, 1, source);
+
+    logger.info('ThreadManager', `Main thread created for ${source}: ${id}`);
+
+    return this.getThread(id)!;
+  }
+
+  /**
    * Récupère le thread principal
    */
   getMainThread(): Thread | null {

@@ -22,7 +22,9 @@ export interface ToolContext {
   aiConsultant: any; // AIConsultant | null
   rollbackManager: any; // RollbackManager | null
   telegramChatId?: string; // Chat ID pour Telegram
+  telegramUserId?: number; // User ID pour Telegram (pour la persistance du thread)
   bot?: any; // Instance TelegramBot
   abortSignal?: AbortSignal; // Signal d'annulation pour les tool calls longs
   threadId?: string; // Thread ID pour tracer le contexte d'exécution
+  source?: 'webapp' | 'telegram'; // Source de la conversation
 }

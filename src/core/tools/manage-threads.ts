@@ -8,6 +8,7 @@
 import { Tool, ToolResult, ToolInput } from '../types';
 import { ToolHandler, ToolContext } from './types';
 import { getThreadManager } from '../thread-manager.js';
+import { getMemory } from '../memory.js';
 
 export const manageThreadsDefinition: Tool = {
   name: 'manage_threads',
@@ -19,6 +20,7 @@ Actions disponibles:
 - create: Crée un nouveau thread
 - create_sub: Crée un sous-thread d'un thread existant
 - switch: Change le thread actif pour la conversation en cours
+- exit: Quitte le thread actuel pour revenir au thread parent
 - rename: Renomme un thread
 - delete: Supprime un thread et tous ses messages
 - clear: Efface les messages d'un thread sans le supprimer
@@ -30,7 +32,7 @@ Les sous-threads permettent de créer des discussions enfants d'un thread parent
     properties: {
       action: {
         type: 'string',
-        enum: ['list', 'get', 'create', 'create_sub', 'switch', 'rename', 'delete', 'clear'],
+        enum: ['list', 'get', 'create', 'create_sub', 'switch', 'exit', 'rename', 'delete', 'clear'],
         description: 'Action à effectuer sur les threads'
       },
       thread_id: {
@@ -59,7 +61,16 @@ export const manageThreadsHandler: ToolHandler = {
   definition: manageThreadsDefinition,
   async execute(input: ToolInput, context: ToolContext): Promise<ToolResult> {
     const threadManager = getThreadManager();
-    const action = input.action as 'list' | 'get' | 'create' | 'create_sub' | 'switch' | 'rename' | 'delete' | 'clear';
+    const memory = getMemory();
+    const action = input.action as 'list' | 'get' | 'create' | 'create_sub' | 'switch' | 'exit' | 'rename' | 'delete' | 'clear';
+
+    // Helper pour persister le thread actif si c'est Telegram
+    const persistThreadForTelegram = (threadId: string) => {
+      if (context.source === 'telegram' && context.telegramUserId) {
+        memory.setTelegramActiveThread(context.telegramUserId, threadId);
+        console.log(`[manage_threads] Thread ${threadId} persisté pour Telegram user ${context.telegramUserId}`);
+      }
+    };
 
     try {
       switch (action) {
@@ -201,6 +212,9 @@ export const manageThreadsHandler: ToolHandler = {
             };
           }
 
+          // Persister le thread pour Telegram
+          persistThreadForTelegram(switchThreadId);
+
           // Note: Le switch réel se fait via WebSocket pour le client spécifique
           // Cette action retourne juste les infos pour confirmation
           return {
@@ -211,6 +225,59 @@ export const manageThreadsHandler: ToolHandler = {
               message_count: threadManager.getThreadMessages(switchThreadId).length,
             },
             message: `Thread actif changé vers "${thread.title}"`,
+          };
+        }
+
+        case 'exit': {
+          // Récupère le thread_id courant depuis le contexte ou l'input
+          const currentThreadId = input.thread_id as string;
+          if (!currentThreadId) {
+            return {
+              success: false,
+              error: 'thread_id est requis pour exit (ID du thread actuel)',
+            };
+          }
+
+          const currentThread = threadManager.getThread(currentThreadId);
+          if (!currentThread) {
+            return {
+              success: false,
+              error: `Thread ${currentThreadId} non trouvé`,
+            };
+          }
+
+          // Vérifie si le thread a un parent
+          if (!currentThread.parentThreadId) {
+            return {
+              success: false,
+              error: `Le thread "${currentThread.title}" n'a pas de thread parent (c'est un thread principal)`,
+            };
+          }
+
+          const parentThread = threadManager.getThread(currentThread.parentThreadId);
+          if (!parentThread) {
+            return {
+              success: false,
+              error: `Thread parent ${currentThread.parentThreadId} non trouvé`,
+            };
+          }
+
+          // Persister le thread parent pour Telegram
+          persistThreadForTelegram(parentThread.id);
+
+          // Retourne les infos du parent pour le switch
+          return {
+            success: true,
+            previous_thread: {
+              id: currentThread.id,
+              title: currentThread.title,
+            },
+            thread: {
+              id: parentThread.id,
+              title: parentThread.title,
+              message_count: threadManager.getThreadMessages(parentThread.id).length,
+            },
+            message: `Retour au thread parent "${parentThread.title}"`,
           };
         }
 

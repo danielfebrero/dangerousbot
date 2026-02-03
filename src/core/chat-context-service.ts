@@ -63,14 +63,18 @@ export class ChatContextService {
    * Charge l'historique complet depuis la base de données
    * Reconstruit les tool_calls et images à partir des colonnes JSON
    */
-  loadHistoryFromDatabase(sessionId?: string): LoadedHistory {
+  loadHistoryFromDatabase(sessionId?: string, threadId?: string): LoadedHistory {
     const memory = getMemory();
     // Si un sessionId est fourni, l'utiliser explicitement
     // Sinon, utiliser la session courante de la mémoire
     const sid = sessionId || memory.getSessionId();
-    
-    console.log(`[ChatContextService] Loading history for session: ${sid}`);
-    const messages = memory.getMessages(sid, 1000);
+
+    if (threadId) {
+      console.log(`[ChatContextService] Loading history for thread: ${threadId}`);
+    } else {
+      console.log(`[ChatContextService] Loading history for session: ${sid}`);
+    }
+    const messages = memory.getMessages(sid, 1000, undefined, threadId);
 
     const conversationHistory: AIMessage[] = [];
 
@@ -297,10 +301,11 @@ L'utilisateur écrit depuis un appareil mobile (Telegram). Sauf indication contr
     userMessage: string,
     source: ChatSource,
     sessionId?: string,
-    currentImages?: ImageContent[]
+    currentImages?: ImageContent[],
+    threadId?: string
   ): Promise<ContextBuildResult> {
     // 1. Charger l'historique depuis la DB
-    const loadedHistory = this.loadHistoryFromDatabase(sessionId);
+    const loadedHistory = this.loadHistoryFromDatabase(sessionId, threadId);
     
     // 2. Construire le system prompt avec injection de contexte
     const systemPrompt = await this.buildSystemPrompt(userMessage, source);
@@ -364,24 +369,25 @@ L'utilisateur écrit depuis un appareil mobile (Telegram). Sauf indication contr
     content: string,
     images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>,
     source?: ChatSource,
-    sessionId?: string
+    sessionId?: string,
+    threadId?: string
   ): void {
     const memory = getMemory();
     if (sessionId) {
       memory.setSessionId(sessionId);
     }
-    memory.addMessage('user', content, undefined, images, source);
+    memory.addMessage('user', content, undefined, images, source, threadId);
   }
 
   /**
    * Sauvegarde un message assistant dans la DB
    */
-  saveAssistantMessage(content: string, source?: ChatSource, sessionId?: string): void {
+  saveAssistantMessage(content: string, source?: ChatSource, sessionId?: string, threadId?: string): void {
     const memory = getMemory();
     if (sessionId) {
       memory.setSessionId(sessionId);
     }
-    memory.addMessage('assistant', content, undefined, undefined, source);
+    memory.addMessage('assistant', content, undefined, undefined, source, threadId);
   }
 }
 

@@ -273,11 +273,12 @@ export class Memory {
   // ============ Messages ============
 
   addMessage(
-    role: 'user' | 'assistant' | 'system', 
-    content: string, 
+    role: 'user' | 'assistant' | 'system',
+    content: string,
     toolCalls?: Array<{ id?: string; name: string; input: unknown }>,
     images?: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>,
-    source?: 'webapp' | 'telegram'
+    source?: 'webapp' | 'telegram',
+    specifiedThreadId?: string
   ): number {
     // Vérifier si un message identique existe déjà dans les 5 dernières secondes (anti-doublon)
     const recentDuplicate = this.db.prepare(`
@@ -286,34 +287,53 @@ export class Memory {
       AND datetime(timestamp) > datetime('now', '-5 seconds')
       LIMIT 1
     `).get(this.currentSessionId, role, content) as { id: number } | undefined;
-    
+
     if (recentDuplicate) {
       logger.debug('Memory', `Doublon détecté et ignoré: ${role}`, { content: content.substring(0, 50) });
       return recentDuplicate.id;
     }
-    
+
     // Migration: ajouter les colonnes si nécessaire
     try {
       this.db.exec(`ALTER TABLE conversations ADD COLUMN images TEXT`);
     } catch (e) {
       // Colonne existe déjà
     }
-    
+
     try {
       this.db.exec(`ALTER TABLE conversations ADD COLUMN source TEXT CHECK(source IN ('webapp', 'telegram'))`);
     } catch (e) {
       // Colonne existe déjà
     }
-    
-    // Rétrocompatibilité: récupérer ou créer le main thread
-    let mainThread = this.db.prepare(`SELECT id FROM threads WHERE is_main = 1 ORDER BY created_at DESC LIMIT 1`).get() as { id: string } | undefined;
-    if (!mainThread) {
-      // Créer le main thread s'il n'existe pas
-      const mainThreadId = `thread_main_${Date.now()}`;
-      this.db.prepare(`INSERT INTO threads (id, title, is_main) VALUES (?, ?, ?)`).run(mainThreadId, 'Main Thread', 1);
-      mainThread = { id: mainThreadId };
+
+    // Utiliser le threadId spécifié ou récupérer/créer le main thread
+    let threadId: string;
+    if (specifiedThreadId) {
+      // Vérifier que le thread existe
+      const existingThread = this.db.prepare(`SELECT id FROM threads WHERE id = ?`).get(specifiedThreadId) as { id: string } | undefined;
+      if (existingThread) {
+        threadId = specifiedThreadId;
+      } else {
+        // Créer le thread s'il n'existe pas
+        this.db.prepare(`INSERT INTO threads (id, title, is_main, source) VALUES (?, ?, ?, ?)`).run(
+          specifiedThreadId,
+          source === 'telegram' ? 'Telegram Main' : 'Main Thread',
+          1,
+          source || null
+        );
+        threadId = specifiedThreadId;
+      }
+    } else {
+      // Rétrocompatibilité: récupérer ou créer le main thread
+      let mainThread = this.db.prepare(`SELECT id FROM threads WHERE is_main = 1 ORDER BY created_at DESC LIMIT 1`).get() as { id: string } | undefined;
+      if (!mainThread) {
+        // Créer le main thread s'il n'existe pas
+        const mainThreadId = `thread_main_${Date.now()}`;
+        this.db.prepare(`INSERT INTO threads (id, title, is_main) VALUES (?, ?, ?)`).run(mainThreadId, 'Main Thread', 1);
+        mainThread = { id: mainThreadId };
+      }
+      threadId = mainThread.id;
     }
-    const threadId = mainThread.id;
     
     const stmt = this.db.prepare(`
       INSERT INTO conversations (thread_id, session_id, role, content, tool_calls, images, source, timestamp)
@@ -448,6 +468,24 @@ export class Memory {
       SELECT value FROM config WHERE key = ?
     `).get(key) as { value: string } | undefined;
     return row?.value || null;
+  }
+
+  // ============ Telegram Thread Persistence ============
+
+  /**
+   * Sauvegarde le thread actif pour un utilisateur Telegram
+   * Persiste entre les redémarrages du serveur
+   */
+  setTelegramActiveThread(userId: number, threadId: string): void {
+    this.setConfig(`telegram.activeThread.${userId}`, threadId);
+  }
+
+  /**
+   * Récupère le thread actif sauvegardé pour un utilisateur Telegram
+   * Retourne null si aucun thread n'est sauvegardé
+   */
+  getTelegramActiveThread(userId: number): string | null {
+    return this.getConfig(`telegram.activeThread.${userId}`);
   }
 
   // ============ Embeddings ============
