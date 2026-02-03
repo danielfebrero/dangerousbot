@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Message, ImageContent } from '../types';
 import { Markdown } from './Markdown';
 import { ToolBadge } from './ToolBadge';
@@ -8,6 +8,25 @@ import { ProviderSwitchMessage } from './ProviderSwitchMessage';
 interface MessageItemProps {
   message: Message;
   onForceRestart?: () => void;
+}
+
+// Icône de copie SVG
+function CopyIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+    </svg>
+  );
+}
+
+// Icône de check SVG
+function CheckIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <polyline points="20 6 9 17 4 12"></polyline>
+    </svg>
+  );
 }
 
 // Format relative time (x time ago)
@@ -29,6 +48,20 @@ function formatRelativeTime(date: Date): string {
 
 export function MessageItem({ message, onForceRestart }: MessageItemProps) {
   const [showTimestamp, setShowTimestamp] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Fonction pour copier le contenu du message
+  const handleCopyMessage = useCallback(async () => {
+    if (!message.content) return;
+
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy message:', err);
+    }
+  }, [message.content]);
 
   const renderImages = () => {
     if (!message.contentParts) return null;
@@ -130,7 +163,7 @@ export function MessageItem({ message, onForceRestart }: MessageItemProps) {
   }
 
   return (
-    <div 
+    <div
       className={`message ${message.type}`}
       onMouseEnter={() => setShowTimestamp(true)}
       onMouseLeave={() => setShowTimestamp(false)}
@@ -140,6 +173,15 @@ export function MessageItem({ message, onForceRestart }: MessageItemProps) {
         {renderToolCalls()}
         {renderForceRestartButton()}
       </div>
+      {message.type === 'bot' && message.content && (
+        <button
+          className={`copy-message-btn ${copied ? 'copied' : ''}`}
+          onClick={handleCopyMessage}
+          title={copied ? 'Copié !' : 'Copier la réponse'}
+        >
+          {copied ? <CheckIcon /> : <CopyIcon />}
+        </button>
+      )}
       {showTimestamp && (
         <div className="message-timestamp-hover">
           {formatRelativeTime(message.timestamp)}

@@ -1615,6 +1615,102 @@ html, body {
 }
 
 /* ═══════════════════════════════════════
+   COPY BUTTONS - Code, Quote & Message
+   ═══════════════════════════════════════ */
+
+/* Wrapper pour code blocks */
+.code-block-wrapper {
+  position: relative;
+  margin: var(--space-3) 0;
+}
+
+.code-block-wrapper pre {
+  margin: 0;
+}
+
+/* Wrapper pour blockquotes */
+.blockquote-wrapper {
+  position: relative;
+}
+
+/* Style commun pour les boutons copie (code et quote) */
+.copy-btn {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  cursor: pointer;
+  opacity: 0;
+  transition: all var(--duration-fast);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.code-block-wrapper:hover .copy-btn,
+.blockquote-wrapper:hover .copy-btn {
+  opacity: 1;
+}
+
+.copy-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.copy-btn.copied {
+  background: var(--success);
+  border-color: var(--success);
+  color: white;
+  opacity: 1;
+}
+
+/* Bouton copie pour le message entier */
+.message.bot {
+  position: relative;
+}
+
+.copy-message-btn {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  cursor: pointer;
+  opacity: 0;
+  transition: all var(--duration-fast);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.message.bot:hover .copy-message-btn {
+  opacity: 1;
+}
+
+.copy-message-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.copy-message-btn.copied {
+  background: var(--success);
+  border-color: var(--success);
+  color: white;
+  opacity: 1;
+}
+
+/* ═══════════════════════════════════════
    PROVIDER SWITCH MESSAGE - Sexy & Clear
    ═══════════════════════════════════════ */
 
