@@ -287,12 +287,12 @@ export class ThreadManager {
    */
   getThreadMessages(threadId: string, limit: number = 100, offset: number = 0): ThreadMessage[] {
     // Récupère les N messages les plus récents avec offset, puis les inverse pour l'ordre chronologique
-    // EXCLUT les messages compressés (compression_summary IS NULL)
+    // EXCLUT les messages compressés (compressed = 0)
     const rows = this.db.prepare(`
       SELECT * FROM (
         SELECT c.id, c.thread_id, c.role, c.content, c.timestamp, c.tool_calls, c.images
         FROM conversations c
-        WHERE c.thread_id = ? AND c.compression_summary IS NULL
+        WHERE c.thread_id = ? AND c.compressed = 0
         ORDER BY c.id DESC
         LIMIT ? OFFSET ?
       ) ORDER BY id ASC
