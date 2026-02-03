@@ -5,14 +5,15 @@
  * - Appelé manuellement via le tool `compact` ou automatiquement si > 128K tokens
  * - Compresse TOUS les messages de la session en un résumé
  * - Stocke le résumé avec son embedding pour recherche future
+ * - Utilise Kimi 2.5 pour la compression (rapide et économique)
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import { getMemory, Memory } from './memory';
 import { getEmbeddingService, EmbeddingService } from './embedding';
 import { Message } from './types';
 import { MODELS, TOKENS, MEMORY } from '../config';
 import { logger } from './logger';
+import { KimiProvider } from './providers/kimi.js';
 
 export interface CompressedMemory {
   id?: number;
@@ -26,13 +27,18 @@ export interface CompressedMemory {
   created_at?: string;
 }
 
+
 export class MemoryCompressor {
-  private anthropic: Anthropic;
+  private kimiProvider: KimiProvider;
   private memory: Memory;
   private embedding: EmbeddingService | null;
 
-  constructor(anthropicApiKey: string) {
-    this.anthropic = new Anthropic({ apiKey: anthropicApiKey });
+  constructor(kimiApiKey: string) {
+    this.kimiProvider = new KimiProvider({
+      apiKey: kimiApiKey,
+      model: MODELS.KIMI_DEFAULT,
+      maxTokens: TOKENS.MAX_COMPRESSION_SUMMARY
+    });
     this.memory = getMemory();
 
     try {
@@ -57,7 +63,7 @@ export class MemoryCompressor {
       return null;
     }
 
-    logger.info('Compressor', `Compressing ${messages.length} messages from session ${sid}...`);
+    logger.info('Compressor', `Compressing ${messages.length} messages from session ${sid} using Kimi 2.5...`);
 
     try {
       const compressed = await this.compressMessages(messages, sid);
@@ -70,7 +76,7 @@ export class MemoryCompressor {
   }
 
   /**
-   * Compresse un ensemble de messages en résumé
+   * Compresse un ensemble de messages en résumé via Kimi 2.5
    */
   private async compressMessages(messages: Message[], sessionId: string): Promise<CompressedMemory> {
     // Formater les messages pour le résumé
@@ -88,11 +94,7 @@ export class MemoryCompressor {
       return `[${m.role.toUpperCase()}]: ${content}`;
     }).join('\n\n');
 
-    // Générer le résumé via Claude
-    const response = await this.anthropic.messages.create({
-      model: MODELS.COMPRESSOR,
-      max_tokens: TOKENS.MAX_COMPRESSION_SUMMARY,
-      system: `Tu es un assistant qui résume des conversations de manière concise mais complète.
+    const systemPrompt = `Tu es un assistant qui résume des conversations de manière concise mais complète.
 Extrais les informations clés:
 - Décisions prises
 - Informations apprises sur l'utilisateur
@@ -100,17 +102,22 @@ Extrais les informations clés:
 - Contexte important pour la suite
 - Erreurs rencontrées et solutions trouvées
 
-Format: Un résumé structuré et factuel, sans fluff. Utilise des bullet points pour la clarté.`,
-      messages: [{
-        role: 'user',
-        content: `Résume cette conversation:\n\n${conversation}`
-      }]
-    });
+Format: Un résumé structuré et factuel, sans fluff. Utilise des bullet points pour la clarté.`;
 
-    const summary = response.content
-      .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-      .map(block => block.text)
-      .join('\n');
+    // Appel à l'API Kimi via le provider (gère la température correctement)
+    const response = await this.kimiProvider.chat(
+      [{ role: 'user', content: `Résume cette conversation:\n\n${conversation}` }],
+      {
+        system: systemPrompt,
+        maxTokens: TOKENS.MAX_COMPRESSION_SUMMARY
+      }
+    );
+
+    // Extraire le texte du résumé
+    const textBlock = response.content.find(block => block.type === 'text');
+    const summary = textBlock?.type === 'text' ? textBlock.text : '';
+
+    logger.debug('Compressor', `Kimi compression: ${response.usage?.input_tokens ?? 0} in, ${response.usage?.output_tokens ?? 0} out`);
 
     // Générer l'embedding du résumé (si disponible)
     let embeddingVector: number[] | undefined;
@@ -284,9 +291,9 @@ export function getCompressor(): MemoryCompressor | null {
   return compressorInstance;
 }
 
-export function initCompressor(anthropicApiKey: string): MemoryCompressor {
-  compressorInstance = new MemoryCompressor(anthropicApiKey);
-  logger.info('Compressor', 'Initialized');
+export function initCompressor(kimiApiKey: string): MemoryCompressor {
+  compressorInstance = new MemoryCompressor(kimiApiKey);
+  logger.info('Compressor', 'Initialized with Kimi 2.5');
   return compressorInstance;
 }
 

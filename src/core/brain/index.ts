@@ -10,6 +10,7 @@ import { HistoryManager } from './history-manager.js';
 import { initEmbeddingService } from '../embedding.js';
 import { initCompressor } from '../compressor.js';
 import { StreamCallback } from '../providers/index.js';
+import { APIS } from '../../config.js';
 
 export class Brain {
   private promptBuilder: PromptBuilder;
@@ -98,7 +99,14 @@ export class Brain {
     try {
       this.providerManager.setOpenRouterApiKey(openRouterApiKey);
       initEmbeddingService(openRouterApiKey);
-      initCompressor(anthropicApiKey);
+      // Le compressor utilise Kimi 2.5 (plus économique que Claude)
+      const kimiApiKey = APIS.KIMI_API_KEY;
+      if (kimiApiKey) {
+        initCompressor(kimiApiKey);
+        console.log('[Brain] Compressor initialized with Kimi 2.5');
+      } else {
+        console.warn('[Brain] Kimi API key not found, compressor disabled');
+      }
       this.promptBuilder.enableContext();
       this.contextEnabled = true;
       console.log('[Brain] Context injection system initialized');
