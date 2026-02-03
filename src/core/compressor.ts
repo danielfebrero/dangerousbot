@@ -87,8 +87,35 @@ export class MemoryCompressor {
   private async compressMessages(messages: Message[], sessionId: string, threadId?: string): Promise<CompressedMemory> {
     // Formater les messages pour le résumé
     const conversation = messages.map(m => {
-      // Filtrer les tool_results pour ne garder que l'essentiel
       let content = m.content;
+      
+      // Inclure les tool_calls si présents (message assistant avec appels d'outils)
+      if (m.tool_calls) {
+        try {
+          // tool_calls peut être une string JSON (depuis DB) ou un tableau (depuis type)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const parsed: any[] = typeof m.tool_calls === 'string'
+            ? JSON.parse(m.tool_calls)
+            : m.tool_calls;
+
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const tools = parsed.map((tc: any) => {
+              // Format peut varier: { function: { name, arguments } } ou { name, input }
+              const name = tc.function?.name || tc.name || 'unknown';
+              const argsRaw = tc.function?.arguments || tc.input || {};
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const args: Record<string, any> = typeof argsRaw === 'string' ? JSON.parse(argsRaw) : argsRaw;
+              return `  - ${name}(${Object.entries(args).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ')})`;
+            }).join('\n');
+            content = content ? `${content}\n[Tools:\n${tools}]` : `[Tools:\n${tools}]`;
+          }
+        } catch {
+          // Ignorer l'erreur de parsing
+        }
+      }
+      
+      // Filtrer les tool_results pour ne garder que l'essentiel
       if (content.startsWith('__TOOL_RESULT__')) {
         const match = content.match(/^__TOOL_RESULT__(.+?)__(.*)$/s);
         if (match) {
