@@ -62,6 +62,22 @@ export class TodoManager {
   }
 
   private initTables(): void {
+    // Check if projects table exists and needs migration
+    const projectsTableExists = this.db.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='projects'"
+    ).get();
+    
+    if (projectsTableExists) {
+      const projectTableInfo = this.db.prepare(`PRAGMA table_info(projects)`).all() as { name: string }[];
+      const hasUpdatedAtColumn = projectTableInfo.some(col => col.name === 'updated_at');
+      
+      if (!hasUpdatedAtColumn) {
+        // Drop and recreate tables with correct schema
+        this.db.exec(`DROP TABLE IF EXISTS tasks`);
+        this.db.exec(`DROP TABLE IF EXISTS projects`);
+      }
+    }
+
     // Projects table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS projects (
@@ -88,29 +104,6 @@ export class TodoManager {
         FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
       )
     `);
-
-    // Migration: add status column if it doesn't exist (old schema used 'completed' INTEGER)
-    const tableInfo = this.db.prepare(`PRAGMA table_info(tasks)`).all() as { name: string }[];
-    const hasStatusColumn = tableInfo.some(col => col.name === 'status');
-    const hasCompletedColumn = tableInfo.some(col => col.name === 'completed');
-    
-    if (!hasStatusColumn && hasCompletedColumn) {
-      // Migrate from old schema (completed INTEGER) to new schema (status TEXT)
-      this.db.exec(`
-        ALTER TABLE tasks ADD COLUMN status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'completed'))
-      `);
-      this.db.exec(`
-        UPDATE tasks SET status = CASE WHEN completed = 1 THEN 'completed' ELSE 'pending' END
-      `);
-    }
-
-    // Migration: add updated_at column to projects if it doesn't exist
-    const projectTableInfo = this.db.prepare(`PRAGMA table_info(projects)`).all() as { name: string }[];
-    const hasUpdatedAtColumn = projectTableInfo.some(col => col.name === 'updated_at');
-    
-    if (!hasUpdatedAtColumn) {
-      this.db.exec(`ALTER TABLE projects ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP`);
-    }
 
     // Indexes for performance
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id)`);
