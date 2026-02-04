@@ -61,8 +61,39 @@ export class MistralProvider extends BaseProvider {
     return true;
   }
 
+  /**
+   * Génère un ID compatible Mistral (9 caractères alphanumériques)
+   */
+  private toMistralId(originalId: string, idMap: Map<string, string>): string {
+    const existing = idMap.get(originalId);
+    if (existing) return existing;
+
+    // Si déjà au bon format, garder tel quel
+    if (/^[a-zA-Z0-9]{9}$/.test(originalId)) {
+      idMap.set(originalId, originalId);
+      return originalId;
+    }
+
+    // Générer un ID déterministe à partir de l'original
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let hash = 0;
+    for (let i = 0; i < originalId.length; i++) {
+      hash = ((hash << 5) - hash + originalId.charCodeAt(i)) | 0;
+    }
+    let id = '';
+    let h = Math.abs(hash);
+    for (let i = 0; i < 9; i++) {
+      id += chars[h % chars.length];
+      h = Math.floor(h / chars.length) || (i + 1);
+    }
+    idMap.set(originalId, id);
+    return id;
+  }
+
   protected convertMessages(messages: AIMessage[]): MistralMessage[] {
     const result: MistralMessage[] = [];
+    // Map pour réécrire les IDs de tool calls au format Mistral (9 chars alphanum)
+    const idMap = new Map<string, string>();
 
     for (const msg of messages) {
       if (typeof msg.content === 'string') {
@@ -78,8 +109,9 @@ export class MistralProvider extends BaseProvider {
           if (block.type === 'text' && block.text) {
             textContent += block.text;
           } else if (block.type === 'tool_use') {
+            const rawId = block.id || `call_${Date.now()}`;
             toolCalls.push({
-              id: block.id || `call_${Date.now()}`,
+              id: this.toMistralId(rawId, idMap),
               type: 'function',
               function: {
                 name: block.name || '',
@@ -123,10 +155,11 @@ export class MistralProvider extends BaseProvider {
                 .map((c: any) => c.text)
                 .join('\n');
             }
+            const rawId = block.tool_use_id || '';
             toolResults.push({
               role: 'tool',
               content: resultContent || 'OK',
-              tool_call_id: block.tool_use_id
+              tool_call_id: this.toMistralId(rawId, idMap)
             });
           }
         }
