@@ -23,14 +23,16 @@ export const restartServerHandler: ToolHandler = {
   async execute(input: ToolInput, context: ToolContext): Promise<ToolResult> {
     const reason = (input.reason as string) || 'Demandé par le bot';
     
-    // Marquer le redémarrage dans le système de lifecycle avec le threadId
+    // Marquer le redémarrage dans le système de lifecycle avec le threadId, source et telegramUserId
     const { Lifecycle } = await import('../lifecycle.js');
     const lifecycle = new Lifecycle(process.cwd());
     const threadId = context.threadId;
-    lifecycle.markRestarted(reason, threadId);
+    const source = context.source;
+    const telegramUserId = context.telegramUserId;
+    lifecycle.markRestarted(reason, threadId, source, telegramUserId);
 
     // Stocker le flag pour que le serveur gère le timing
-    (global as any).__pendingRestart = { reason, threadId };
+    (global as any).__pendingRestart = { reason, threadId, source, telegramUserId };
 
     return {
       success: true,
