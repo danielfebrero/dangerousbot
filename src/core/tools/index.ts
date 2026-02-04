@@ -33,6 +33,8 @@ import { downloadFileHandler, downloadFileDefinition } from './download-file';
 import { sendFileHandler, sendFileDefinition } from './send-file';
 import { recallToolResultHandler, recallToolResultDefinition } from './recall-tool-result';
 import { compactHandler, compactDefinition } from './compact';
+import { waitHandler, waitDefinition } from './wait';
+import { swarmHandler, swarmDefinition } from './swarm';
 
 import { PROVIDER } from '../../config';
 
@@ -72,7 +74,9 @@ export function registerAllTools(): void {
     downloadFileHandler,
     sendFileHandler,
     recallToolResultHandler,
-    compactHandler
+    compactHandler,
+    waitHandler,
+    swarmHandler
   ];
 
   for (const handler of handlers) {
@@ -111,7 +115,9 @@ export function getToolDefinitions(): Tool[] {
     downloadFileDefinition,
     sendFileDefinition,
     recallToolResultDefinition,
-    compactDefinition
+    compactDefinition,
+    waitDefinition,
+    swarmDefinition
   ];
 }
 
@@ -191,5 +197,7 @@ export {
   setLogLevelHandler,
   clearLogsHandler,
   recallToolResultHandler,
-  compactHandler
+  compactHandler,
+  waitHandler,
+  swarmHandler
 };

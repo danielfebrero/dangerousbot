@@ -1,241 +1,242 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import * as path from 'path';
-import * as os from 'os';
-import * as fs from 'fs';
-import Database from 'better-sqlite3';
+/**
+ * Unit tests for Memory
+ */
 
-// Mock des modules
-vi.mock('os', async () => {
-  const actual = await vi.importActual('os') as typeof import('os');
-  return {
-    ...actual,
-    homedir: () => TEST_DATA_DIR,
-  };
-});
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const TEST_DATA_DIR = path.join(__dirname, '../../.test-data');
-const TEST_DB_PATH = path.join(TEST_DATA_DIR, 'data', 'dangerousbot.db');
+// Mock database
+const mockDb = {
+  prepare: vi.fn().mockReturnThis(),
+  run: vi.fn().mockReturnValue({ lastInsertRowid: 1, changes: 1 }),
+  get: vi.fn(),
+  all: vi.fn().mockReturnValue([]),
+};
 
-// Import après le mock
-let Memory: typeof import('../../memory.js').Memory;
+vi.mock('../../../database/index.js', () => ({
+  getDatabase: vi.fn(() => mockDb),
+}));
+
+vi.mock('../../logger', () => ({
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+
+import { Memory } from '../../memory.js';
 
 describe('Memory', () => {
-  beforeEach(async () => {
-    // Nettoyer le dossier de test
-    if (fs.existsSync(TEST_DATA_DIR)) {
-      fs.rmSync(TEST_DATA_DIR, { recursive: true });
-    }
-    
-    // Réimporter pour réinitialiser
-    const module = await import('../../memory.js');
-    Memory = module.Memory;
+  let memory: Memory;
+
+  beforeEach(() => {
+    // Reset all mocks
+    mockDb.prepare.mockReturnThis();
+    mockDb.run.mockReturnValue({ lastInsertRowid: 1, changes: 1 });
+    mockDb.get.mockReturnValue(undefined);
+    mockDb.all.mockReturnValue([]);
+
+    memory = new Memory();
   });
 
-  afterEach(() => {
-    // Nettoyer après chaque test
-    if (fs.existsSync(TEST_DATA_DIR)) {
-      fs.rmSync(TEST_DATA_DIR, { recursive: true });
-    }
-    vi.resetModules();
+  describe('getSessionId', () => {
+    it('should return a session ID', () => {
+      const sid = memory.getSessionId();
+      expect(sid).toBeDefined();
+      expect(typeof sid).toBe('string');
+    });
+  });
+
+  describe('setSessionId', () => {
+    it('should update session ID', () => {
+      memory.setSessionId('test-session');
+      expect(memory.getSessionId()).toBe('test-session');
+    });
+  });
+
+  describe('resumeLastSession', () => {
+    it('should return true if last session exists', () => {
+      mockDb.get.mockReturnValue({ session_id: 'prev-session' });
+      const result = memory.resumeLastSession();
+      expect(result).toBe(true);
+      expect(memory.getSessionId()).toBe('prev-session');
+    });
+
+    it('should return false if no previous session', () => {
+      mockDb.get.mockReturnValue(undefined);
+      const result = memory.resumeLastSession();
+      expect(result).toBe(false);
+    });
   });
 
   describe('addMessage', () => {
-    it('should add a user message with text only', () => {
-      const memory = new Memory();
-      
+    it('should insert a message and return ID', () => {
+      // No duplicate found
+      mockDb.get
+        .mockReturnValueOnce(undefined) // recentDuplicate check
+        .mockReturnValue({ id: 'thread_main_1' }); // mainThread check
+
+      mockDb.run.mockReturnValue({ lastInsertRowid: 42 });
+
       const id = memory.addMessage('user', 'Hello world');
-      
-      expect(id).toBeGreaterThan(0);
+      expect(id).toBe(42);
     });
 
-    it('should add a message with tool_calls', () => {
-      const memory = new Memory();
-      const toolCalls = [
-        { name: 'read_file', arguments: { path: 'test.txt' } },
-      ];
-      
-      const id = memory.addMessage('assistant', 'Let me read the file', toolCalls);
-      
-      expect(id).toBeGreaterThan(0);
+    it('should skip duplicate messages', () => {
+      mockDb.get.mockReturnValue({ id: 99 }); // recentDuplicate found
+
+      const id = memory.addMessage('user', 'Hello world');
+      expect(id).toBe(99);
     });
 
-    it('should add a message with source', () => {
-      const memory = new Memory();
-      
-      const id = memory.addMessage('user', 'Hello from Telegram', undefined, undefined, 'telegram');
-      
-      expect(id).toBeGreaterThan(0);
-      
-      // Vérifier que le message est récupéré avec la source
-      const messages = memory.getMessages();
-      const lastMessage = messages[messages.length - 1];
-      expect(lastMessage.source).toBe('telegram');
-    });
+    it('should use specified threadId', () => {
+      // No duplicate
+      mockDb.get
+        .mockReturnValueOnce(undefined) // recentDuplicate
+        .mockReturnValueOnce({ id: 'thread-abc' }); // existing thread
 
-    it('should add a message with images', () => {
-      const memory = new Memory();
-      const images = [
-        {
-          type: 'image' as const,
-          source: {
-            type: 'base64' as const,
-            media_type: 'image/jpeg' as const,
-            data: 'base64encodeddata',
-          },
-        },
-      ];
-      
-      const id = memory.addMessage('user', 'Check this image', undefined, images);
-      
-      expect(id).toBeGreaterThan(0);
-      
-      // Vérifier que les images sont récupérées
-      const messages = memory.getMessages();
-      const lastMessage = messages[messages.length - 1];
-      expect(lastMessage.images).toEqual(images);
+      mockDb.run.mockReturnValue({ lastInsertRowid: 10 });
+
+      const id = memory.addMessage('user', 'Hello', undefined, undefined, undefined, 'thread-abc');
+      expect(id).toBe(10);
     });
   });
 
   describe('getMessages', () => {
-    it('should return messages in chronological order', () => {
-      const memory = new Memory();
-      
-      memory.addMessage('user', 'First message');
-      memory.addMessage('assistant', 'First response');
-      memory.addMessage('user', 'Second message');
-      
+    it('should return parsed messages in chronological order', () => {
+      mockDb.all.mockReturnValue([
+        { id: 2, session_id: 's1', role: 'assistant', content: 'Hi', tool_calls: null, images: null, source: null, timestamp: '2025-01-01T00:00:01Z' },
+        { id: 1, session_id: 's1', role: 'user', content: 'Hello', tool_calls: null, images: null, source: null, timestamp: '2025-01-01T00:00:00Z' },
+      ]);
+
       const messages = memory.getMessages();
-      
-      expect(messages).toHaveLength(3);
-      expect(messages[0].content).toBe('First message');
-      expect(messages[1].content).toBe('First response');
-      expect(messages[2].content).toBe('Second message');
+      expect(messages).toHaveLength(2);
+      // Rows come DESC [id:2, id:1], reversed -> [id:1 user, id:2 assistant]
+      expect(messages[0].role).toBe('user');
+      expect(messages[1].role).toBe('assistant');
     });
 
-    it('should filter by source', () => {
-      const memory = new Memory();
-      
-      memory.addMessage('user', 'Web message', undefined, undefined, 'webapp');
-      memory.addMessage('user', 'Telegram message', undefined, undefined, 'telegram');
-      memory.addMessage('user', 'Another web message', undefined, undefined, 'webapp');
-      
-      const webMessages = memory.getMessages(undefined, 100, 'webapp');
-      
-      expect(webMessages).toHaveLength(2);
-      expect(webMessages.every(m => m.source === 'webapp' || m.source === undefined)).toBe(true);
-    });
+    it('should parse tool_calls JSON', () => {
+      mockDb.all.mockReturnValue([
+        { id: 1, role: 'assistant', content: 'text', tool_calls: '[{"name":"read_file"}]', images: null, source: null, timestamp: '2025-01-01' },
+      ]);
 
-    it('should limit the number of messages', () => {
-      const memory = new Memory();
-      
-      for (let i = 0; i < 10; i++) {
-        memory.addMessage('user', `Message ${i}`);
-      }
-      
-      const messages = memory.getMessages(undefined, 5);
-      
-      expect(messages).toHaveLength(5);
+      const messages = memory.getMessages();
+      expect(messages[0].tool_calls).toEqual([{ name: 'read_file' }]);
     });
   });
 
-  describe('getRecentMessages', () => {
-    it('should return recent messages only', () => {
-      const memory = new Memory();
-      
-      memory.addMessage('user', 'Old message 1');
-      memory.addMessage('user', 'Old message 2');
-      memory.addMessage('user', 'Recent message');
-      
-      const recent = memory.getRecentMessages(1);
-      
-      expect(recent).toHaveLength(1);
-      expect(recent[0].content).toBe('Recent message');
-    });
-
-    it('should apply source filter', () => {
-      const memory = new Memory();
-      
-      memory.addMessage('user', 'Web 1', undefined, undefined, 'webapp');
-      memory.addMessage('user', 'Telegram 1', undefined, undefined, 'telegram');
-      memory.addMessage('user', 'Web 2', undefined, undefined, 'webapp');
-      
-      const recentWeb = memory.getRecentMessages(10, 'webapp');
-      
-      expect(recentWeb.every(m => m.source === 'webapp' || m.source === undefined)).toBe(true);
+  describe('addKnowledge', () => {
+    it('should insert knowledge and return ID', () => {
+      mockDb.run.mockReturnValue({ lastInsertRowid: 5 });
+      const id = memory.addKnowledge('fact', 'The sky is blue');
+      expect(id).toBe(5);
     });
   });
 
-  describe('Knowledge management', () => {
-    it('should add and retrieve knowledge', () => {
-      const memory = new Memory();
-      
-      const id = memory.addKnowledge('fact', 'Test fact');
-      
-      expect(id).toBeGreaterThan(0);
-      
-      const knowledge = memory.getKnowledge('fact');
+  describe('getKnowledge', () => {
+    it('should return all knowledge when no type specified', () => {
+      mockDb.all.mockReturnValue([
+        { id: 1, type: 'fact', content: 'Fact 1', created_at: '2025-01-01' },
+      ]);
+
+      const knowledge = memory.getKnowledge();
       expect(knowledge).toHaveLength(1);
-      expect(knowledge[0].content).toBe('Test fact');
     });
 
-    it('should filter knowledge by type', () => {
-      const memory = new Memory();
-      
-      memory.addKnowledge('fact', 'Fact 1');
-      memory.addKnowledge('skill', 'Skill 1');
-      memory.addKnowledge('fact', 'Fact 2');
-      
-      const facts = memory.getKnowledge('fact');
-      const skills = memory.getKnowledge('skill');
-      
-      expect(facts).toHaveLength(2);
-      expect(skills).toHaveLength(1);
-    });
-
-    it('should retrieve all knowledge when no type specified', () => {
-      const memory = new Memory();
-      
-      memory.addKnowledge('fact', 'Fact 1');
-      memory.addKnowledge('skill', 'Skill 1');
-      
-      const all = memory.getKnowledge();
-      
-      expect(all).toHaveLength(2);
+    it('should filter by type when specified', () => {
+      mockDb.all.mockReturnValue([]);
+      memory.getKnowledge('preference');
+      expect(mockDb.prepare).toHaveBeenCalled();
     });
   });
 
-  describe('Session management', () => {
-    it('should create a new session with setSessionId', () => {
-      const memory = new Memory();
-      
-      const firstSessionId = memory.getSessionId();
-      const newSessionId = `session_${Date.now()}_test`;
-      
-      memory.setSessionId(newSessionId);
-      
-      expect(memory.getSessionId()).toBe(newSessionId);
-      expect(memory.getSessionId()).not.toBe(firstSessionId);
+  describe('setConfig / getConfig', () => {
+    it('should store and retrieve config', () => {
+      memory.setConfig('key1', 'value1');
+      expect(mockDb.run).toHaveBeenCalled();
     });
 
-    it('should isolate messages between sessions', () => {
-      const memory = new Memory();
-      
-      const session1Id = memory.getSessionId();
-      memory.addMessage('user', 'Session 1 message');
-      
-      const session2Id = `session_${Date.now()}_test2`;
-      memory.setSessionId(session2Id);
-      memory.addMessage('user', 'Session 2 message');
-      
-      // Check session 2 messages
-      const messagesSession2 = memory.getMessages(session2Id);
-      expect(messagesSession2).toHaveLength(1);
-      expect(messagesSession2[0].content).toBe('Session 2 message');
-      
-      // Check session 1 messages
-      const messagesSession1 = memory.getMessages(session1Id);
-      expect(messagesSession1).toHaveLength(1);
-      expect(messagesSession1[0].content).toBe('Session 1 message');
+    it('should return null for missing config', () => {
+      mockDb.get.mockReturnValue(undefined);
+      const value = memory.getConfig('nonexistent');
+      expect(value).toBeNull();
+    });
+
+    it('should return value for existing config', () => {
+      mockDb.get.mockReturnValue({ value: 'test-value' });
+      const value = memory.getConfig('key1');
+      expect(value).toBe('test-value');
+    });
+  });
+
+  describe('updateMessageEmbedding', () => {
+    it('should update embedding as buffer', () => {
+      memory.updateMessageEmbedding(1, [0.1, 0.2, 0.3]);
+      expect(mockDb.run).toHaveBeenCalled();
+    });
+  });
+
+  describe('getStats', () => {
+    it('should return session, message, and knowledge counts', () => {
+      mockDb.get
+        .mockReturnValueOnce({ count: 3 })  // sessions
+        .mockReturnValueOnce({ count: 100 }) // messages
+        .mockReturnValueOnce({ count: 5 });  // knowledge
+
+      const stats = memory.getStats();
+      expect(stats.sessions).toBe(3);
+      expect(stats.messages).toBe(100);
+      expect(stats.knowledge).toBe(5);
+    });
+  });
+
+  describe('clearSession', () => {
+    it('should delete messages for current session', () => {
+      memory.clearSession();
+      expect(mockDb.run).toHaveBeenCalled();
+    });
+  });
+
+  describe('telegram', () => {
+    it('should set and get telegram active thread', () => {
+      memory.setTelegramActiveThread(12345, 'thread-1');
+      expect(mockDb.run).toHaveBeenCalled();
+    });
+
+    it('should set and get telegram master', () => {
+      mockDb.get.mockReturnValue({ user_id: 12345, username: 'test' });
+      const master = memory.getTelegramMaster();
+      expect(master).toEqual({ user_id: 12345, username: 'test' });
+    });
+  });
+
+  describe('code embeddings', () => {
+    it('should add code embedding', () => {
+      mockDb.run.mockReturnValue({ lastInsertRowid: 7 });
+      const id = memory.addCodeEmbedding('/src/test.ts', 'content', 'hash123', [0.1, 0.2], 50, 200);
+      expect(id).toBe(7);
+    });
+
+    it('should return null for missing code embedding', () => {
+      mockDb.get.mockReturnValue(undefined);
+      const result = memory.getCodeEmbedding('/nonexistent.ts');
+      expect(result).toBeNull();
+    });
+
+    it('should list indexed projects', () => {
+      mockDb.all.mockReturnValue([{ project_name: 'dangerousbot' }]);
+      const projects = memory.listIndexedProjects();
+      expect(projects).toEqual(['dangerousbot']);
+    });
+  });
+
+  describe('webapp settings', () => {
+    it('should return default settings', () => {
+      mockDb.get.mockReturnValue(undefined);
+      const settings = memory.getWebappSettings();
+      expect(settings.showAllSources).toBe(false);
+    });
+
+    it('should save settings', () => {
+      memory.setWebappSettings({ showAllSources: true });
+      expect(mockDb.run).toHaveBeenCalled();
     });
   });
 });

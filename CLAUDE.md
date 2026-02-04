@@ -109,7 +109,7 @@ No provider is required, but at least one must be configured. Switch providers a
 
 **File Operations:** `read_file`, `write_file`, `edit_file`, `list_files`, `delete_file`
 
-**Execution:** `execute_code` (JS sandbox), `shell` (system commands)
+**Execution:** `execute_code` (JS sandbox), `shell` (system commands), `wait` (pause N seconds), `swarm` (parallel agent dispatch)
 
 **Memory:** `remember`, `recall` (long-term knowledge storage)
 
