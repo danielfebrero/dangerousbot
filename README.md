@@ -231,38 +231,29 @@ Le tool `manage_conversations` permet de lister, récupérer ou supprimer les co
 
 ## 🐝 Swarm (Agents Parallèles)
 
-DangerousBot peut dispatcher des tâches à des **agents IA indépendants** qui travaillent en arrière-plan. Chaque agent a sa propre instance provider, son historique de conversation, et peut utiliser les tools (lecture/écriture de fichiers, shell, recherche, etc.).
+DangerousBot peut dispatcher des tâches à des **agents IA indépendants** exécutés en parallèle. Chaque agent a sa propre instance provider et son propre tool-loop. L'appel est synchrone : il attend que tous les agents terminent puis retourne les résultats.
 
-### Workflow typique
+### Utilisation
 
 ```
-1. Créer un swarm avec plusieurs queries
-   swarm(create, "Lis src/foo.ts et liste toutes les fonctions ||| Analyse la couverture de tests de src/bar.ts")
-
-2. Continuer à travailler de son côté, utiliser wait() si nécessaire
-   wait(10)
-
-3. Récupérer les résultats
-   swarm(retrieve, agent_id_1)
-   swarm(retrieve, agent_id_2)
-
-4. Optionnel : approfondir avec un agent
-   swarm(continue, agent_id_1, "Regarde plus en détail la fonction X")
+swarm("Lis src/foo.ts et liste toutes les fonctions|||Analyse la couverture de tests de src/bar.ts")
+→ { success, results: [{ query, success, result }, { query, success, result }] }
 ```
+
+Les queries sont séparées par `|||`.
 
 ### Configuration
 
-| Clé | Description | Défaut |
-|-----|-------------|--------|
-| `swarm.model` | Provider et modèle (`provider` ou `provider:model_id`) | `mistral` (Mistral Large) |
-| `swarm.max_iterations` | Max itérations tool-loop par agent | `25` |
-| `swarm.max_agents` | Max agents concurrents | `10` |
+| Clé                    | Description                                           | Défaut                    |
+|------------------------|-------------------------------------------------------|---------------------------|
+| `swarm.model`          | Provider et modèle (`provider` ou `provider:model_id`) | `mistral` (Mistral Large) |
+| `swarm.max_iterations` | Max itérations tool-loop par agent                    | `25`                      |
 
 Exemples :
 ```
-config(set, swarm.model, claude)           → Claude Opus 4.5
+config(set, swarm.model, claude)                      → Claude Opus 4.5
 config(set, swarm.model, mistral:mistral-medium-2505) → Mistral Medium
-config(set, swarm.model, grok)             → Grok Reasoning
+config(set, swarm.model, grok)                        → Grok Reasoning
 ```
 
 ### Tools disponibles pour les agents
@@ -302,7 +293,7 @@ DangerousBot dispose de 31 tools organisés par catégorie.
 | `self_update` | Compile et redémarre le bot après modification du code. Validation TypeScript + build + rollback automatique en cas d'échec. |
 | `restart_server` | Redémarre le serveur sans recompilation. |
 | `wait` | Attend un nombre de secondes spécifié (max 300s). Utile pour créer des pauses entre des actions. |
-| `swarm` | Dispatch de tâches à des agents IA indépendants en arrière-plan. Actions : `create`, `add`, `retrieve`, `continue`. Chaque agent a son propre provider et tool-loop. Configurable via `config()` (`swarm.model`, `swarm.max_iterations`, `swarm.max_agents`). |
+| `swarm` | Exécute plusieurs queries IA en parallèle via des agents indépendants avec tool calls. Synchrone : attend la fin de tous les agents. Configurable via `config()` (`swarm.model`, `swarm.max_iterations`). |
 
 ### Mémoire & Connaissances
 
