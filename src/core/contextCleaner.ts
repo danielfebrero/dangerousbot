@@ -115,21 +115,51 @@ function getToolSummary(executionId: string): string | null {
 }
 
 /**
+ * Détecte si un message user contient uniquement des tool_results (= mid-turn)
+ * ou si c'est un vrai message utilisateur (= nouveau turn)
+ */
+function isToolResultOnlyMessage(msg: Message): boolean {
+  if (msg.role !== 'user') return false;
+  if (!Array.isArray(msg.content)) return false;
+
+  // Vérifier si tous les blocks sont des tool_result
+  return msg.content.every((block: any) => block.type === 'tool_result');
+}
+
+/**
+ * Trouve l'index du dernier vrai message utilisateur (pas juste tool_results)
+ * pour identifier le début du turn actuel
+ */
+function findLastUserTurnIndex(messages: Message[]): number {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg.role === 'user' && !isToolResultOnlyMessage(msg)) {
+      return i;
+    }
+  }
+  return 0; // Pas de message user trouvé, tout est dans le turn actuel
+}
+
+/**
  * Nettoie les tool_results des anciens messages
- * Garde les messages récents intacts
- * Remplace les anciens par leurs résumés si disponibles
+ * CRITICAL: Garde TOUS les messages du turn actuel intacts (chaînage de tool calls)
+ * Ne compresse que les messages des turns PRÉCÉDENTS
  */
 export function cleanOldToolResults(messages: Message[]): Message[] {
-  const recentCount = THRESHOLDS.KEEP_RECENT_COUNT;
+  if (messages.length === 0) return messages;
+
+  // Trouver le début du turn actuel (dernier vrai message utilisateur)
+  const currentTurnStartIndex = findLastUserTurnIndex(messages);
 
   return messages.map((msg, index) => {
-    // Garder les messages récents intacts
-    const isRecent = index >= messages.length - recentCount;
-    if (isRecent) {
-      return msg;
+    // CRITICAL: Garder TOUS les messages du turn actuel intacts
+    // Cela inclut le message user initial + tous les assistant/tool_result du même turn
+    const isCurrentTurn = index >= currentTurnStartIndex;
+    if (isCurrentTurn) {
+      return msg; // Pas de compression pendant le turn actuel
     }
 
-    // Si le contenu est un tableau (avec tool_results)
+    // Pour les turns précédents, appliquer la compression
     if (Array.isArray(msg.content)) {
       const cleanedContent = msg.content.map((block: any) => {
         if (block.type === 'tool_result') {
