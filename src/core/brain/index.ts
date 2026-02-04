@@ -10,7 +10,8 @@ import { HistoryManager } from './history-manager.js';
 import { initEmbeddingService } from '../embedding.js';
 import { initCompressor } from '../compressor.js';
 import { StreamCallback } from '../providers/index.js';
-import { APIS } from '../../config.js';
+import { APIS, PROVIDER, ProviderType as ConfigProviderType } from '../../config.js';
+import { getThreadManager } from '../thread-manager.js';
 
 export class Brain {
   private promptBuilder: PromptBuilder;
@@ -69,6 +70,22 @@ export class Brain {
   releaseHistoryManager(threadId: string): void {
     this.activeHistoryManagers.delete(threadId);
     this.historyManagerLastAccess.delete(threadId);
+  }
+
+  /**
+   * Résout le provider à utiliser pour un thread donné
+   * Priorité: provider du thread > provider global actif
+   */
+  resolveProviderForThread(threadId?: string): ConfigProviderType {
+    if (threadId) {
+      try {
+        const tp = getThreadManager().getThreadProvider(threadId);
+        if (tp) return tp;
+      } catch {
+        // ThreadManager might not be initialized yet
+      }
+    }
+    return PROVIDER.ACTIVE;
   }
 
   /**
@@ -143,12 +160,16 @@ export class Brain {
     const apiHistory = historyManager.getHistoryForAPI();
     const aiTools = this.formatTools(tools);
 
+    // Résoudre le provider pour ce thread
+    const preferredProvider = this.resolveProviderForThread(threadId);
+
     // Appeler le provider
     const response = await this.providerManager.chatStreamWithFallback(apiHistory, {
       system: this.promptBuilder.getSystemPrompt(source),
       tools: aiTools,
       abortSignal,
-      onChunk
+      onChunk,
+      preferredProvider
     });
 
     // Sauvegarder la réponse dans l'historique mémoire (DB gérée séparément pour éviter doublons)
@@ -178,10 +199,13 @@ export class Brain {
     const apiHistory = historyManager.getHistoryForAPI();
     const aiTools = this.formatTools(tools);
 
+    const preferredProvider = this.resolveProviderForThread(threadId);
+
     const response = await this.providerManager.chatWithFallback(apiHistory, {
       system: this.promptBuilder.getSystemPrompt(source),
       tools: aiTools,
-      abortSignal
+      abortSignal,
+      preferredProvider
     });
 
     historyManager.addAssistantMessage(response.content);
@@ -204,11 +228,14 @@ export class Brain {
     const apiHistory = historyManager.getHistoryForAPI();
     const aiTools = this.formatTools(tools);
 
+    const preferredProvider = this.resolveProviderForThread(threadId);
+
     const response = await this.providerManager.chatStreamWithFallback(apiHistory, {
       system: this.promptBuilder.getSystemPrompt(),
       tools: aiTools,
       abortSignal,
-      onChunk
+      onChunk,
+      preferredProvider
     });
 
     // Sauvegarder en mémoire seulement (DB gérée par server/index.ts)
@@ -231,10 +258,13 @@ export class Brain {
     const apiHistory = historyManager.getHistoryForAPI();
     const aiTools = this.formatTools(tools);
 
+    const preferredProvider = this.resolveProviderForThread(threadId);
+
     const response = await this.providerManager.chatWithFallback(apiHistory, {
       system: this.promptBuilder.getSystemPrompt(),
       tools: aiTools,
-      abortSignal
+      abortSignal,
+      preferredProvider
     });
 
     // Sauvegarder en mémoire seulement

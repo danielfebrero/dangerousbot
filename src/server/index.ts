@@ -248,7 +248,8 @@ export class DangerousBotServer {
     this.wsManager.sendTokenUpdate(threadId, initialStats);
 
     try {
-      const tools = getToolDefinitionsForProvider();
+      let effectiveProvider = this.brain.resolveProviderForThread(threadId);
+      let tools = getToolDefinitionsForProvider(effectiveProvider);
 
       // Récupérer les infos du thread pour le contexte
       const thread = threadManager.getThread(threadId);
@@ -453,10 +454,23 @@ export class DangerousBotServer {
             if (pendingProviderSwitch) {
               delete (global as any).__pendingProviderSwitch;
               const previousProvider = this.brain.getCurrentProvider().name;
-              this.brain.switchProvider(pendingProviderSwitch);
-              const switchMessage = `🔄 Provider changé: ${previousProvider} → ${pendingProviderSwitch}`;
-              this.wsManager.sendProviderSwitch(threadId, previousProvider, pendingProviderSwitch, 'user_request');
+              const switchData = typeof pendingProviderSwitch === 'string'
+                ? { provider: pendingProviderSwitch, threadId: null, scope: 'global' }
+                : pendingProviderSwitch;
+
+              if (switchData.scope === 'global') {
+                this.brain.switchProvider(switchData.provider);
+              }
+              // Thread-scoped: already persisted in DB by the tool
+
+              const scopeLabel = switchData.scope === 'thread' ? ' (thread)' : ' (global)';
+              const switchMessage = `🔄 Provider changé${scopeLabel}: ${previousProvider} → ${switchData.provider}`;
+              this.wsManager.sendProviderSwitch(threadId, previousProvider, switchData.provider, 'user_request');
               threadManager.addMessage(threadId, 'system', switchMessage);
+
+              // Refresh tools for the new provider
+              effectiveProvider = this.brain.resolveProviderForThread(threadId);
+              tools = getToolDefinitionsForProvider(effectiveProvider);
             }
           }
         }

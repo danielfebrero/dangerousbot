@@ -9,10 +9,12 @@ import { ApiKeys } from './types.js';
 export class ProviderManager {
   private provider: AIProvider;
   private apiKeys: ApiKeys;
+  private providerCache: Map<ProviderType, AIProvider> = new Map();
 
   constructor(apiKeys: ApiKeys) {
     this.apiKeys = apiKeys;
     this.provider = this.createCurrentProvider();
+    this.providerCache.set(this.provider.name as ProviderType, this.provider);
     console.log(`[ProviderManager] Initialized with: ${this.provider.name} (${this.provider.model})`);
   }
 
@@ -90,11 +92,23 @@ export class ProviderManager {
   }
 
   /**
-   * Change le provider actif (hot-swap)
+   * Récupère ou crée un provider par type (avec cache)
+   */
+  getOrCreateProvider(type: ProviderType): AIProvider {
+    const cached = this.providerCache.get(type);
+    if (cached) return cached;
+
+    const provider = this.createProviderByType(type);
+    this.providerCache.set(type, provider);
+    return provider;
+  }
+
+  /**
+   * Change le provider actif global (hot-swap)
    */
   switchProvider(provider: ProviderType): void {
     setActiveProvider(provider);
-    this.provider = this.createCurrentProvider();
+    this.provider = this.getOrCreateProvider(provider);
     console.log(`[ProviderManager] Switched to: ${this.provider.name} (${this.provider.model})`);
   }
 
@@ -110,6 +124,7 @@ export class ProviderManager {
    */
   setKimiApiKey(apiKey: string): void {
     this.apiKeys.kimi = apiKey;
+    this.providerCache.delete('kimi');
   }
 
   /**
@@ -117,6 +132,14 @@ export class ProviderManager {
    */
   setOpenRouterApiKey(apiKey: string): void {
     this.apiKeys.openRouter = apiKey;
+  }
+
+  /**
+   * Définit la clé API Mistral
+   */
+  setMistralApiKey(apiKey: string): void {
+    this.apiKeys.mistral = apiKey;
+    this.providerCache.delete('mistral');
   }
 
   /**
@@ -129,32 +152,33 @@ export class ProviderManager {
       tools: { name: string; description: string; input_schema: any }[];
       maxTokens?: number;
       abortSignal?: AbortSignal;
+      preferredProvider?: ProviderType;
     }
   ): Promise<AIResponse> {
     const providers: ProviderType[] = ['claude', 'kimi', 'mistral'];
-    const currentProviderName = this.provider.name as ProviderType;
+    const primaryProvider = options.preferredProvider || this.provider.name as ProviderType;
 
     const orderedProviders = [
-      currentProviderName,
-      ...providers.filter(p => p !== currentProviderName)
+      primaryProvider,
+      ...providers.filter(p => p !== primaryProvider)
     ];
 
     let lastError: Error | null = null;
 
     for (const providerName of orderedProviders) {
       try {
-        if (providerName !== this.provider.name) {
-          console.log(`[ProviderManager] Fallback: switching to ${providerName}`);
-          this.switchProvider(providerName);
+        const activeProvider = this.getOrCreateProvider(providerName);
 
+        if (providerName !== primaryProvider) {
+          console.log(`[ProviderManager] Fallback: trying ${providerName}`);
           (global as any).__providerSwitched = {
-            from: currentProviderName,
+            from: primaryProvider,
             to: providerName,
             reason: lastError?.message || 'Provider unavailable'
           };
         }
 
-        return await this.provider.chat(messages, {
+        return await activeProvider.chat(messages, {
           system: options.system,
           tools: options.tools,
           maxTokens: options.maxTokens || TOKENS.MAX_RESPONSE,
@@ -186,32 +210,33 @@ export class ProviderManager {
       maxTokens?: number;
       abortSignal?: AbortSignal;
       onChunk?: StreamCallback;
+      preferredProvider?: ProviderType;
     }
   ): Promise<AIResponse> {
     const providers: ProviderType[] = ['claude', 'kimi', 'mistral'];
-    const currentProviderName = this.provider.name as ProviderType;
+    const primaryProvider = options.preferredProvider || this.provider.name as ProviderType;
 
     const orderedProviders = [
-      currentProviderName,
-      ...providers.filter(p => p !== currentProviderName)
+      primaryProvider,
+      ...providers.filter(p => p !== primaryProvider)
     ];
 
     let lastError: Error | null = null;
 
     for (const providerName of orderedProviders) {
       try {
-        if (providerName !== this.provider.name) {
-          console.log(`[ProviderManager] Fallback: switching to ${providerName}`);
-          this.switchProvider(providerName);
-          
+        const activeProvider = this.getOrCreateProvider(providerName);
+
+        if (providerName !== primaryProvider) {
+          console.log(`[ProviderManager] Fallback: trying ${providerName}`);
           (global as any).__providerSwitched = {
-            from: currentProviderName,
+            from: primaryProvider,
             to: providerName,
             reason: lastError?.message || 'Provider unavailable'
           };
         }
 
-        return await this.provider.chatStream(messages, {
+        return await activeProvider.chatStream(messages, {
           system: options.system,
           tools: options.tools,
           maxTokens: options.maxTokens || TOKENS.MAX_RESPONSE,
@@ -220,7 +245,7 @@ export class ProviderManager {
         });
       } catch (error) {
         lastError = error as Error;
-        
+
         if (this.shouldFallback(lastError)) {
           console.error(`[ProviderManager] Provider ${providerName} failed: ${lastError.message}`);
           continue;

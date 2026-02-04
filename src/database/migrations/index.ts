@@ -11,7 +11,8 @@ import m008 from './008_create_projects_tasks.js';
 import m009 from './009_create_consultant_tables.js';
 import m010 from './010_create_files_table.js';
 import m011 from './011_add_code_embeddings_project.js';
+import m012 from './012_add_thread_provider.js';
 
 export function getAllMigrations(): Migration[] {
-  return [m001, m002, m003, m004, m005, m006, m007, m008, m009, m010, m011];
+  return [m001, m002, m003, m004, m005, m006, m007, m008, m009, m010, m011, m012];
 }

@@ -10,6 +10,7 @@
 
 import { getMemory } from './memory.js';
 import { logger } from './logger.js';
+import type { ProviderType } from '../config.js';
 
 export interface Thread {
   id: string;
@@ -17,6 +18,7 @@ export interface Thread {
   title: string;
   isMain: boolean;
   source: 'webapp' | 'telegram' | null;
+  provider: ProviderType | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -108,7 +110,7 @@ export class ThreadManager {
    */
   getThread(threadId: string): Thread | null {
     const row = this.db.prepare(`
-      SELECT id, parent_thread_id, title, is_main, source, created_at, updated_at
+      SELECT id, parent_thread_id, title, is_main, source, provider, created_at, updated_at
       FROM threads WHERE id = ?
     `).get(threadId) as {
       id: string;
@@ -116,6 +118,7 @@ export class ThreadManager {
       title: string;
       is_main: number;
       source: 'webapp' | 'telegram' | null;
+      provider: ProviderType | null;
       created_at: string;
       updated_at: string;
     } | undefined;
@@ -128,6 +131,7 @@ export class ThreadManager {
       title: row.title,
       isMain: row.is_main === 1,
       source: row.source,
+      provider: row.provider,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -139,14 +143,14 @@ export class ThreadManager {
    */
   listThreads(includeSubThreads: boolean = true): Thread[] {
     let query = `
-      SELECT id, parent_thread_id, title, is_main, source, created_at, updated_at
+      SELECT id, parent_thread_id, title, is_main, source, provider, created_at, updated_at
       FROM threads
     `;
-    
+
     if (!includeSubThreads) {
       query += ` WHERE is_main = 1`;
     }
-    
+
     query += ` ORDER BY updated_at DESC`;
 
     const rows = this.db.prepare(query).all() as Array<{
@@ -155,6 +159,7 @@ export class ThreadManager {
       title: string;
       is_main: number;
       source: 'webapp' | 'telegram' | null;
+      provider: ProviderType | null;
       created_at: string;
       updated_at: string;
     }>;
@@ -165,6 +170,7 @@ export class ThreadManager {
       title: row.title,
       isMain: row.is_main === 1,
       source: row.source,
+      provider: row.provider,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }));
@@ -175,7 +181,7 @@ export class ThreadManager {
    */
   getSubThreads(parentThreadId: string): Thread[] {
     const rows = this.db.prepare(`
-      SELECT id, parent_thread_id, title, is_main, source, created_at, updated_at
+      SELECT id, parent_thread_id, title, is_main, source, provider, created_at, updated_at
       FROM threads WHERE parent_thread_id = ?
       ORDER BY created_at ASC
     `).all(parentThreadId) as Array<{
@@ -184,6 +190,7 @@ export class ThreadManager {
       title: string;
       is_main: number;
       source: 'webapp' | 'telegram' | null;
+      provider: ProviderType | null;
       created_at: string;
       updated_at: string;
     }>;
@@ -194,6 +201,7 @@ export class ThreadManager {
       title: row.title,
       isMain: row.is_main === 1,
       source: row.source,
+      provider: row.provider,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }));
@@ -257,6 +265,26 @@ export class ThreadManager {
       UPDATE threads SET title = ?, updated_at = datetime('now') WHERE id = ?
     `).run(newTitle, threadId);
 
+    return result.changes > 0;
+  }
+
+  /**
+   * Récupère le provider assigné à un thread (ou null si global par défaut)
+   */
+  getThreadProvider(threadId: string): ProviderType | null {
+    const row = this.db.prepare(`
+      SELECT provider FROM threads WHERE id = ?
+    `).get(threadId) as { provider: ProviderType | null } | undefined;
+    return row?.provider || null;
+  }
+
+  /**
+   * Assigne un provider à un thread
+   */
+  setThreadProvider(threadId: string, provider: ProviderType): boolean {
+    const result = this.db.prepare(`
+      UPDATE threads SET provider = ?, updated_at = datetime('now') WHERE id = ?
+    `).run(provider, threadId);
     return result.changes > 0;
   }
 
@@ -394,7 +422,7 @@ export class ThreadManager {
 
     // Cherche un thread main existant pour cette source/identifier
     let query = `
-      SELECT id, parent_thread_id, title, is_main, source, created_at, updated_at
+      SELECT id, parent_thread_id, title, is_main, source, provider, created_at, updated_at
       FROM threads WHERE is_main = 1 AND source = ?
     `;
     const params: any[] = [source];
@@ -412,6 +440,7 @@ export class ThreadManager {
       title: string;
       is_main: number;
       source: 'webapp' | 'telegram' | null;
+      provider: ProviderType | null;
       created_at: string;
       updated_at: string;
     } | undefined;
@@ -423,6 +452,7 @@ export class ThreadManager {
         title: row.title,
         isMain: row.is_main === 1,
         source: row.source,
+        provider: row.provider,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       };
@@ -452,7 +482,7 @@ export class ThreadManager {
    */
   getMainThread(): Thread | null {
     const row = this.db.prepare(`
-      SELECT id, parent_thread_id, title, is_main, source, created_at, updated_at
+      SELECT id, parent_thread_id, title, is_main, source, provider, created_at, updated_at
       FROM threads WHERE is_main = 1
       ORDER BY created_at DESC LIMIT 1
     `).get() as {
@@ -461,6 +491,7 @@ export class ThreadManager {
       title: string;
       is_main: number;
       source: 'webapp' | 'telegram' | null;
+      provider: ProviderType | null;
       created_at: string;
       updated_at: string;
     } | undefined;
@@ -473,6 +504,7 @@ export class ThreadManager {
       title: row.title,
       isMain: row.is_main === 1,
       source: row.source,
+      provider: row.provider,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };

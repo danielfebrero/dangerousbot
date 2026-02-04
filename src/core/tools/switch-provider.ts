@@ -1,14 +1,15 @@
 /**
- * Tool: switch_provider - Change de provider AI
+ * Tool: switch_provider - Change de provider AI (par thread ou global)
  */
 
 import { Tool, ToolResult, ToolInput } from '../types';
 import { ToolHandler, ToolContext } from './types';
 import { setActiveProvider, ProviderType } from '../../config';
+import { getThreadManager } from '../thread-manager';
 
 export const switchProviderDefinition: Tool = {
   name: 'switch_provider',
-  description: 'Change le provider AI actif (Claude, Kimi ou Mistral). Le changement prend effet immédiatement pour le prochain message.',
+  description: 'Change le provider AI actif (Claude, Kimi ou Mistral). Si appelé dans un thread, le changement est scopé à ce thread uniquement. Sinon, il s\'applique globalement.',
   input_schema: {
     type: 'object',
     properties: {
@@ -33,15 +34,35 @@ export const switchProviderHandler: ToolHandler = {
       return { success: false, error: `Provider inconnu: ${provider}. Utilise 'claude', 'kimi' ou 'mistral'.` };
     }
 
-    // Changer le provider dans la config
+    if (context.threadId) {
+      // Thread-scoped: persiste dans la DB, pas de mutation globale
+      getThreadManager().setThreadProvider(context.threadId, provider);
+
+      (global as any).__pendingProviderSwitch = {
+        provider,
+        threadId: context.threadId,
+        scope: 'thread'
+      };
+
+      return {
+        success: true,
+        message: `Provider du thread changé vers: ${provider}. Ce thread utilisera ${provider} pour les prochains messages.`,
+        provider
+      };
+    }
+
+    // Global: change pour tous les threads sans provider explicite
     setActiveProvider(provider);
 
-    // Stocker le flag
-    (global as any).__pendingProviderSwitch = provider;
+    (global as any).__pendingProviderSwitch = {
+      provider,
+      threadId: null,
+      scope: 'global'
+    };
 
     return {
       success: true,
-      message: `Provider changé vers: ${provider}. Le prochain message utilisera ce provider.`,
+      message: `Provider global changé vers: ${provider}. Les threads sans provider explicite utiliseront ce provider.`,
       provider
     };
   }

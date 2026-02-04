@@ -18,7 +18,6 @@ import { recallHandler, recallDefinition } from './recall';
 import { selfUpdateHandler, selfUpdateDefinition } from './self-update';
 import { restartServerHandler, restartServerDefinition } from './restart-server';
 import { switchProviderHandler, switchProviderDefinition } from './switch-provider';
-import { consultMistralHandler, consultMistralDefinition } from './consult-mistral';
 import { consultAIHandler, consultAIDefinition } from './consult-ai';
 import { manageConversationsHandler, manageConversationsDefinition } from './manage-conversations';
 import { manageThreadsHandler, manageThreadsDefinition } from './manage-threads';
@@ -57,7 +56,6 @@ export function registerAllTools(): void {
     selfUpdateHandler,
     restartServerHandler,
     switchProviderHandler,
-    consultMistralHandler,
     consultAIHandler,
     manageConversationsHandler,
     manageThreadsHandler,
@@ -97,7 +95,6 @@ export function getToolDefinitions(): Tool[] {
     selfUpdateDefinition,
     restartServerDefinition,
     switchProviderDefinition,
-    consultMistralDefinition,
     consultAIDefinition,
     manageConversationsDefinition,
     manageThreadsDefinition,
@@ -183,7 +180,6 @@ export {
   selfUpdateHandler,
   restartServerHandler,
   switchProviderHandler,
-  consultMistralHandler,
   consultAIHandler,
   manageConversationsHandler,
   searxngSearchHandler,
