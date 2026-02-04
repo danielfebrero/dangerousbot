@@ -94,6 +94,7 @@ export class Versioning {
     // Créer .gitignore basique
     const gitignore = `node_modules/
 dist/
+.build/
 .env
 *.log
 .DS_Store

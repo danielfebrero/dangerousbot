@@ -1,6 +1,6 @@
 {
   "name": "dangerousbot",
-  "version": "0.1.154",
+  "version": "0.1.155",
   "description": "DangerousBot - Programme IA autonome et évolutif",
   "main": "dist/dangerousbot.js",
   "scripts": {
@@ -8,6 +8,8 @@
     "build": "node esbuild.config.js",
     "build:server": "node esbuild.config.js --server-only",
     "build:client": "node esbuild.config.js --client-only",
+    "promote": "node promote.js",
+    "build:deploy": "npm run build && npm run promote",
     "start": "NODE_ENV=production node dist/dangerousbot.js",
     "start:daemon": "./start.sh",
     "setup": "tsx src/cli/setup.ts",

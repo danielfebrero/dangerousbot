@@ -111,7 +111,7 @@ export class Lifecycle {
   // Compiler le projet
   async build(): Promise<{ success: boolean; error?: string }> {
     return new Promise((resolve) => {
-      exec('npm run build', { cwd: this.projectRoot }, (error, stdout, stderr) => {
+      exec('npm run build:deploy', { cwd: this.projectRoot }, (error, stdout, stderr) => {
         if (error) {
           resolve({ success: false, error: stderr || error.message });
         } else {

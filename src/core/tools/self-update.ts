@@ -117,7 +117,7 @@ export const selfUpdateHandler: ToolHandler = {
       // Mode legacy sans rollback
       console.warn('[self_update] RollbackManager non disponible, mode legacy');
 
-      const buildResult = await context.executor.shell('npm run build');
+      const buildResult = await context.executor.shell('npm run build:deploy');
       if (!buildResult.success) {
         return { success: false, error: `Erreur de compilation: ${buildResult.error}` };
       }

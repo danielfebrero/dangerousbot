@@ -7,10 +7,10 @@ const serverOnly = args.includes('--server-only');
 const clientOnly = args.includes('--client-only');
 const watchClient = args.includes('--watch-client');
 
-const distDir = path.join(__dirname, 'dist');
+const distDir = path.join(__dirname, '.build');
 const webDistDir = path.join(distDir, 'web');
 
-// Ensure dist directories exist
+// Ensure .build directories exist
 if (!fs.existsSync(distDir)) {
   fs.mkdirSync(distDir, { recursive: true });
 }
@@ -68,7 +68,7 @@ async function buildServer() {
     bundle: true,
     platform: 'node',
     target: 'node20',
-    outfile: 'dist/dangerousbot.js',
+    outfile: path.join(distDir, 'dangerousbot.js'),
     external: ['better-sqlite3'],
     minify: false,
     sourcemap: false,
@@ -76,7 +76,7 @@ async function buildServer() {
       'process.env.NODE_ENV': '"production"'
     }
   });
-  console.log('Server build complete: dist/dangerousbot.js');
+  console.log('Server build complete: .build/dangerousbot.js');
 }
 
 // Build client (React)
@@ -88,7 +88,7 @@ async function buildClient(watch = false) {
     bundle: true,
     platform: 'browser',
     target: ['es2020', 'chrome90', 'firefox90', 'safari14'],
-    outfile: 'dist/web/bundle.js',
+    outfile: path.join(webDistDir, 'bundle.js'),
     minify: !watch,
     sourcemap: watch,
     define: {
@@ -107,7 +107,7 @@ async function buildClient(watch = false) {
     console.log('Watching client for changes...');
   } else {
     await esbuild.build(buildOptions);
-    console.log('Client build complete: dist/web/bundle.js');
+    console.log('Client build complete: .build/web/bundle.js');
   }
 }
 

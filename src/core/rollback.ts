@@ -163,7 +163,7 @@ export class RollbackManager {
       for (const item of items) {
         const relativePath = path.join(prefix, item.name);
         if (item.isDirectory()) {
-          if (!['node_modules', 'dist', '.git', '.backups'].includes(item.name)) {
+          if (!['node_modules', 'dist', '.build', '.git', '.backups'].includes(item.name)) {
             walkDir(path.join(dir, item.name), relativePath);
           }
         } else if (item.name.endsWith('.ts') || item.name.endsWith('.tsx') || item.name.endsWith('.css')) {
@@ -297,18 +297,40 @@ export class RollbackManager {
   }
 
   /**
-   * Pipeline CI complet: TypeScript check + Build + Tests
+   * Promeut le build staging (.build/) vers production (dist/)
+   */
+  async promoteBuild(): Promise<RollbackResult> {
+    console.log('[Rollback] 📦 Promotion .build/ -> dist/...');
+
+    const result = await this.execCommand('npm run promote');
+
+    if (result.success) {
+      return {
+        success: true,
+        message: '✅ Build promoted to dist/'
+      };
+    } else {
+      return {
+        success: false,
+        message: '❌ Promotion failed',
+        error: result.stderr || result.stdout
+      };
+    }
+  }
+
+  /**
+   * Pipeline CI complet: TypeScript check + Build + Tests + Promote
    */
   async runCI(): Promise<RollbackResult> {
     console.log('[Rollback] 🚀 Running CI pipeline...');
-    
+
     // Step 1: TypeScript validation
     const tsResult = await this.validateTypes();
     if (!tsResult.success) {
       return tsResult;
     }
-    
-    // Step 2: Build
+
+    // Step 2: Build (to .build/ staging directory)
     const buildResult = await this.validateBuild();
     if (!buildResult.success) {
       return buildResult;
@@ -319,10 +341,16 @@ export class RollbackManager {
     if (!testResult.success) {
       return testResult;
     }
-    
+
+    // Step 4: Promote .build/ -> dist/
+    const promoteResult = await this.promoteBuild();
+    if (!promoteResult.success) {
+      return promoteResult;
+    }
+
     return {
       success: true,
-      message: '🎉 CI passed (TypeScript + Build + Tests)'
+      message: '🎉 CI passed (TypeScript + Build + Tests + Promote)'
     };
   }
 
@@ -457,9 +485,9 @@ export class RollbackManager {
         
         // Rollback automatique
         const restoreResult = await this.restoreBackup(backupResult.backupId);
-        
-        // Recompiler après restauration
-        await this.execCommand('npm run build');
+
+        // Recompiler et promouvoir après restauration
+        await this.execCommand('npm run build:deploy');
         
         return {
           success: false,
@@ -480,7 +508,7 @@ export class RollbackManager {
       
       // Rollback automatique en cas d'erreur
       await this.restoreBackup(backupResult.backupId);
-      await this.execCommand('npm run build');
+      await this.execCommand('npm run build:deploy');
       
       return {
         success: false,

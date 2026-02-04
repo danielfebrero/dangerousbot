@@ -68,6 +68,7 @@ export class DangerousBotServer {
     // Servir les fichiers statiques du frontend
     const webPaths = [
       path.join(this.projectRoot, 'dist', 'web'),
+      path.join(this.projectRoot, '.build', 'web'),
       path.join(__dirname, '..', 'web'),
       path.join(__dirname, 'web'),
       path.join(this.projectRoot, 'src', 'web')
@@ -107,6 +108,7 @@ export class DangerousBotServer {
     this.app.get('*', (req, res) => {
       const webPaths = [
         path.join(this.projectRoot, 'dist', 'web', 'index.html'),
+        path.join(this.projectRoot, '.build', 'web', 'index.html'),
         path.join(__dirname, '..', 'web', 'index.html'),
         path.join(__dirname, 'web', 'index.html'),
         path.join(this.projectRoot, 'src', 'web', 'index.html')
