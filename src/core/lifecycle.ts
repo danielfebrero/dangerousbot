@@ -185,8 +185,10 @@ export class Lifecycle {
   restart(reason: string = 'Manual restart'): void {
     console.log(`[Lifecycle] Redémarrage: ${reason}`);
 
-    // Marquer le redémarrage
-    this.markRestarted(reason);
+    // Marquer le redémarrage seulement si pas déjà marqué (le tool a pu écrire le signal avec le contexte complet)
+    if (!fs.existsSync(RESTART_SIGNAL)) {
+      this.markRestarted(reason);
+    }
 
     // Relâcher le lock
     this.releaseLock();
