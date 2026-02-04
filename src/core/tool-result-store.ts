@@ -6,13 +6,9 @@
  */
 
 import Database from 'better-sqlite3';
-import * as path from 'path';
-import * as os from 'os';
 import { TOOL_RESULTS } from '../config.js';
 import { logger } from './logger.js';
-
-const DATA_DIR = path.join(os.homedir(), '.dangerousbot', 'data');
-const DB_PATH = path.join(DATA_DIR, 'dangerousbot.db');
+import { getDatabase } from '../database/index.js';
 
 export interface ToolExecution {
   toolCallId: string;
@@ -48,7 +44,7 @@ export class ToolResultStore {
   private db: Database.Database;
 
   constructor() {
-    this.db = new Database(DB_PATH);
+    this.db = getDatabase();
   }
 
   /**

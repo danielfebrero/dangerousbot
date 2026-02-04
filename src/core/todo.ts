@@ -4,13 +4,7 @@
  */
 
 import Database from 'better-sqlite3';
-import path from 'path';
-import os from 'os';
-import fs from 'fs';
-
-// Database path - use the main dangerousbot.db
-const DATA_DIR = path.join(os.homedir(), '.dangerousbot', 'data');
-const DB_PATH = path.join(DATA_DIR, 'dangerousbot.db');
+import { getDatabase } from '../database/index.js';
 
 // Types
 export interface Project {
@@ -51,63 +45,7 @@ export class TodoManager {
   private db: Database.Database;
 
   constructor() {
-    // Ensure data directory exists
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-
-    // Use the main dangerousbot.db database
-    this.db = new Database(DB_PATH);
-    this.initTables();
-  }
-
-  private initTables(): void {
-    // Check if projects table exists and needs migration
-    const projectsTableExists = this.db.prepare(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='projects'"
-    ).get();
-    
-    if (projectsTableExists) {
-      const projectTableInfo = this.db.prepare(`PRAGMA table_info(projects)`).all() as { name: string }[];
-      const hasUpdatedAtColumn = projectTableInfo.some(col => col.name === 'updated_at');
-      
-      if (!hasUpdatedAtColumn) {
-        // Drop and recreate tables with correct schema
-        this.db.exec(`DROP TABLE IF EXISTS tasks`);
-        this.db.exec(`DROP TABLE IF EXISTS projects`);
-      }
-    }
-
-    // Projects table
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS projects (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT UNIQUE NOT NULL,
-        description TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Tasks table
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS tasks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        project_id INTEGER NOT NULL,
-        title TEXT NOT NULL,
-        description TEXT,
-        priority TEXT DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high')),
-        status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'completed')),
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        completed_at DATETIME,
-        order_index INTEGER DEFAULT 0,
-        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-      )
-    `);
-
-    // Indexes for performance
-    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id)`);
-    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)`);
+    this.db = getDatabase();
   }
 
   // Project operations

@@ -335,42 +335,6 @@ Format: Un résumé structuré et factuel, sans fluff. Utilise des bullet points
   private saveCompressedMemory(compressed: CompressedMemory): number {
     const db = (this.memory as any).db;
 
-    // Créer la table si elle n'existe pas (sans thread_id d'abord pour compatibilité)
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS compressed_memories (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        session_id TEXT NOT NULL,
-        summary TEXT NOT NULL,
-        message_ids TEXT NOT NULL,
-        start_time TEXT NOT NULL,
-        end_time TEXT NOT NULL,
-        embedding BLOB,
-        created_at TEXT DEFAULT (datetime('now'))
-      );
-      CREATE INDEX IF NOT EXISTS idx_compressed_session ON compressed_memories(session_id);
-    `);
-
-    // Migration: ajouter thread_id si la colonne n'existe pas
-    try {
-      // Vérifier si la colonne existe via PRAGMA
-      const columns = db.prepare(`PRAGMA table_info(compressed_memories)`).all() as Array<{ name: string }>;
-      const hasThreadId = columns.some((col: { name: string }) => col.name === 'thread_id');
-
-      if (!hasThreadId) {
-        db.exec(`ALTER TABLE compressed_memories ADD COLUMN thread_id TEXT`);
-        logger.info('Compressor', 'Migration: added thread_id column to compressed_memories');
-      }
-    } catch (migrationError) {
-      logger.warn('Compressor', `Migration warning: ${(migrationError as Error).message}`);
-    }
-
-    // Créer l'index sur thread_id (après migration)
-    try {
-      db.exec(`CREATE INDEX IF NOT EXISTS idx_compressed_thread ON compressed_memories(thread_id)`);
-    } catch {
-      // Index peut déjà exister ou colonne manquante
-    }
-
     const stmt = db.prepare(`
       INSERT INTO compressed_memories (session_id, thread_id, summary, message_ids, start_time, end_time, embedding)
       VALUES (?, ?, ?, ?, ?, ?, ?)

@@ -4,6 +4,7 @@
  */
 
 import { getMemory } from '../memory';
+import { getDatabase } from '../../database/index.js';
 
 export class ConfigService {
   private static instance: ConfigService;
@@ -28,7 +29,7 @@ export class ConfigService {
 
     const memory = getMemory();
     const value = memory.getConfig(key);
-    
+
     if (value !== null) {
       this.cache.set(key, value);
       return value;
@@ -43,7 +44,7 @@ export class ConfigService {
   async set(key: string, value: string): Promise<void> {
     const memory = getMemory();
     memory.setConfig(key, value);
-    
+
     // Mettre à jour le cache
     this.cache.set(key, value);
   }
@@ -52,30 +53,15 @@ export class ConfigService {
    * Récupère toutes les configurations
    */
   async getAll(): Promise<Record<string, string>> {
-    // Pour getAll, on doit utiliser une requête directe sur la DB
-    // car Memory n'expose pas de méthode pour lister toutes les configs
-    const Database = (await import('better-sqlite3')).default;
-    const path = await import('path');
-    const os = await import('os');
-    const fs = await import('fs');
-    
-    const DATA_DIR = path.default.join(os.default.homedir(), '.dangerousbot', 'data');
-    const DB_PATH = path.default.join(DATA_DIR, 'dangerousbot.db');
-    
-    if (!fs.default.existsSync(DB_PATH)) {
-      return {};
-    }
-    
-    const db = new Database(DB_PATH);
+    const db = getDatabase();
     const rows = db.prepare('SELECT key, value FROM config').all() as { key: string; value: string }[];
-    db.close();
-    
+
     const config: Record<string, string> = {};
     for (const row of rows) {
       config[row.key] = row.value;
       this.cache.set(row.key, row.value);
     }
-    
+
     this.cacheValid = true;
     return config;
   }
@@ -84,22 +70,9 @@ export class ConfigService {
    * Supprime une configuration
    */
   async delete(key: string): Promise<void> {
-    const Database = (await import('better-sqlite3')).default;
-    const path = await import('path');
-    const os = await import('os');
-    const fs = await import('fs');
-    
-    const DATA_DIR = path.default.join(os.default.homedir(), '.dangerousbot', 'data');
-    const DB_PATH = path.default.join(DATA_DIR, 'dangerousbot.db');
-    
-    if (!fs.default.existsSync(DB_PATH)) {
-      return;
-    }
-    
-    const db = new Database(DB_PATH);
+    const db = getDatabase();
     db.prepare('DELETE FROM config WHERE key = ?').run(key);
-    db.close();
-    
+
     this.cache.delete(key);
   }
 

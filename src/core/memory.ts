@@ -4,23 +4,16 @@
  */
 
 import Database from 'better-sqlite3';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as os from 'os';
 import { Message, Knowledge, Stats } from './types';
 import { logger } from './logger';
-
-const DATA_DIR = path.join(os.homedir(), '.dangerousbot', 'data');
-const DB_PATH = path.join(DATA_DIR, 'dangerousbot.db');
+import { getDatabase } from '../database/index.js';
 
 export class Memory {
   private db: Database.Database;
   private currentSessionId: string;
 
   constructor() {
-    this.ensureDataDir();
-    this.db = new Database(DB_PATH);
-    this.initSchema();
+    this.db = getDatabase();
     // Reprendre la dernière session si elle existe, sinon en créer une nouvelle
     const lastSession = this.getLastSessionIdInternal();
     this.currentSessionId = lastSession || this.generateSessionId();
@@ -35,212 +28,8 @@ export class Memory {
     return row?.session_id || null;
   }
 
-  private ensureDataDir(): void {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
-    }
-  }
-
   private generateSessionId(): string {
     return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
-
-  private initSchema(): void {
-    // Table des threads (conversations principales et sous-threads)
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS threads (
-        id TEXT PRIMARY KEY,
-        parent_thread_id TEXT,
-        title TEXT,
-        is_main BOOLEAN DEFAULT 1,
-        source TEXT CHECK(source IN ('webapp', 'telegram')),
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now')),
-        FOREIGN KEY (parent_thread_id) REFERENCES threads(id)
-      );
-      CREATE INDEX IF NOT EXISTS idx_threads_parent ON threads(parent_thread_id);
-      CREATE INDEX IF NOT EXISTS idx_threads_is_main ON threads(is_main);
-    `);
-
-    // Vérifier si la table conversations existe déjà (ancienne version sans thread_id)
-    const tableInfo = this.db.prepare(`PRAGMA table_info(conversations)`).all() as Array<{ name: string }>;
-    const hasThreadId = tableInfo.some(col => col.name === 'thread_id');
-
-    if (tableInfo.length > 0 && !hasThreadId) {
-      // Migration: ancienne table conversations vers nouvelle structure avec thread_id
-      // 1. Créer un main thread par défaut
-      const mainThreadId = `thread_main_${Date.now()}`;
-      this.db.prepare(`INSERT OR IGNORE INTO threads (id, title, is_main) VALUES (?, ?, ?)`).run(mainThreadId, 'Main Thread', 1);
-
-      // 2. Ajouter la colonne thread_id avec une valeur par défaut
-      this.db.exec(`ALTER TABLE conversations ADD COLUMN thread_id TEXT`);
-
-      // 3. Mettre à jour tous les messages existants pour utiliser le main thread
-      this.db.prepare(`UPDATE conversations SET thread_id = ? WHERE thread_id IS NULL`).run(mainThreadId);
-    }
-
-    // Table des conversations (messages liés à un thread)
-    // Note: CREATE TABLE IF NOT EXISTS ne modifie pas une table existante
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS conversations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        thread_id TEXT,
-        session_id TEXT NOT NULL,
-        role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'system')),
-        content TEXT NOT NULL,
-        timestamp TEXT NOT NULL,
-        created_at TEXT DEFAULT (datetime('now')),
-        FOREIGN KEY (thread_id) REFERENCES threads(id) ON DELETE CASCADE
-      );
-      CREATE INDEX IF NOT EXISTS idx_conversations_session ON conversations(session_id);
-    `);
-
-    // Index pour thread_id (créé séparément car la colonne peut avoir été ajoutée par migration)
-    try {
-      this.db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_thread ON conversations(thread_id)`);
-    } catch (e) {
-      // Index existe déjà ou colonne n'existe pas encore
-    }
-
-    // Migration: ajouter la colonne tool_calls si elle n'existe pas
-    try {
-      this.db.exec(`ALTER TABLE conversations ADD COLUMN tool_calls TEXT`);
-    } catch (e) {
-      // Colonne existe déjà, ignorer
-    }
-
-    // Migration: ajouter la colonne images si elle n'existe pas
-    try {
-      this.db.exec(`ALTER TABLE conversations ADD COLUMN images TEXT`);
-    } catch (e) {
-      // Colonne existe déjà, ignorer
-    }
-
-    // Migration: ajouter la colonne source si elle n'existe pas
-    try {
-      this.db.exec(`ALTER TABLE conversations ADD COLUMN source TEXT CHECK(source IN ('webapp', 'telegram'))`);
-    } catch (e) {
-      // Colonne existe déjà, ignorer
-    }
-
-    // Migration: ajouter la colonne compressed si elle n'existe pas
-    // compressed = 0 (ou NULL) = message visible dans le contexte LLM
-    // compressed = 1 = message compressé (caché du contexte LLM, remplacé par résumé)
-    try {
-      this.db.exec(`ALTER TABLE conversations ADD COLUMN compressed INTEGER DEFAULT 0`);
-      this.db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_compressed ON conversations(compressed)`);
-    } catch (e) {
-      // Colonne existe déjà, ignorer
-    }
-
-    // Index pour source (après la migration)
-    try {
-      this.db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_source ON conversations(source)`);
-    } catch (e) {
-      // Index existe déjà, ignorer
-    }
-
-    // Migration: ajouter la colonne embedding aux conversations
-    try {
-      this.db.exec(`ALTER TABLE conversations ADD COLUMN embedding BLOB`);
-    } catch (e) {
-      // Colonne existe déjà, ignorer
-    }
-
-    // Migration: ajouter la colonne project_name à code_embeddings si elle n'existe pas
-    try {
-      this.db.exec(`ALTER TABLE code_embeddings ADD COLUMN project_name TEXT DEFAULT 'dangerousbot'`);
-    } catch (e) {
-      // Colonne existe déjà, ignorer
-    }
-
-    // Index pour project_name (après la migration)
-    try {
-      this.db.exec(`CREATE INDEX IF NOT EXISTS idx_code_embeddings_project ON code_embeddings(project_name)`);
-    } catch (e) {
-      // Index existe déjà, ignorer
-    }
-
-    // Table des embeddings (préparé pour le futur)
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS embeddings (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        conversation_id INTEGER,
-        vector BLOB,
-        metadata TEXT,
-        created_at TEXT DEFAULT (datetime('now')),
-        FOREIGN KEY (conversation_id) REFERENCES conversations(id)
-      );
-    `);
-
-    // Table des embeddings de code source (pour retrieve_code)
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS code_embeddings (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        file_path TEXT NOT NULL UNIQUE,
-        content TEXT NOT NULL,
-        content_hash TEXT NOT NULL,
-        embedding BLOB NOT NULL,
-        token_count INTEGER,
-        file_size INTEGER,
-        last_modified TEXT,
-        indexed_at TEXT DEFAULT (datetime('now'))
-      );
-      CREATE INDEX IF NOT EXISTS idx_code_embeddings_path ON code_embeddings(file_path);
-      CREATE INDEX IF NOT EXISTS idx_code_embeddings_hash ON code_embeddings(content_hash);
-    `);
-
-    // Table des connaissances
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS knowledge (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        type TEXT NOT NULL CHECK(type IN ('fact', 'preference', 'context', 'skill')),
-        content TEXT NOT NULL,
-        embedding BLOB,
-        created_at TEXT DEFAULT (datetime('now'))
-      );
-    `);
-
-    // Table de configuration
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS config (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL,
-        updated_at TEXT DEFAULT (datetime('now'))
-      );
-    `);
-
-    // Table du master user Telegram
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS telegram_master (
-        id INTEGER PRIMARY KEY CHECK (id = 1),
-        user_id INTEGER,
-        username TEXT,
-        set_at TEXT DEFAULT (datetime('now'))
-      );
-    `);
-
-    // Table des exécutions de tools (pour persistance et recall)
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS tool_executions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tool_call_id TEXT NOT NULL UNIQUE,
-        tool_name TEXT NOT NULL,
-        timestamp TEXT NOT NULL,
-        status TEXT NOT NULL CHECK(status IN ('success', 'error')),
-        input TEXT NOT NULL,
-        output TEXT NOT NULL,
-        error TEXT,
-        execution_time_ms INTEGER,
-        thread_id TEXT NOT NULL,
-        message_id INTEGER,
-        created_at TEXT DEFAULT (datetime('now')),
-        FOREIGN KEY (thread_id) REFERENCES threads(id) ON DELETE CASCADE
-      );
-      CREATE INDEX IF NOT EXISTS idx_tool_executions_thread ON tool_executions(thread_id);
-      CREATE INDEX IF NOT EXISTS idx_tool_executions_timestamp ON tool_executions(timestamp);
-      CREATE INDEX IF NOT EXISTS idx_tool_executions_tool_call_id ON tool_executions(tool_call_id);
-    `);
   }
 
   // ============ Session Management ============
@@ -291,19 +80,6 @@ export class Memory {
     if (recentDuplicate) {
       logger.debug('Memory', `Doublon détecté et ignoré: ${role}`, { content: content.substring(0, 50) });
       return recentDuplicate.id;
-    }
-
-    // Migration: ajouter les colonnes si nécessaire
-    try {
-      this.db.exec(`ALTER TABLE conversations ADD COLUMN images TEXT`);
-    } catch (e) {
-      // Colonne existe déjà
-    }
-
-    try {
-      this.db.exec(`ALTER TABLE conversations ADD COLUMN source TEXT CHECK(source IN ('webapp', 'telegram'))`);
-    } catch (e) {
-      // Colonne existe déjà
     }
 
     // Utiliser le threadId spécifié ou récupérer/créer le main thread

@@ -12,13 +12,7 @@
 
 import { config, TOKENS, MODELS, APIS, PATHS } from "../config.js";
 import Database from 'better-sqlite3';
-import * as path from 'path';
-import * as os from 'os';
-import * as fs from 'fs';
-
-// Database path - use the main dangerousbot.db
-const DATA_DIR = path.join(os.homedir(), '.dangerousbot', 'data');
-const DB_PATH = path.join(DATA_DIR, 'dangerousbot.db');
+import { getDatabase } from '../database/index.js';
 
 // ============================================================================
 // TYPES
@@ -365,41 +359,7 @@ class ConversationStore {
   private maxMessagesPerConversation = 50;
 
   constructor() {
-    // Ensure data directory exists
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-
-    this.db = new Database(DB_PATH);
-    this.initTables();
-  }
-
-  private initTables(): void {
-    // Table for consultant conversations
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS consultant_conversations (
-        id TEXT PRIMARY KEY,
-        model TEXT NOT NULL,
-        metadata TEXT,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_consultant_conv_updated ON consultant_conversations(updated_at);
-    `);
-
-    // Table for consultant conversation messages
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS consultant_messages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        conversation_id TEXT NOT NULL,
-        role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'system')),
-        content TEXT NOT NULL,
-        model TEXT,
-        timestamp INTEGER NOT NULL,
-        FOREIGN KEY (conversation_id) REFERENCES consultant_conversations(id) ON DELETE CASCADE
-      );
-      CREATE INDEX IF NOT EXISTS idx_consultant_msg_conv ON consultant_messages(conversation_id);
-    `);
+    this.db = getDatabase();
   }
 
   private cleanupOldConversations(): void {

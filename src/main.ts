@@ -17,6 +17,7 @@ import { getMemory } from './core/memory.js';
 import { initRollbackManager } from './core/rollback.js';
 import { logger, enableConsoleCapture } from './core/logger.js';
 import { SERVER, PATHS, APIS, initializeApiKeys, reloadProviderConfig, loadApiKey } from './config.js';
+import { getDatabase } from './database/index.js';
 
 // Activer la capture des console.* dès le démarrage
 enableConsoleCapture();
@@ -256,6 +257,9 @@ async function main(): Promise<void> {
   
   // Démarrer le health check régulier de SearxNG
   startSearxNGHealthCheck();
+
+  // Initialiser la base de données et appliquer les migrations
+  getDatabase();
 
   // Initialiser la mémoire
   const memory = getMemory();

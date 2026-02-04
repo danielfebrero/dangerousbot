@@ -4,37 +4,8 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import Database from 'better-sqlite3';
-import * as os from 'os';
 import { configService } from './config';
-
-const DATA_DIR = path.join(os.homedir(), '.dangerousbot', 'data');
-const DB_PATH = path.join(DATA_DIR, 'dangerousbot.db');
-
-function getDb(): Database.Database {
-  const db = new Database(DB_PATH);
-  // S'assurer que la table files existe
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS files (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      url TEXT NOT NULL,
-      filename TEXT NOT NULL,
-      original_name TEXT,
-      mime_type TEXT,
-      size_bytes INTEGER NOT NULL DEFAULT 0,
-      source TEXT NOT NULL DEFAULT 'webapp',
-      telegram_chat_id TEXT,
-      downloaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      accessed_at DATETIME,
-      deleted_at DATETIME,
-      is_deleted INTEGER DEFAULT 0
-    );
-    CREATE INDEX IF NOT EXISTS idx_files_downloaded_at ON files(downloaded_at);
-    CREATE INDEX IF NOT EXISTS idx_files_is_deleted ON files(is_deleted);
-    CREATE INDEX IF NOT EXISTS idx_files_source ON files(source);
-  `);
-  return db;
-}
+import { getDatabase } from '../../database/index.js';
 
 export interface FileRecord {
   id: number;
@@ -135,7 +106,7 @@ export class DownloadService {
       const size = buffer.length;
 
       // Enregistrer en base de données
-      const db = getDb();
+      const db = getDatabase();
       const result = db.prepare(`
         INSERT INTO files (url, filename, original_name, mime_type, size_bytes, source, telegram_chat_id)
         VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -153,7 +124,6 @@ export class DownloadService {
 
       // Mettre à jour la date d'accès
       db.prepare('UPDATE files SET accessed_at = CURRENT_TIMESTAMP WHERE id = ?').run(fileId);
-      db.close();
 
       return {
         success: true,
@@ -176,15 +146,14 @@ export class DownloadService {
    * Récupère un fichier par son ID
    */
   async getFile(fileId: number): Promise<FileRecord | null> {
-    const db = getDb();
+    const db = getDatabase();
     const file = db.prepare('SELECT * FROM files WHERE id = ? AND is_deleted = 0').get(fileId) as FileRecord | undefined;
-    
+
     if (file) {
       // Mettre à jour la date d'accès
       db.prepare('UPDATE files SET accessed_at = CURRENT_TIMESTAMP WHERE id = ?').run(fileId);
     }
-    
-    db.close();
+
     return file || null;
   }
 
@@ -192,9 +161,8 @@ export class DownloadService {
    * Récupère un fichier par son nom
    */
   async getFileByName(filename: string): Promise<FileRecord | null> {
-    const db = getDb();
+    const db = getDatabase();
     const file = db.prepare('SELECT * FROM files WHERE filename = ? AND is_deleted = 0').get(filename) as FileRecord | null;
-    db.close();
     return file;
   }
 
@@ -210,10 +178,10 @@ export class DownloadService {
    */
   async deleteFile(fileId: number): Promise<boolean> {
     const file = await this.getFile(fileId);
-    
+
     if (!file) return false;
 
-    const db = getDb();
+    const db = getDatabase();
 
     try {
       // Supprimer physiquement
@@ -224,11 +192,9 @@ export class DownloadService {
 
       // Marquer comme supprimé en base
       db.prepare('UPDATE files SET is_deleted = 1, deleted_at = CURRENT_TIMESTAMP WHERE id = ?').run(fileId);
-      db.close();
 
       return true;
     } catch (error) {
-      db.close();
       console.error('[DownloadService] Erreur suppression:', error);
       return false;
     }
@@ -247,9 +213,8 @@ export class DownloadService {
    * Calcule la taille totale des fichiers stockés
    */
   async getTotalSize(): Promise<number> {
-    const db = getDb();
+    const db = getDatabase();
     const result = db.prepare('SELECT COALESCE(SUM(size_bytes), 0) as total FROM files WHERE is_deleted = 0').get() as { total: number };
-    db.close();
     return result.total;
   }
 
@@ -263,11 +228,10 @@ export class DownloadService {
 
     // Si on dépasse la limite, supprimer les plus anciens
     while (currentSize > limitBytes) {
-      const db = getDb();
+      const db = getDatabase();
       const oldestFile = db.prepare(
         'SELECT * FROM files WHERE is_deleted = 0 ORDER BY accessed_at ASC, downloaded_at ASC LIMIT 1'
       ).get() as FileRecord | undefined;
-      db.close();
 
       if (!oldestFile) break;
 
@@ -283,16 +247,15 @@ export class DownloadService {
    * Liste tous les fichiers actifs
    */
   async listFiles(source?: 'webapp' | 'telegram'): Promise<FileRecord[]> {
-    const db = getDb();
-    
+    const db = getDatabase();
+
     let files: FileRecord[];
     if (source) {
       files = db.prepare('SELECT * FROM files WHERE is_deleted = 0 AND source = ? ORDER BY downloaded_at DESC').all(source) as FileRecord[];
     } else {
       files = db.prepare('SELECT * FROM files WHERE is_deleted = 0 ORDER BY downloaded_at DESC').all() as FileRecord[];
     }
-    
-    db.close();
+
     return files;
   }
 
