@@ -61,6 +61,18 @@ export class Versioning {
     fs.writeFileSync(this.versionFile, JSON.stringify(info, null, 2));
   }
 
+  // Mettre à jour la version dans package.json
+  private updatePackageJson(newVersion: string): void {
+    const pkgPath = path.join(this.projectRoot, 'package.json');
+    try {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+      pkg.version = newVersion;
+      fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+    } catch (e) {
+      console.warn('[Versioning] Could not update package.json version:', e);
+    }
+  }
+
   // Vérifier si git est initialisé
   async isGitRepo(): Promise<boolean> {
     const result = await this.gitCommand('rev-parse --is-inside-work-tree');
@@ -114,6 +126,12 @@ dist/
     // Incrémenter la version
     const currentVersion = this.getCurrentVersion();
     const newVersion = this.incrementVersion(currentVersion.version);
+
+    // Mettre à jour package.json avec la nouvelle version
+    this.updatePackageJson(newVersion);
+
+    // Re-stage après la mise à jour de package.json
+    await this.gitCommand('add -A');
 
     // Créer le commit
     const commitMessage = `DangerousBot v${newVersion} - ${description}`;

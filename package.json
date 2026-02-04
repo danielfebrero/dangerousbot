@@ -1,6 +1,6 @@
 {
   "name": "dangerousbot",
-  "version": "0.1.0",
+  "version": "0.1.148",
   "description": "DangerousBot - Programme IA autonome et évolutif",
   "main": "dist/dangerousbot.js",
   "scripts": {
