@@ -21,32 +21,70 @@ export class ProviderManager {
    */
   private createCurrentProvider(): AIProvider {
     const providerType = PROVIDER.ACTIVE;
-    
+
     if (providerType === 'kimi') {
       const kimiKey = this.apiKeys.kimi || APIS.KIMI_API_KEY;
-      if (!kimiKey) {
-        console.warn('[ProviderManager] Kimi API key not found, falling back to Claude');
-        return this.createClaudeProvider();
+      if (kimiKey) {
+        return createProvider({
+          provider: 'kimi',
+          apiKey: kimiKey,
+          model: MODELS.KIMI,
+          maxTokens: TOKENS.MAX_RESPONSE
+        });
       }
-      return createProvider({
-        provider: 'kimi',
-        apiKey: kimiKey,
-        model: MODELS.KIMI_DEFAULT,
-        maxTokens: TOKENS.MAX_RESPONSE
-      });
+      console.warn('[ProviderManager] Kimi API key not found, trying fallback');
     }
-    
-    return this.createClaudeProvider();
+
+    if (providerType === 'mistral') {
+      const mistralKey = this.apiKeys.mistral || APIS.MISTRAL_API_KEY;
+      if (mistralKey) {
+        return createProvider({
+          provider: 'mistral',
+          apiKey: mistralKey,
+          model: MODELS.MISTRAL_LARGE,
+          maxTokens: TOKENS.MAX_RESPONSE
+        });
+      }
+      console.warn('[ProviderManager] Mistral API key not found, trying fallback');
+    }
+
+    if (providerType === 'claude' || providerType === 'kimi' || providerType === 'mistral') {
+      // If requested provider wasn't available, try any available one
+      if (providerType !== 'claude' && this.apiKeys.anthropic) {
+        return this.createProviderByType('claude');
+      }
+      if (providerType !== 'kimi') {
+        const kimiKey = this.apiKeys.kimi || APIS.KIMI_API_KEY;
+        if (kimiKey) return this.createProviderByType('kimi');
+      }
+      if (providerType !== 'mistral') {
+        const mistralKey = this.apiKeys.mistral || APIS.MISTRAL_API_KEY;
+        if (mistralKey) return this.createProviderByType('mistral');
+      }
+    }
+
+    // Last resort: try Claude even without key validation (will fail at API call)
+    return this.createProviderByType('claude');
   }
 
   /**
-   * Crée un provider Claude
+   * Crée un provider par type
    */
-  private createClaudeProvider(): AIProvider {
+  private createProviderByType(type: ProviderType): AIProvider {
+    const modelMap: Record<ProviderType, string> = {
+      claude: MODELS.CLAUDE,
+      kimi: MODELS.KIMI,
+      mistral: MODELS.MISTRAL_LARGE,
+    };
+    const keyMap: Record<ProviderType, string> = {
+      claude: this.apiKeys.anthropic,
+      kimi: this.apiKeys.kimi || APIS.KIMI_API_KEY,
+      mistral: this.apiKeys.mistral || APIS.MISTRAL_API_KEY,
+    };
     return createProvider({
-      provider: 'claude',
-      apiKey: this.apiKeys.anthropic,
-      model: MODELS.BRAIN,
+      provider: type,
+      apiKey: keyMap[type],
+      model: modelMap[type],
       maxTokens: TOKENS.MAX_RESPONSE
     });
   }
@@ -93,9 +131,9 @@ export class ProviderManager {
       abortSignal?: AbortSignal;
     }
   ): Promise<AIResponse> {
-    const providers: ProviderType[] = ['claude', 'kimi'];
+    const providers: ProviderType[] = ['claude', 'kimi', 'mistral'];
     const currentProviderName = this.provider.name as ProviderType;
-    
+
     const orderedProviders = [
       currentProviderName,
       ...providers.filter(p => p !== currentProviderName)
@@ -108,7 +146,7 @@ export class ProviderManager {
         if (providerName !== this.provider.name) {
           console.log(`[ProviderManager] Fallback: switching to ${providerName}`);
           this.switchProvider(providerName);
-          
+
           (global as any).__providerSwitched = {
             from: currentProviderName,
             to: providerName,
@@ -124,7 +162,7 @@ export class ProviderManager {
         });
       } catch (error) {
         lastError = error as Error;
-        
+
         if (this.shouldFallback(lastError)) {
           console.error(`[ProviderManager] Provider ${providerName} failed: ${lastError.message}`);
           continue;
@@ -150,9 +188,9 @@ export class ProviderManager {
       onChunk?: StreamCallback;
     }
   ): Promise<AIResponse> {
-    const providers: ProviderType[] = ['claude', 'kimi'];
+    const providers: ProviderType[] = ['claude', 'kimi', 'mistral'];
     const currentProviderName = this.provider.name as ProviderType;
-    
+
     const orderedProviders = [
       currentProviderName,
       ...providers.filter(p => p !== currentProviderName)

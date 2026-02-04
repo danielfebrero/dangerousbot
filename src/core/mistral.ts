@@ -132,9 +132,9 @@ export class MistralConsultant {
     }
 
     // Construction du prompt
-    const systemPrompt = `Tu es un assistant consulté par DangerousBot, une IA autonome basée sur Claude Opus 4.5.
+    const systemPrompt = `Tu es un assistant consulté par DangerousBot, une IA autonome et évolutive.
 DangerousBot te consulte pour obtenir un second avis, brainstormer, ou déléguer certaines tâches.
-Sois concis, direct et utile. Tu n'es pas le cerveau principal, tu es un conseiller.`;
+Sois concis, direct et utile.`;
 
     const userContent = context 
       ? `Contexte:\n${context}\n\n---\n\nQuestion/Tâche:\n${query}`
@@ -153,7 +153,7 @@ Sois concis, direct et utile. Tu n'es pas le cerveau principal, tu es un conseil
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },
         ],
-        max_tokens: TOKENS.MAX_MISTRAL_RESPONSE,
+        max_tokens: TOKENS.MAX_CONSULT_AI_RESPONSE,
         temperature: 0.7,
       }),
     });

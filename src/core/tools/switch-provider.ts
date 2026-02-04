@@ -8,14 +8,14 @@ import { setActiveProvider, ProviderType } from '../../config';
 
 export const switchProviderDefinition: Tool = {
   name: 'switch_provider',
-  description: 'Change le provider AI actif (Claude ou Kimi). Le changement prend effet immédiatement pour le prochain message.',
+  description: 'Change le provider AI actif (Claude, Kimi ou Mistral). Le changement prend effet immédiatement pour le prochain message.',
   input_schema: {
     type: 'object',
     properties: {
       provider: {
         type: 'string',
         description: 'Le provider à utiliser',
-        enum: ['claude', 'kimi']
+        enum: ['claude', 'kimi', 'mistral']
       }
     },
     required: ['provider']
@@ -29,8 +29,8 @@ export const switchProviderHandler: ToolHandler = {
     const provider = input.provider as ProviderType;
 
     // Valider le provider
-    if (provider !== 'claude' && provider !== 'kimi') {
-      return { success: false, error: `Provider inconnu: ${provider}. Utilise 'claude' ou 'kimi'.` };
+    if (provider !== 'claude' && provider !== 'kimi' && provider !== 'mistral') {
+      return { success: false, error: `Provider inconnu: ${provider}. Utilise 'claude', 'kimi' ou 'mistral'.` };
     }
 
     // Changer le provider dans la config

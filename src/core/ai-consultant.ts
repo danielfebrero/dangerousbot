@@ -164,9 +164,9 @@ class MistralProvider implements AIProvider {
         : `Complexité spécifiée: ${complexity}`;
     }
 
-    const defaultSystemPrompt = `Tu es un assistant consulté par DangerousBot, une IA autonome basée sur Claude Opus 4.5.
+    const defaultSystemPrompt = `Tu es un assistant consulté par DangerousBot, une IA autonome et évolutive.
 DangerousBot te consulte pour obtenir un second avis, brainstormer, ou déléguer certaines tâches.
-Sois concis, direct et utile. Tu n'es pas le cerveau principal, tu es un conseiller.`;
+Sois concis, direct et utile.`;
 
     // Construction des messages
     const messages: MistralMessage[] = [
@@ -197,7 +197,7 @@ Sois concis, direct et utile. Tu n'es pas le cerveau principal, tu es un conseil
       body: JSON.stringify({
         model,
         messages,
-        max_tokens: TOKENS.MAX_MISTRAL_RESPONSE,
+        max_tokens: TOKENS.MAX_CONSULT_AI_RESPONSE,
         temperature: 0.7,
       }),
     });
@@ -263,11 +263,11 @@ class GrokProvider implements AIProvider {
 
   private selectModel(complexity: AIComplexity, query: string): string {
     if (complexity === "low") {
-      return MODELS.GROK_4_1_FAST_NON_REASONING;
+      return MODELS.GROK_NON_REASONING;
     }
     // Pour high, medium, ou auto avec indicateurs de complexité
     if (complexity === "high" || complexity === "medium") {
-      return MODELS.GROK_4_1_FAST_REASONING;
+      return MODELS.GROK_REASONING;
     }
 
     // Auto-détection
@@ -279,10 +279,10 @@ class GrokProvider implements AIProvider {
 
     const hasLowIndicator = lowComplexityIndicators.some(i => queryLower.includes(i));
     if (hasLowIndicator) {
-      return MODELS.GROK_4_1_FAST_NON_REASONING;
+      return MODELS.GROK_NON_REASONING;
     }
 
-    return MODELS.GROK_4_1_FAST_REASONING;
+    return MODELS.GROK_REASONING;
   }
 
   async consult(request: ConsultRequest, history?: ConversationMessage[]): Promise<ConsultResponse> {
@@ -291,9 +291,9 @@ class GrokProvider implements AIProvider {
     const model = this.selectModel(complexity, query);
     const reasoning = `Grok selected: ${model}`;
 
-    const defaultSystemPrompt = `Tu es un assistant consulté par DangerousBot, une IA autonome basée sur Claude Opus 4.5.
+    const defaultSystemPrompt = `Tu es un assistant consulté par DangerousBot, une IA autonome et évolutive.
 DangerousBot te consulte pour obtenir un second avis, brainstormer, ou déléguer certaines tâches.
-Sois concis, direct et utile. Tu n'es pas le cerveau principal, tu es un conseiller.`;
+Sois concis, direct et utile.`;
 
     // Construction des messages
     const messages: GrokMessage[] = [
@@ -324,7 +324,7 @@ Sois concis, direct et utile. Tu n'es pas le cerveau principal, tu es un conseil
       body: JSON.stringify({
         model,
         messages,
-        max_tokens: TOKENS.MAX_MISTRAL_RESPONSE,
+        max_tokens: TOKENS.MAX_CONSULT_AI_RESPONSE,
         temperature: 0.7,
       }),
     });

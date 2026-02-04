@@ -10,10 +10,10 @@ import * as os from 'os';
 // PROVIDER ACTIF (hot-swappable)
 // ============================================================================
 
-export type ProviderType = 'claude' | 'kimi';
+export type ProviderType = 'claude' | 'kimi' | 'mistral';
 
 export const PROVIDER = {
-  /** Provider actif ('claude' ou 'kimi') - modifiable à chaud */
+  /** Provider actif ('claude', 'kimi' ou 'mistral') - modifiable à chaud */
   ACTIVE: 'kimi' as ProviderType,
 } as const;
 
@@ -22,27 +22,37 @@ export const PROVIDER = {
 // ============================================================================
 
 export const MODELS = {
-  /** Modèle principal pour le cerveau (Opus 4.5 = le plus intelligent) */
-  BRAIN: 'claude-opus-4-5-20251101',
-  
-  /** Modèle pour la compression/résumés (Kimi = rapide et économique) */
-  COMPRESSOR: 'kimi-k2.5',
-  
-  /** Modèle pour les embeddings (via OpenRouter) */
+  // --- Modèles Brain (providers principaux) ---
+
+  /** Claude Opus 4.5 (Anthropic) */
+  CLAUDE: 'claude-opus-4-5-20251101',
+
+  /** Kimi K2.5 (Moonshot) */
+  KIMI: 'kimi-k2.5',
+
+  /** Mistral Large (Mistral AI) - utilisable comme brain ou consultation */
+  MISTRAL_LARGE: 'mistral-large-2411',
+
+  // --- Modèles Consultation (second regard) ---
+
+  /** Mistral Medium - brainstorming, validation */
+  MISTRAL_MEDIUM: 'mistral-medium-2505',
+
+  /** Mistral Small - tâches rapides, formatting */
+  MISTRAL_SMALL: 'mistral-small-2503',
+
+  // --- Modèles Grok (xAI) ---
+
+  /** Grok raisonnement avancé */
+  GROK_REASONING: 'grok-4-1-fast-reasoning',
+
+  /** Grok rapide sans raisonnement */
+  GROK_NON_REASONING: 'grok-4-1-fast-non-reasoning',
+
+  // --- Embeddings ---
+
+  /** Embeddings (via OpenRouter) */
   EMBEDDING: 'qwen/qwen3-embedding-8b',
-  
-  /** Modèles Mistral (second regard) */
-  MISTRAL_LARGE: 'mistral-large-2411',      // Complexe: architecture, sécurité, review critique
-  MISTRAL_MEDIUM: 'mistral-medium-2505',    // Équilibré: brainstorming, validation
-  MISTRAL_SMALL: 'mistral-small-2503',      // Rapide: tâches simples, formatting
-  
-  /** Modèles Grok (xAI) */
-  GROK_4_1_FAST_REASONING: 'grok-4-1-fast-reasoning',       // Complexe/moyen: raisonnement avancé
-  GROK_4_1_FAST_NON_REASONING: 'grok-4-1-fast-non-reasoning', // Simple: rapide sans raisonnement
-  
-  /** Modèles Kimi (Moonshot) */
-  KIMI_DEFAULT: 'kimi-k2.5',                // Kimi 2.5 - modèle par défaut
-  KIMI_LONG: 'kimi-k2.5',                   // Kimi 2.5 (supporte jusqu'à 128k)
 } as const;
 
 // ============================================================================
@@ -51,13 +61,13 @@ export const MODELS = {
 
 export const TOKENS = {
   /** Max tokens pour les réponses du brain */
-  MAX_RESPONSE: 8096,
-  
+  MAX_RESPONSE: 32768,
+
   /** Max tokens pour les résumés de compression */
-  MAX_COMPRESSION_SUMMARY: 1024,
-  
-  /** Max tokens pour les réponses Mistral */
-  MAX_MISTRAL_RESPONSE: 2048,
+  MAX_COMPRESSION_SUMMARY: 8096,
+
+  /** Max tokens pour les réponses de consultation IA (Mistral, Grok, etc.) */
+  MAX_CONSULT_AI_RESPONSE: 2048,
 } as const;
 
 // ============================================================================
@@ -69,7 +79,7 @@ export const MEMORY = {
   TOKEN_LIMIT_FOR_COMPRESSION: 128000,
 
   /** Nombre de mémoires pertinentes à récupérer par recherche sémantique */
-  RELEVANT_MEMORIES_TOP_K: 3,
+  RELEVANT_MEMORIES_TOP_K: 8,
 } as const;
 
 // ============================================================================
@@ -248,7 +258,7 @@ export function reloadProviderConfig(): ProviderType {
     const { getMemory } = require('./core/memory');
     const memory = getMemory();
     const savedProvider = memory.getConfig('provider');
-    if (savedProvider && (savedProvider === 'claude' || savedProvider === 'kimi')) {
+    if (savedProvider && (savedProvider === 'claude' || savedProvider === 'kimi' || savedProvider === 'mistral')) {
       (PROVIDER as any).ACTIVE = savedProvider;
       console.log(`[Config] Provider loaded from DB: ${savedProvider}`);
       return savedProvider;

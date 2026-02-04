@@ -89,11 +89,12 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed extension guides (adding t
 
 | Provider | Model | Use Case |
 | -------- | ----- | -------- |
-| Kimi (default) | K2.5 | Primary brain with native web search |
-| Claude | Opus 4.5 | Alternative brain (highest capability) |
-| Mistral | Large/Medium/Small | Consultation (`consult_mistral` tool) |
+| Kimi (default) | K2.5 | Brain with native web search |
+| Claude | Opus 4.5 | Brain |
+| Mistral | Large | Brain / Consultation (`consult_mistral` tool) |
+| Mistral | Medium/Small | Consultation only |
 
-Switch providers at runtime via `switch_provider` tool. Provider choice persists in SQLite.
+No provider is required, but at least one must be configured. Switch providers at runtime via `switch_provider` tool. Provider choice persists in SQLite.
 
 ## Development vs Production
 

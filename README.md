@@ -65,14 +65,16 @@ npm run setup:keys
 npm run setup:keys -- --status
 ```
 
-### Clés nécessaires
+### Clés API
 
-| Clé | Obligatoire | Description |
-|-----|-------------|-------------|
-| **Anthropic** | ✅ Oui | Claude Opus/Sonnet - [console.anthropic.com](https://console.anthropic.com) |
-| OpenRouter | ❌ Non | Embeddings Qwen - [openrouter.ai](https://openrouter.ai) |
-| Mistral | ❌ Non | Second regard / TTS - [console.mistral.ai](https://console.mistral.ai) |
-| Kimi | ❌ Non | Alternative à Claude - [platform.moonshot.ai](https://platform.moonshot.ai) |
+Aucun provider n'est obligatoire, mais **au moins un** doit être configuré pour que le bot fonctionne.
+
+| Clé | Description |
+|-----|-------------|
+| **Anthropic** | Claude Opus/Sonnet - [console.anthropic.com](https://console.anthropic.com) |
+| **Kimi** | Kimi K2.5 (Moonshot) - [platform.moonshot.ai](https://platform.moonshot.ai) |
+| **Mistral** | Mistral Large/Medium/Small - [console.mistral.ai](https://console.mistral.ai) |
+| OpenRouter | Embeddings Qwen (optionnel) - [openrouter.ai](https://openrouter.ai) |
 
 ## 💬 Bot Telegram
 

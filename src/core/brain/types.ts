@@ -16,6 +16,7 @@ export interface BrainConfig {
 export interface ApiKeys {
   anthropic: string;
   kimi?: string;
+  mistral?: string;
   openRouter?: string;
 }
 

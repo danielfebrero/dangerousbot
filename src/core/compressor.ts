@@ -36,7 +36,7 @@ export class MemoryCompressor {
   constructor(kimiApiKey: string) {
     this.kimiProvider = new KimiProvider({
       apiKey: kimiApiKey,
-      model: MODELS.KIMI_DEFAULT,
+      model: MODELS.KIMI,
       maxTokens: TOKENS.MAX_COMPRESSION_SUMMARY
     });
     this.memory = getMemory();
