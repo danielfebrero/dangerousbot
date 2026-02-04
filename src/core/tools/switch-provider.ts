@@ -9,14 +9,14 @@ import { getThreadManager } from '../thread-manager';
 
 export const switchProviderDefinition: Tool = {
   name: 'switch_provider',
-  description: 'Change le provider AI actif (Claude, Kimi ou Mistral). Si appelé dans un thread, le changement est scopé à ce thread uniquement. Sinon, il s\'applique globalement.',
+  description: 'Change le provider AI actif (Claude, Kimi, Mistral ou Grok). Si appelé dans un thread, le changement est scopé à ce thread uniquement. Sinon, il s\'applique globalement.',
   input_schema: {
     type: 'object',
     properties: {
       provider: {
         type: 'string',
         description: 'Le provider à utiliser',
-        enum: ['claude', 'kimi', 'mistral']
+        enum: ['claude', 'kimi', 'mistral', 'grok']
       }
     },
     required: ['provider']
@@ -30,8 +30,8 @@ export const switchProviderHandler: ToolHandler = {
     const provider = input.provider as ProviderType;
 
     // Valider le provider
-    if (provider !== 'claude' && provider !== 'kimi' && provider !== 'mistral') {
-      return { success: false, error: `Provider inconnu: ${provider}. Utilise 'claude', 'kimi' ou 'mistral'.` };
+    if (provider !== 'claude' && provider !== 'kimi' && provider !== 'mistral' && provider !== 'grok') {
+      return { success: false, error: `Provider inconnu: ${provider}. Utilise 'claude', 'kimi', 'mistral' ou 'grok'.` };
     }
 
     if (context.threadId) {

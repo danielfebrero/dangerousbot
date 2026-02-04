@@ -1,16 +1,19 @@
 /**
  * AIConsultant - Service de consultation multi-modèles IA
- * 
+ *
  * Permet de consulter différents modèles IA (Mistral, Grok, etc.) pour:
  * - Obtenir un second avis
  * - Brainstormer
  * - Valider des idées
  * - Déléguer des tâches
- * 
+ *
  * Supporte le multi-turn avec historique de conversation persistant.
+ * Utilise les core providers (src/core/providers/) pour les appels API.
  */
 
-import { config, TOKENS, MODELS, APIS, PATHS } from "../config.js";
+import { TOKENS, MODELS, APIS } from "../config.js";
+import { createProvider } from './providers/index.js';
+import type { AIProvider as CoreAIProvider } from './providers/types.js';
 import Database from 'better-sqlite3';
 import { getDatabase } from '../database/index.js';
 
@@ -60,293 +63,74 @@ export interface ConsultResponse {
 }
 
 // ============================================================================
-// INTERFACES PROVIDERS
+// MODEL SELECTION
 // ============================================================================
 
-interface AIProvider {
-  name: string;
-  consult(request: ConsultRequest, history?: ConversationMessage[]): Promise<ConsultResponse>;
-  isAvailable(): boolean;
-}
-
-// ============================================================================
-// MISTRAL PROVIDER
-// ============================================================================
-
-interface MistralMessage {
-  role: "user" | "assistant" | "system";
-  content: string;
-}
-
-interface MistralResponse {
-  id: string;
-  object: string;
-  created: number;
-  model: string;
-  choices: Array<{
-    index: number;
-    message: MistralMessage;
-    finish_reason: string;
-  }>;
-  usage: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  };
-}
-
-class MistralProvider implements AIProvider {
-  name = "mistral";
-  private baseUrl = "https://api.mistral.ai/v1";
-  private apiKey: string;
-
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
-  }
-
-  isAvailable(): boolean {
-    return !!this.apiKey;
-  }
-
-  private selectModel(complexity: AIComplexity, query: string): string {
-    if (complexity !== "auto") {
-      const modelMap = {
-        low: MODELS.MISTRAL_SMALL,
-        medium: MODELS.MISTRAL_MEDIUM,
-        high: MODELS.MISTRAL_LARGE,
-      };
-      return modelMap[complexity];
-    }
-
-    // Auto-détection basée sur des heuristiques
-    const queryLower = query.toLowerCase();
-    
-    const highComplexityIndicators = [
-      "architecture", "design", "security", "critical", "review",
-      "optimize", "refactor", "complex", "strategy", "decision"
-    ];
-    
-    const lowComplexityIndicators = [
-      "format", "convert", "simple", "quick", "list", "generate data",
-      "json", "example", "template"
-    ];
-
-    const hasHighIndicator = highComplexityIndicators.some(i => queryLower.includes(i));
-    const hasLowIndicator = lowComplexityIndicators.some(i => queryLower.includes(i));
-
-    if (hasHighIndicator && !hasLowIndicator) {
-      return MODELS.MISTRAL_LARGE;
-    } else if (hasLowIndicator && !hasHighIndicator) {
-      return MODELS.MISTRAL_SMALL;
-    }
-    
-    return MODELS.MISTRAL_MEDIUM;
-  }
-
-  async consult(request: ConsultRequest, history?: ConversationMessage[]): Promise<ConsultResponse> {
-    const { query, context, complexity = "auto", forceModelSize, systemPrompt } = request;
-
-    let model: string;
-    let reasoning: string;
-
-    if (forceModelSize) {
-      const modelMap = {
-        large: MODELS.MISTRAL_LARGE,
-        medium: MODELS.MISTRAL_MEDIUM,
-        small: MODELS.MISTRAL_SMALL,
-      };
-      model = modelMap[forceModelSize];
-      reasoning = `Modèle forcé: ${forceModelSize}`;
-    } else {
-      model = this.selectModel(complexity, query);
-      reasoning = complexity === "auto" 
-        ? `Auto-sélection basée sur l'analyse de la requête`
-        : `Complexité spécifiée: ${complexity}`;
-    }
-
-    const defaultSystemPrompt = `Tu es un assistant consulté par DangerousBot, une IA autonome et évolutive.
-DangerousBot te consulte pour obtenir un second avis, brainstormer, ou déléguer certaines tâches.
-Sois concis, direct et utile.`;
-
-    // Construction des messages
-    const messages: MistralMessage[] = [
-      { role: "system", content: systemPrompt || defaultSystemPrompt }
-    ];
-
-    // Ajout de l'historique si présent
-    if (history && history.length > 0) {
-      for (const msg of history) {
-        if (msg.role !== "system") {
-          messages.push({ role: msg.role, content: msg.content });
-        }
-      }
-    }
-
-    const userContent = context 
-      ? `Contexte:\n${context}\n\n---\n\nQuestion/Tâche:\n${query}`
-      : query;
-
-    messages.push({ role: "user", content: userContent });
-
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        max_tokens: TOKENS.MAX_CONSULT_AI_RESPONSE,
-        temperature: 0.7,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Mistral API error: ${response.status} - ${error}`);
-    }
-
-    const data = await response.json() as MistralResponse;
-
-    return {
-      response: data.choices[0].message.content,
-      model: this.name,
-      modelSize: model,
-      reasoning,
-      usage: {
-        input_tokens: data.usage.prompt_tokens,
-        output_tokens: data.usage.completion_tokens,
-      },
+function selectMistralModel(complexity: AIComplexity, query: string, forceModelSize?: string): { model: string; reasoning: string } {
+  if (forceModelSize) {
+    const modelMap: Record<string, string> = {
+      large: MODELS.MISTRAL_LARGE,
+      medium: MODELS.MISTRAL_MEDIUM,
+      small: MODELS.MISTRAL_SMALL,
     };
-  }
-}
-
-// ============================================================================
-// GROK PROVIDER
-// ============================================================================
-
-interface GrokMessage {
-  role: "user" | "assistant" | "system";
-  content: string;
-}
-
-interface GrokResponse {
-  id: string;
-  object: string;
-  created: number;
-  model: string;
-  choices: Array<{
-    index: number;
-    message: GrokMessage;
-    finish_reason: string;
-  }>;
-  usage: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  };
-}
-
-class GrokProvider implements AIProvider {
-  name = "grok";
-  private baseUrl = "https://api.x.ai/v1";
-  private apiKey: string;
-
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
+    return { model: modelMap[forceModelSize] || MODELS.MISTRAL_MEDIUM, reasoning: `Modèle forcé: ${forceModelSize}` };
   }
 
-  isAvailable(): boolean {
-    return !!this.apiKey;
-  }
-
-  private selectModel(complexity: AIComplexity, query: string): string {
-    if (complexity === "low") {
-      return MODELS.GROK_NON_REASONING;
-    }
-    // Pour high, medium, ou auto avec indicateurs de complexité
-    if (complexity === "high" || complexity === "medium") {
-      return MODELS.GROK_REASONING;
-    }
-
-    // Auto-détection
-    const queryLower = query.toLowerCase();
-    const lowComplexityIndicators = [
-      "format", "convert", "simple", "quick", "list", "generate data",
-      "json", "example", "template", "summarize"
-    ];
-
-    const hasLowIndicator = lowComplexityIndicators.some(i => queryLower.includes(i));
-    if (hasLowIndicator) {
-      return MODELS.GROK_NON_REASONING;
-    }
-
-    return MODELS.GROK_REASONING;
-  }
-
-  async consult(request: ConsultRequest, history?: ConversationMessage[]): Promise<ConsultResponse> {
-    const { query, context, complexity = "auto", systemPrompt } = request;
-
-    const model = this.selectModel(complexity, query);
-    const reasoning = `Grok selected: ${model}`;
-
-    const defaultSystemPrompt = `Tu es un assistant consulté par DangerousBot, une IA autonome et évolutive.
-DangerousBot te consulte pour obtenir un second avis, brainstormer, ou déléguer certaines tâches.
-Sois concis, direct et utile.`;
-
-    // Construction des messages
-    const messages: GrokMessage[] = [
-      { role: "system", content: systemPrompt || defaultSystemPrompt }
-    ];
-
-    // Ajout de l'historique si présent
-    if (history && history.length > 0) {
-      for (const msg of history) {
-        if (msg.role !== "system") {
-          messages.push({ role: msg.role, content: msg.content });
-        }
-      }
-    }
-
-    const userContent = context 
-      ? `Contexte:\n${context}\n\n---\n\nQuestion/Tâche:\n${query}`
-      : query;
-
-    messages.push({ role: "user", content: userContent });
-
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        max_tokens: TOKENS.MAX_CONSULT_AI_RESPONSE,
-        temperature: 0.7,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Grok API error: ${response.status} - ${error}`);
-    }
-
-    const data = await response.json() as GrokResponse;
-
-    return {
-      response: data.choices[0].message.content,
-      model: this.name,
-      modelSize: model,
-      reasoning,
-      usage: {
-        input_tokens: data.usage.prompt_tokens,
-        output_tokens: data.usage.completion_tokens,
-      },
+  if (complexity !== "auto") {
+    const modelMap = {
+      low: MODELS.MISTRAL_SMALL,
+      medium: MODELS.MISTRAL_MEDIUM,
+      high: MODELS.MISTRAL_LARGE,
     };
+    return { model: modelMap[complexity], reasoning: `Complexité spécifiée: ${complexity}` };
   }
+
+  // Auto-détection basée sur des heuristiques
+  const queryLower = query.toLowerCase();
+
+  const highComplexityIndicators = [
+    "architecture", "design", "security", "critical", "review",
+    "optimize", "refactor", "complex", "strategy", "decision"
+  ];
+
+  const lowComplexityIndicators = [
+    "format", "convert", "simple", "quick", "list", "generate data",
+    "json", "example", "template"
+  ];
+
+  const hasHighIndicator = highComplexityIndicators.some(i => queryLower.includes(i));
+  const hasLowIndicator = lowComplexityIndicators.some(i => queryLower.includes(i));
+
+  if (hasHighIndicator && !hasLowIndicator) {
+    return { model: MODELS.MISTRAL_LARGE, reasoning: "Auto-sélection: complexité élevée détectée" };
+  } else if (hasLowIndicator && !hasHighIndicator) {
+    return { model: MODELS.MISTRAL_SMALL, reasoning: "Auto-sélection: tâche simple détectée" };
+  }
+
+  return { model: MODELS.MISTRAL_MEDIUM, reasoning: "Auto-sélection: complexité moyenne" };
+}
+
+function selectGrokModel(complexity: AIComplexity, query: string): { model: string; reasoning: string } {
+  if (complexity === "low") {
+    return { model: MODELS.GROK_NON_REASONING, reasoning: "Grok non-reasoning (complexité basse)" };
+  }
+  if (complexity === "high" || complexity === "medium") {
+    return { model: MODELS.GROK_REASONING, reasoning: `Grok reasoning (complexité ${complexity})` };
+  }
+
+  // Auto-détection
+  const queryLower = query.toLowerCase();
+  const lowComplexityIndicators = [
+    "format", "convert", "simple", "quick", "list", "generate data",
+    "json", "example", "template", "summarize"
+  ];
+
+  const hasLowIndicator = lowComplexityIndicators.some(i => queryLower.includes(i));
+  if (hasLowIndicator) {
+    return { model: MODELS.GROK_NON_REASONING, reasoning: "Auto-sélection: tâche simple → non-reasoning" };
+  }
+
+  return { model: MODELS.GROK_REASONING, reasoning: "Auto-sélection: reasoning par défaut" };
 }
 
 // ============================================================================
@@ -364,11 +148,9 @@ class ConversationStore {
 
   private cleanupOldConversations(): void {
     try {
-      // Count conversations
       const countResult = this.db.prepare('SELECT COUNT(*) as count FROM consultant_conversations').get() as { count: number };
 
       if (countResult.count > this.maxConversations) {
-        // Delete oldest conversations beyond the limit
         const toDelete = countResult.count - this.maxConversations;
         this.db.prepare(`
           DELETE FROM consultant_conversations
@@ -442,21 +224,18 @@ class ConversationStore {
 
   save(conversation: Conversation): void {
     try {
-      // Limit messages
       if (conversation.messages.length > this.maxMessagesPerConversation) {
         conversation.messages = conversation.messages.slice(-this.maxMessagesPerConversation);
       }
 
       conversation.updatedAt = Date.now();
 
-      // Update conversation metadata
       this.db.prepare(`
         UPDATE consultant_conversations
         SET updated_at = ?, metadata = ?
         WHERE id = ?
       `).run(conversation.updatedAt, conversation.metadata ? JSON.stringify(conversation.metadata) : null, conversation.id);
 
-      // Delete existing messages and re-insert (simpler than tracking changes)
       this.db.prepare('DELETE FROM consultant_messages WHERE conversation_id = ?').run(conversation.id);
 
       const insertStmt = this.db.prepare(`
@@ -481,10 +260,8 @@ class ConversationStore {
         VALUES (?, ?, ?, ?, ?)
       `).run(conversationId, message.role, message.content, message.model || null, timestamp);
 
-      // Update conversation updated_at
       this.db.prepare('UPDATE consultant_conversations SET updated_at = ? WHERE id = ?').run(timestamp, conversationId);
 
-      // Limit messages per conversation
       const countResult = this.db.prepare('SELECT COUNT(*) as count FROM consultant_messages WHERE conversation_id = ?').get(conversationId) as { count: number };
 
       if (countResult.count > this.maxMessagesPerConversation) {
@@ -542,58 +319,67 @@ class ConversationStore {
 // AI CONSULTANT PRINCIPAL
 // ============================================================================
 
+const DEFAULT_SYSTEM_PROMPT = `Tu es un assistant consulté par DangerousBot, une IA autonome et évolutive.
+DangerousBot te consulte pour obtenir un second avis, brainstormer, ou déléguer certaines tâches.
+Sois concis, direct et utile.`;
+
 export class AIConsultant {
-  private providers: Map<AIModel, AIProvider>;
+  private mistralApiKey: string;
+  private grokApiKey: string;
   private conversationStore: ConversationStore;
 
   constructor(mistralKey?: string, grokKey?: string) {
-    this.providers = new Map();
+    this.mistralApiKey = mistralKey || APIS.MISTRAL_API_KEY;
+    this.grokApiKey = grokKey || APIS.GROK_API_KEY;
     this.conversationStore = new ConversationStore();
-
-    // Initialiser les providers
-    const mistralApiKey = mistralKey || APIS.MISTRAL_API_KEY;
-    const grokApiKey = grokKey || APIS.GROK_API_KEY;
-
-    if (mistralApiKey) {
-      this.providers.set("mistral", new MistralProvider(mistralApiKey));
-    }
-
-    if (grokApiKey) {
-      this.providers.set("grok", new GrokProvider(grokApiKey));
-    }
   }
 
   /**
    * Vérifie si un modèle est disponible
    */
   isAvailable(model: AIModel): boolean {
-    const provider = this.providers.get(model);
-    return provider?.isAvailable() || false;
+    if (model === 'mistral') return !!this.mistralApiKey;
+    if (model === 'grok') return !!this.grokApiKey;
+    return false;
   }
 
   /**
    * Liste les modèles disponibles
    */
   getAvailableModels(): AIModel[] {
-    return Array.from(this.providers.entries())
-      .filter(([_, provider]) => provider.isAvailable())
-      .map(([model, _]) => model);
+    const models: AIModel[] = [];
+    if (this.mistralApiKey) models.push('mistral');
+    if (this.grokApiKey) models.push('grok');
+    return models;
+  }
+
+  /**
+   * Crée un provider via le système core
+   */
+  private createProviderForConsult(model: AIModel, modelString: string): CoreAIProvider {
+    const apiKey = model === 'grok' ? this.grokApiKey : this.mistralApiKey;
+    return createProvider({
+      provider: model,
+      apiKey,
+      model: modelString,
+      maxTokens: TOKENS.MAX_CONSULT_AI_RESPONSE
+    });
   }
 
   /**
    * Consulte un modèle IA avec support multi-turn
    */
   async consult(request: ConsultRequest): Promise<ConsultResponse> {
-    const { model = "mistral", conversationId } = request;
+    const { model = "mistral", conversationId, query, context, complexity = "auto", forceModelSize, systemPrompt } = request;
 
-    const provider = this.providers.get(model);
-    if (!provider) {
+    if (!this.isAvailable(model)) {
       throw new Error(`Modèle '${model}' non disponible. Modèles disponibles: ${this.getAvailableModels().join(', ')}`);
     }
 
-    if (!provider.isAvailable()) {
-      throw new Error(`Le modèle '${model}' n'est pas configuré (clé API manquante)`);
-    }
+    // Sélection du modèle selon la complexité
+    const { model: modelString, reasoning } = model === 'grok'
+      ? selectGrokModel(complexity, query)
+      : selectMistralModel(complexity, query, forceModelSize);
 
     // Gestion de la conversation
     let conversation: Conversation | null = null;
@@ -606,33 +392,66 @@ export class AIConsultant {
       }
     }
 
-    // Si pas de conversation existante, en créer une nouvelle
     if (!conversation) {
-      conversation = this.conversationStore.create(model, { 
-        initialQuery: request.query.substring(0, 100) 
+      conversation = this.conversationStore.create(model, {
+        initialQuery: query.substring(0, 100)
       });
     }
 
     // Ajouter le message utilisateur à l'historique
     this.conversationStore.addMessage(conversation.id, {
       role: "user",
-      content: request.query,
+      content: query,
     });
 
-    // Consulter le modèle
-    const response = await provider.consult(request, history);
+    // Créer le provider via le système core
+    const provider = this.createProviderForConsult(model, modelString);
+
+    // Construire les messages au format AIMessage
+    const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+
+    // Historique
+    if (history && history.length > 0) {
+      for (const msg of history) {
+        if (msg.role !== "system") {
+          messages.push({ role: msg.role, content: msg.content });
+        }
+      }
+    }
+
+    // Message utilisateur
+    const userContent = context
+      ? `Contexte:\n${context}\n\n---\n\nQuestion/Tâche:\n${query}`
+      : query;
+    messages.push({ role: "user", content: userContent });
+
+    // Appel via le core provider
+    const response = await provider.chat(messages, {
+      system: systemPrompt || DEFAULT_SYSTEM_PROMPT,
+      tools: [],
+      maxTokens: TOKENS.MAX_CONSULT_AI_RESPONSE
+    });
+
+    // Extraire le texte de la réponse
+    const responseText = response.content
+      .filter(b => b.type === 'text')
+      .map(b => b.text || '')
+      .join('');
 
     // Ajouter la réponse à l'historique
     this.conversationStore.addMessage(conversation.id, {
       role: "assistant",
-      content: response.response,
-      model: response.model,
+      content: responseText,
+      model,
     });
 
-    // Retourner avec l'ID de conversation
     return {
-      ...response,
+      response: responseText,
+      model,
+      modelSize: modelString,
+      reasoning,
       conversationId: conversation.id,
+      usage: response.usage || { input_tokens: 0, output_tokens: 0 },
     };
   }
 
@@ -669,10 +488,10 @@ export class AIConsultant {
    */
 
   async reviewCode(
-    code: string, 
-    language: string, 
-    options?: { 
-      focus?: string; 
+    code: string,
+    language: string,
+    options?: {
+      focus?: string;
       model?: AIModel;
       conversationId?: string;
     }
@@ -686,8 +505,8 @@ export class AIConsultant {
   }
 
   async brainstorm(
-    topic: string, 
-    options?: { 
+    topic: string,
+    options?: {
       constraints?: string;
       model?: AIModel;
       conversationId?: string;
@@ -702,8 +521,8 @@ export class AIConsultant {
   }
 
   async quickTask(
-    task: string, 
-    options?: { 
+    task: string,
+    options?: {
       model?: AIModel;
       conversationId?: string;
     }
@@ -717,8 +536,8 @@ export class AIConsultant {
   }
 
   async validate(
-    idea: string, 
-    options?: { 
+    idea: string,
+    options?: {
       context?: string;
       model?: AIModel;
       conversationId?: string;

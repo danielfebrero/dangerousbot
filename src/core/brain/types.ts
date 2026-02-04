@@ -17,6 +17,7 @@ export interface ApiKeys {
   anthropic: string;
   kimi?: string;
   mistral?: string;
+  grok?: string;
   openRouter?: string;
 }
 

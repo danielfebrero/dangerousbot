@@ -6,8 +6,9 @@ import { AIProvider, AIProviderConfig } from './types.js';
 import { ClaudeProvider } from './claude.js';
 import { KimiProvider } from './kimi.js';
 import { MistralProvider } from './mistral.js';
+import { GrokProvider } from './grok.js';
 
-export type ProviderType = 'claude' | 'kimi' | 'mistral';
+export type ProviderType = 'claude' | 'kimi' | 'mistral' | 'grok';
 
 export interface ProviderFactoryConfig {
   provider: ProviderType;
@@ -35,7 +36,10 @@ export function createProvider(config: ProviderFactoryConfig): AIProvider {
     
     case 'mistral':
       return new MistralProvider(providerConfig);
-    
+
+    case 'grok':
+      return new GrokProvider(providerConfig);
+
     default:
       throw new Error(`Unknown provider: ${config.provider}`);
   }
@@ -46,4 +50,5 @@ export * from './types.js';
 export { ClaudeProvider } from './claude.js';
 export { KimiProvider } from './kimi.js';
 export { MistralProvider } from './mistral.js';
+export { GrokProvider } from './grok.js';
 export { BaseProvider } from './base-provider.js';

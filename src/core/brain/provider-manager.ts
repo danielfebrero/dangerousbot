@@ -50,18 +50,28 @@ export class ProviderManager {
       console.warn('[ProviderManager] Mistral API key not found, trying fallback');
     }
 
-    if (providerType === 'claude' || providerType === 'kimi' || providerType === 'mistral') {
-      // If requested provider wasn't available, try any available one
-      if (providerType !== 'claude' && this.apiKeys.anthropic) {
-        return this.createProviderByType('claude');
+    if (providerType === 'grok') {
+      const grokKey = this.apiKeys.grok || APIS.GROK_API_KEY;
+      if (grokKey) {
+        return createProvider({
+          provider: 'grok',
+          apiKey: grokKey,
+          model: MODELS.GROK_REASONING,
+          maxTokens: TOKENS.MAX_RESPONSE
+        });
       }
-      if (providerType !== 'kimi') {
-        const kimiKey = this.apiKeys.kimi || APIS.KIMI_API_KEY;
-        if (kimiKey) return this.createProviderByType('kimi');
-      }
-      if (providerType !== 'mistral') {
-        const mistralKey = this.apiKeys.mistral || APIS.MISTRAL_API_KEY;
-        if (mistralKey) return this.createProviderByType('mistral');
+      console.warn('[ProviderManager] Grok API key not found, trying fallback');
+    }
+
+    // If requested provider wasn't available, try any available one
+    const fallbackOrder: ProviderType[] = ['claude', 'kimi', 'mistral', 'grok'];
+    for (const fallback of fallbackOrder) {
+      if (fallback === providerType) continue;
+      try {
+        const key = this.getApiKeyForProvider(fallback);
+        if (key) return this.createProviderByType(fallback);
+      } catch {
+        continue;
       }
     }
 
@@ -72,20 +82,26 @@ export class ProviderManager {
   /**
    * Crée un provider par type
    */
+  private getApiKeyForProvider(type: ProviderType): string {
+    const keyMap: Record<ProviderType, string> = {
+      claude: this.apiKeys.anthropic,
+      kimi: this.apiKeys.kimi || APIS.KIMI_API_KEY,
+      mistral: this.apiKeys.mistral || APIS.MISTRAL_API_KEY,
+      grok: this.apiKeys.grok || APIS.GROK_API_KEY,
+    };
+    return keyMap[type];
+  }
+
   private createProviderByType(type: ProviderType): AIProvider {
     const modelMap: Record<ProviderType, string> = {
       claude: MODELS.CLAUDE,
       kimi: MODELS.KIMI,
       mistral: MODELS.MISTRAL_LARGE,
-    };
-    const keyMap: Record<ProviderType, string> = {
-      claude: this.apiKeys.anthropic,
-      kimi: this.apiKeys.kimi || APIS.KIMI_API_KEY,
-      mistral: this.apiKeys.mistral || APIS.MISTRAL_API_KEY,
+      grok: MODELS.GROK_REASONING,
     };
     return createProvider({
       provider: type,
-      apiKey: keyMap[type],
+      apiKey: this.getApiKeyForProvider(type),
       model: modelMap[type],
       maxTokens: TOKENS.MAX_RESPONSE
     });
@@ -143,6 +159,14 @@ export class ProviderManager {
   }
 
   /**
+   * Définit la clé API Grok
+   */
+  setGrokApiKey(apiKey: string): void {
+    this.apiKeys.grok = apiKey;
+    this.providerCache.delete('grok');
+  }
+
+  /**
    * Chat avec fallback automatique entre providers
    */
   async chatWithFallback(
@@ -155,7 +179,7 @@ export class ProviderManager {
       preferredProvider?: ProviderType;
     }
   ): Promise<AIResponse> {
-    const providers: ProviderType[] = ['claude', 'kimi', 'mistral'];
+    const providers: ProviderType[] = ['claude', 'kimi', 'mistral', 'grok'];
     const primaryProvider = options.preferredProvider || this.provider.name as ProviderType;
 
     const orderedProviders = [
@@ -213,7 +237,7 @@ export class ProviderManager {
       preferredProvider?: ProviderType;
     }
   ): Promise<AIResponse> {
-    const providers: ProviderType[] = ['claude', 'kimi', 'mistral'];
+    const providers: ProviderType[] = ['claude', 'kimi', 'mistral', 'grok'];
     const primaryProvider = options.preferredProvider || this.provider.name as ProviderType;
 
     const orderedProviders = [

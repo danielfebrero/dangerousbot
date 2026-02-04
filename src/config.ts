@@ -10,10 +10,10 @@ import * as os from 'os';
 // PROVIDER ACTIF (hot-swappable)
 // ============================================================================
 
-export type ProviderType = 'claude' | 'kimi' | 'mistral';
+export type ProviderType = 'claude' | 'kimi' | 'mistral' | 'grok';
 
 export const PROVIDER = {
-  /** Provider actif ('claude', 'kimi' ou 'mistral') - modifiable à chaud */
+  /** Provider actif ('claude', 'kimi', 'mistral' ou 'grok') - modifiable à chaud */
   ACTIVE: 'kimi' as ProviderType,
 } as const;
 
@@ -182,6 +182,9 @@ export const APIS = {
   
   /** URL de l'API Mistral */
   MISTRAL_BASE_URL: 'https://api.mistral.ai/v1',
+
+  /** URL de l'API Grok (xAI) */
+  GROK_BASE_URL: 'https://api.x.ai/v1',
   
   /** Clé API Mistral (chargée au runtime) */
   MISTRAL_API_KEY: '' as string,
@@ -258,7 +261,7 @@ export function reloadProviderConfig(): ProviderType {
     const { getMemory } = require('./core/memory');
     const memory = getMemory();
     const savedProvider = memory.getConfig('provider');
-    if (savedProvider && (savedProvider === 'claude' || savedProvider === 'kimi' || savedProvider === 'mistral')) {
+    if (savedProvider && (savedProvider === 'claude' || savedProvider === 'kimi' || savedProvider === 'mistral' || savedProvider === 'grok')) {
       (PROVIDER as any).ACTIVE = savedProvider;
       console.log(`[Config] Provider loaded from DB: ${savedProvider}`);
       return savedProvider;
