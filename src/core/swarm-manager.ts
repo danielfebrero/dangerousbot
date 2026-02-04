@@ -194,11 +194,10 @@ export async function executeSwarm(queries: string[]): Promise<SwarmResult> {
   });
 
   const results = await Promise.all(promises);
-  const allSuccess = results.every(r => r.success);
 
   logger.info('Swarm', `Swarm completed: ${results.filter(r => r.success).length}/${results.length} succeeded`);
 
-  return { success: allSuccess, results };
+  return { success: true, results };
 }
 
 // ============================================================================

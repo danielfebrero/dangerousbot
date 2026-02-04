@@ -166,12 +166,17 @@ export class WebSocketManager {
                 
                 const abortController = this.createAbortController(client.clientId);
                 
-                await this.messageHandler(text, client.threadId, {
-                  images,
-                  abortSignal: abortController.signal,
-                  clientId: client.clientId,
-                  ws,
-                });
+                try {
+                  await this.messageHandler(text, client.threadId, {
+                    images,
+                    abortSignal: abortController.signal,
+                    clientId: client.clientId,
+                    ws,
+                  });
+                } finally {
+                  // Nettoyer l'abortController après traitement (succès ou erreur)
+                  this.abortControllers.delete(client.clientId);
+                }
               }
               break;
             }
