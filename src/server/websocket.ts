@@ -616,29 +616,25 @@ export class WebSocketManager {
         mistral: null,
         aiConsultant: null,
         rollbackManager,
+        threadId,
+        source: 'webapp' as const
       };
       
       const result = await selfUpdateHandler.execute({ reason, force: true }, context);
       
       if (result.success && result.needsRestart) {
-        // Programmer le redémarrage
-        const fs = await import('fs');
-        const path = await import('path');
-        const restartFile = path.join(process.cwd(), '.restart');
-        fs.writeFileSync(restartFile, JSON.stringify({
-          reason,
-          timestamp: new Date().toISOString()
-        }));
+        // Le fichier .restart est déjà écrit par selfUpdateHandler
+        // avec threadId, source et les bonnes informations
         
         // Stocker le flag pour le serveur
-        (global as any).__pendingRestart = { reason };
+        (global as any).__pendingRestart = { reason, threadId, source: 'webapp' };
         
         // Envoyer le signal de redémarrage à tous les clients
         this.sendRestartSignal(reason);
         
-        // Redémarrer après un délai
+        // Redémarrer après un délai (le fichier .restart est déjà créé par self_update)
         setTimeout(() => {
-          lifecycle.restart(reason);
+          process.exit(0);
         }, 2000);
       }
       

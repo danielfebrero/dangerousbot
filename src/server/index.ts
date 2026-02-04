@@ -359,7 +359,10 @@ export class DangerousBotServer {
                 block.name,
                 toolInput as ToolInput,
                 signal,
-                { threadId }  // Passer le threadId au contexte des tools
+                { 
+                  threadId,
+                  source: 'webapp' as const
+                }  // Passer le threadId et la source au contexte des tools
               );
             } catch (toolError) {
               const errorMessage = (toolError as Error).message || 'Tool execution failed';
