@@ -73,6 +73,23 @@ export class Versioning {
     }
   }
 
+  // Mettre à jour la version dans README.md
+  private updateReadme(newVersion: string): void {
+    const readmePath = path.join(this.projectRoot, 'README.md');
+    try {
+      if (!fs.existsSync(readmePath)) return;
+      let content = fs.readFileSync(readmePath, 'utf-8');
+      // Match shields.io version badge: ![Version](https://img.shields.io/badge/version-X.X.X-blue)
+      const versionBadgeRegex = /(!\[Version\]\(https:\/\/img\.shields\.io\/badge\/version-)[^-]+(-.+?\))/;
+      if (versionBadgeRegex.test(content)) {
+        content = content.replace(versionBadgeRegex, `$1${newVersion}$2`);
+        fs.writeFileSync(readmePath, content);
+      }
+    } catch (e) {
+      console.warn('[Versioning] Could not update README.md version:', e);
+    }
+  }
+
   // Vérifier si git est initialisé
   async isGitRepo(): Promise<boolean> {
     const result = await this.gitCommand('rev-parse --is-inside-work-tree');
@@ -131,7 +148,10 @@ dist/
     // Mettre à jour package.json avec la nouvelle version
     this.updatePackageJson(newVersion);
 
-    // Re-stage après la mise à jour de package.json
+    // Mettre à jour README.md avec la nouvelle version
+    this.updateReadme(newVersion);
+
+    // Re-stage après la mise à jour de package.json et README.md
     await this.gitCommand('add -A');
 
     // Créer le commit
