@@ -379,6 +379,12 @@ Le projet suit une architecture modulaire :
 
 Voir [ARCHITECTURE.md](./ARCHITECTURE.md) pour plus de détails.
 
+## Related
+
+This repository is DangerousBot. Its plugins stay here.
+Read Entireum's own catalog there. Not these skills.
+Everything App for Agents. https://entireum.com/
+
 ## 📝 Licence
 
 Projet personnel - Usage privé uniquement.
